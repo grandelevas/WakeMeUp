@@ -2,7 +2,7 @@ name: WakeMeUp
 options:
   bundleIdPrefix: com.grandelevas
   deploymentTarget:
-    iOS: "26.0"
+    iOS: "26.1"
   developmentLanguage: en
   knownRegions:
     - en
@@ -35,7 +35,7 @@ targets:
   WakeMeUp:
     type: application
     platform: iOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "26.1"
     sources:
       - path: WakeMeUp
         excludes:
@@ -65,7 +65,7 @@ targets:
   WakeMeUpWidget:
     type: app-extension
     platform: iOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "26.1"
     sources:
       - path: WakeMeUpWidget
         excludes:
@@ -81,7 +81,7 @@ targets:
   WakeMeUpTests:
     type: bundle.unit-test
     platform: iOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "26.1"
     sources:
       - path: WakeMeUpTests
     settings:

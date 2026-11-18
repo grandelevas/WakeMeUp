@@ -97,7 +97,7 @@ final class AppModel {
         await reschedule(requestAccess: false)
         if let handoff = LaunchHandoff.consume() {
             ringingAlarmID = handoff.alarmID
-            UIApplication.shared.open(handoff.songURL)
+            await UIApplication.shared.open(handoff.songURL)
         }
         Task { await refreshRemote() }
         await coordinator.observeAlerting { [weak self] id in
@@ -352,7 +352,7 @@ final class AppModel {
         guard let link = alarm.songLink else { return }
         await coordinator.stop(id: alarm.id)
         ringingAlarmID = nil
-        UIApplication.shared.open(link.url)
+        await UIApplication.shared.open(link.url)
     }
 
     func handle(url: URL) {
@@ -382,7 +382,7 @@ final class AppModel {
             if let alarmID { ringingAlarmID = alarmID }
             if let song = info["song"] as? String, let url = URL(string: song) {
                 await coordinator.stop(id: alarmID ?? UUID())
-                UIApplication.shared.open(url)
+                await UIApplication.shared.open(url)
             }
         case NotificationAction.snooze:
             if let alarmID, let alarm = snapshot.library.alarm(alarmID) {

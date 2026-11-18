@@ -180,7 +180,7 @@ If bootstrap fails while enabling iCloud or App Groups, create those records in 
 
 ## iOS behavior worth knowing
 
-- Minimum system is **iOS 26**. That is the first release with AlarmKit. Supporting iOS 18 would mean those phones can only use notifications, which do not ring through Silent. The notification path is still in the app, but only as the fallback when AlarmKit access is denied.
+- Minimum system is **iOS 26.1**. AlarmKit arrived in iOS 26.0, and the alert API this app uses (a system Stop button plus one secondary button) is the iOS 26.1 form. Supporting iOS 18 would mean those phones can only use notifications, which do not ring through Silent. The notification path is still in the app, but only as the fallback when AlarmKit access is denied.
 - A third-party app cannot become the system Clock and cannot start Spotify, YouTube, or Apple Music while the phone is locked unless the person taps a button. The button is the product.
 - Custom alert sounds should stay at or under 30 seconds. Import enforces that. The bundled tones are about 12 seconds, 22.05 kHz, 16-bit mono WAV.
 - Force-quitting WakeMeUp does not delete AlarmKit alarms that are already scheduled. It does stop the silent push that delivers a new remote alarm.

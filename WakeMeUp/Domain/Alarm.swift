@@ -72,7 +72,8 @@ struct Alarm: Codable, Equatable, Hashable, Identifiable {
 
     var sortMinute: Int {
         switch schedule {
-        case let .wallClock(hour, minute, _): hour * 60 + minute
+        case let .wallClock(hour, minute, _):
+            return hour * 60 + minute
         case let .oneShot(fireAt):
             let calendar = Calendar.current
             return calendar.component(.hour, from: fireAt) * 60 + calendar.component(.minute, from: fireAt)
