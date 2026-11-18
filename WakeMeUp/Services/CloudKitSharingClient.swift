@@ -66,7 +66,9 @@ final class CloudKitSharingClient {
         try await requireAccount()
         let metadata = try await container.shareMetadata(for: url)
         _ = try await container.accept([metadata])
-        let rootID = metadata.hierarchicalRootRecordID
+        guard let rootID = metadata.hierarchicalRootRecordID else {
+            throw RemoteBackendError.missingRoot
+        }
         let root = try await container.sharedCloudDatabase.record(for: rootID)
         guard var grant = readGrant(from: root) else { throw RemoteBackendError.missingRoot }
         grant.grantee = grantee
