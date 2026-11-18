@@ -72,13 +72,12 @@ struct AlarmListView: View {
             if !ungrouped.isEmpty {
                 section(groupID: nil, title: String(localized: "alarms.otherGroup"), symbol: "alarm", group: nil, alarms: ungrouped)
             }
-        }
-        .safeAreaInset(edge: .bottom) {
             if let next = nextAlarmDescription {
-                Text("\(String(localized: "alarms.next")) · \(next)")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 8)
+                Section("alarms.next") {
+                    Text(next)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
