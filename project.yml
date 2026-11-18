@@ -1,0 +1,107 @@
+name: WakeMeUp
+options:
+  bundleIdPrefix: com.grandelevas
+  deploymentTarget:
+    iOS: "26.1"
+  developmentLanguage: en
+  knownRegions:
+    - en
+    - pl
+    - Base
+  createIntermediateGroups: true
+  groupSortPosition: top
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    SUPPORTS_MACCATALYST: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+  configs:
+    Debug:
+      CODE_SIGN_STYLE: Manual
+      CODE_SIGN_IDENTITY: "-"
+      CODE_SIGNING_ALLOWED: YES
+      CODE_SIGNING_REQUIRED: NO
+      ENABLE_DEBUG_DYLIB: NO
+      ENABLE_TESTABILITY: YES
+    Release:
+      CODE_SIGN_STYLE: Manual
+      CODE_SIGN_IDENTITY: "Apple Distribution"
+      ENABLE_DEBUG_DYLIB: NO
+targets:
+  WakeMeUp:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.1"
+    sources:
+      - path: WakeMeUp
+        excludes:
+          - Info.plist
+      - path: Shared
+    postBuildScripts:
+      - name: Copy alarm sounds to bundle root
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          DEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+          mkdir -p "${DEST}"
+          cp "${SRCROOT}/WakeMeUp/Sounds/"*.wav "${DEST}/"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.grandelevas.wakemeup
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: WakeMeUp/Info.plist
+        PRODUCT_NAME: WakeMeUp
+        ENABLE_PREVIEWS: YES
+      configs:
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Config/Release.entitlements
+    dependencies:
+      - target: WakeMeUpWidget
+        embed: true
+  WakeMeUpWidget:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "26.1"
+    sources:
+      - path: WakeMeUpWidget
+        excludes:
+          - Info.plist
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.grandelevas.wakemeup.widget
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: WakeMeUpWidget/Info.plist
+        PRODUCT_NAME: WakeMeUpWidget
+        SKIP_INSTALL: YES
+  WakeMeUpTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.1"
+    sources:
+      - path: WakeMeUpTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.grandelevas.wakemeup.tests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: WakeMeUp
+schemes:
+  WakeMeUp:
+    build:
+      targets:
+        WakeMeUp: all
+        WakeMeUpWidget: all
+        WakeMeUpTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - WakeMeUpTests
+    archive:
+      config: Release

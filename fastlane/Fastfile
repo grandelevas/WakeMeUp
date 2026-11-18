@@ -1,0 +1,136 @@
+default_platform(:ios)
+
+def bundle_id
+  ENV.fetch("BUNDLE_ID", "com.grandelevas.wakemeup")
+end
+
+def widget_id
+  "#{bundle_id}.widget"
+end
+
+def asc_key
+  app_store_connect_api_key(
+    key_id: ENV.fetch("ASC_KEY_ID"),
+    issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+    key_filepath: "signing/AuthKey.p8",
+    duration: 1200,
+    in_house: false
+  )
+end
+
+platform :ios do
+  desc "Create the App ID, distribution certificate, and App Store profiles on the runner"
+  lane :bootstrap_signing do
+    key = asc_key
+    setup_ci
+    # produce is idempotent when the app already exists.
+    produce(
+      api_key: key,
+      app_identifier: bundle_id,
+      app_name: "WakeMeUp",
+      language: "en-US",
+      sku: bundle_id.gsub(".", "-"),
+      skip_itc: false,
+      enable_services: {
+        push_notification: "on",
+        icloud: "cloudkit",
+        app_group: "on"
+      }
+    )
+    produce(
+      api_key: key,
+      app_identifier: widget_id,
+      app_name: "WakeMeUp Widget",
+      language: "en-US",
+      sku: "#{bundle_id.gsub(".", "-")}-widget",
+      skip_itc: true
+    )
+    cert(
+      api_key: key,
+      development: false,
+      force: false,
+      output_path: "signing-out",
+      p12_password: ENV.fetch("DISTRIBUTION_CERTIFICATE_PASSWORD")
+    )
+    sigh(
+      api_key: key,
+      app_identifier: bundle_id,
+      force: true,
+      output_path: "signing-out"
+    )
+    sigh(
+      api_key: key,
+      app_identifier: widget_id,
+      force: true,
+      output_path: "signing-out"
+    )
+    UI.important("Download the signing-out artifact. Add the .p12 as DISTRIBUTION_CERTIFICATE_P12_BASE64 and its password as DISTRIBUTION_CERTIFICATE_PASSWORD. Do not commit the files.")
+  end
+
+  desc "Archive a Release build and upload it to TestFlight"
+  lane :beta do
+    key = asc_key
+    setup_ci
+    import_certificate(
+      certificate_path: "signing/distribution.p12",
+      certificate_password: ENV.fetch("DISTRIBUTION_CERTIFICATE_PASSWORD"),
+      keychain_name: "fastlane_tmp_keychain",
+      keychain_password: "ci"
+    )
+    sigh(
+      api_key: key,
+      app_identifier: bundle_id,
+      force: false,
+      output_path: "signing-out",
+      filename: "app.mobileprovision"
+    )
+    app_profile_name = lane_context[SharedValues::SIGH_NAME]
+    sigh(
+      api_key: key,
+      app_identifier: widget_id,
+      force: false,
+      output_path: "signing-out",
+      filename: "widget.mobileprovision"
+    )
+    widget_profile_name = lane_context[SharedValues::SIGH_NAME]
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "WakeMeUp.xcodeproj",
+      team_id: ENV.fetch("APPLE_TEAM_ID"),
+      code_sign_identity: "Apple Distribution",
+      targets: ["WakeMeUp"],
+      profile_name: app_profile_name,
+      build_configurations: ["Release"]
+    )
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "WakeMeUp.xcodeproj",
+      team_id: ENV.fetch("APPLE_TEAM_ID"),
+      code_sign_identity: "Apple Distribution",
+      targets: ["WakeMeUpWidget"],
+      profile_name: widget_profile_name,
+      build_configurations: ["Release"]
+    )
+    build_app(
+      project: "WakeMeUp.xcodeproj",
+      scheme: "WakeMeUp",
+      configuration: "Release",
+      export_method: "app-store",
+      export_team_id: ENV.fetch("APPLE_TEAM_ID"),
+      export_options: {
+        signingStyle: "manual",
+        teamID: ENV.fetch("APPLE_TEAM_ID"),
+        provisioningProfiles: {
+          bundle_id => app_profile_name,
+          widget_id => widget_profile_name
+        }
+      },
+      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch("APPLE_TEAM_ID")} CODE_SIGN_STYLE=Manual"
+    )
+    upload_to_testflight(
+      api_key: key,
+      skip_waiting_for_build_processing: true,
+      distribute_external: false
+    )
+  end
+end

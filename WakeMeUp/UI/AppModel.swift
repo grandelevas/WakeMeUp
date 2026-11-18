@@ -1,0 +1,433 @@
+import Foundation
+import Observation
+import UIKit
+import UserNotifications
+
+enum AppTab: Hashable {
+    case alarms
+    case sharing
+}
+
+@MainActor
+enum AppRuntime {
+    static var model: AppModel?
+}
+
+@MainActor
+@Observable
+final class AppModel {
+    private(set) var snapshot: LibrarySnapshot
+    var editor: AlarmDraft?
+    var ringingAlarmID: UUID?
+    var showGroups = false
+    var selectedTab: AppTab = .alarms
+    var authorization: AlarmAccessState = .unknown
+    var notificationAllowed = false
+    var lastError: String?
+    var shareURL: URL?
+    var pastedInvite = ""
+    var friendDraftName = ""
+    var remoteLabel = ""
+    var remoteHour = 7
+    var remoteMinute = 0
+    let suppressPermissionBanner: Bool
+
+    private let store: LibraryStore
+    private let coordinator: AlarmCoordinator
+    private let cloudKit: CloudKitSharingClient?
+    private var started = false
+
+    var library: AlarmLibrary { snapshot.library }
+    var usesCloudKit: Bool { cloudKit != nil }
+    var profile: Participant { snapshot.profile }
+    var simulatedFriend: Participant? { snapshot.simulatedFriend }
+    var grants: [ShareGrant] { snapshot.permissions.grants }
+    var customSounds: [CustomSound] { snapshot.customSounds }
+
+    var ringingAlarm: Alarm? {
+        guard let ringingAlarmID else { return nil }
+        return snapshot.library.alarm(ringingAlarmID)
+    }
+
+    init(store: LibraryStore? = nil, cloudKit explicitCloudKit: CloudKitSharingClient? = nil, screenshot: Bool? = nil) {
+        let store = store ?? LibraryStore(url: LibraryStore.applicationSupportURL())
+        self.store = store
+        let screenshot = screenshot ?? LaunchConfiguration.seedDemo
+        suppressPermissionBanner = screenshot
+        let loaded = store.load() ?? LibrarySnapshot.empty(
+            profile: Participant(id: UUID(), displayName: "")
+        )
+        snapshot = screenshot ? DemoData.make() : loaded
+        coordinator = AlarmCoordinator()
+        if let explicitCloudKit {
+            cloudKit = explicitCloudKit
+        } else if AppConfig.usesCloudKit && !screenshot {
+            cloudKit = CloudKitSharingClient(containerID: AppConfig.cloudKitContainerID)
+        } else {
+            cloudKit = nil
+        }
+        AppRuntime.model = self
+        friendDraftName = String(localized: "demo.friend")
+        remoteLabel = String(localized: "demo.morning")
+        switch LaunchConfiguration.screen {
+        case .editor:
+            editor = snapshot.library.alarms.first.map { AlarmDraft(alarm: $0) } ?? .makeNew()
+        case .groups:
+            showGroups = true
+        case .sharing:
+            selectedTab = .sharing
+        case .ringing:
+            ringingAlarmID = snapshot.library.alarms.first?.id
+        case .alarms:
+            break
+        }
+    }
+
+    static func preview() -> AppModel {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("wakemeup-preview.json")
+        return AppModel(store: LibraryStore(url: url), cloudKit: nil, screenshot: true)
+    }
+
+    func start() async {
+        guard !started else { return }
+        started = true
+        guard !suppressPermissionBanner else { return }
+        authorization = coordinator.accessState()
+        notificationAllowed = await coordinator.notificationStatus() == .authorized
+        await reschedule(requestAccess: false)
+        if let handoff = LaunchHandoff.consume() {
+            ringingAlarmID = handoff.alarmID
+            await UIApplication.shared.open(handoff.songURL)
+        }
+        Task { await refreshRemote() }
+        await coordinator.observeAlerting { [weak self] id in
+            self?.ringingAlarmID = id
+        }
+    }
+
+    func allowAlarms() async {
+        authorization = await coordinator.requestAccess()
+        notificationAllowed = await coordinator.notificationStatus() == .authorized
+        await reschedule(requestAccess: false)
+    }
+
+    func addAlarm() {
+        editor = .makeNew()
+    }
+
+    func edit(_ alarm: Alarm) {
+        editor = AlarmDraft(alarm: alarm)
+    }
+
+    func save(draft: AlarmDraft) {
+        guard let alarm = draft.makeAlarm() else {
+            lastError = String(localized: "song.invalid")
+            return
+        }
+        update { $0.library.upsert(alarm) }
+        editor = nil
+        Task { await reschedule(requestAccess: true) }
+    }
+
+    func delete(alarmID: UUID) {
+        update { $0.library.delete(id: alarmID) }
+        Task { await reschedule(requestAccess: false) }
+    }
+
+    func toggle(alarmID: UUID) {
+        guard let alarm = snapshot.library.alarm(alarmID) else { return }
+        update { $0.library.setEnabled(!alarm.isEnabled, alarmID: alarmID) }
+        Task { await reschedule(requestAccess: true) }
+    }
+
+    func toggle(groupID: UUID) {
+        guard let group = snapshot.library.group(groupID) else { return }
+        update { $0.library.setGroupEnabled(!group.isEnabled, groupID: groupID) }
+        Task { await reschedule(requestAccess: true) }
+    }
+
+    func createGroup(name: String, symbol: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        update { _ = $0.library.addGroup(name: trimmed, symbol: symbol) }
+    }
+
+    func deleteGroup(id: UUID) {
+        update { $0.library.deleteGroup(id: id) }
+        Task { await reschedule(requestAccess: false) }
+    }
+
+    func rename(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        update { $0.profile.displayName = trimmed }
+    }
+
+    func importSound(source: URL, window: TrimWindow, name: String) async -> String? {
+        let accessing = source.startAccessingSecurityScopedResource()
+        defer { if accessing { source.stopAccessingSecurityScopedResource() } }
+        do {
+            let directory = try SoundFiles.librarySoundsDirectory()
+            let id = UUID().uuidString
+            let destination = directory.appendingPathComponent("\(id).caf")
+            try await AudioTrimmer.trim(source: source, window: window, destination: destination)
+            let sound = CustomSound(id: id, displayName: name, filename: "\(id).caf")
+            update { $0.customSounds.append(sound) }
+            return id
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
+    }
+
+    func addSimulatedFriend() {
+        let name = friendDraftName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        let friend = Participant(id: UUID(), displayName: name)
+        update { snapshot in
+            snapshot.simulatedFriend = friend
+            let invite = snapshot.permissions.createInvite(
+                owner: snapshot.profile,
+                now: .now,
+                code: InviteCode.make(),
+                secret: UUID().uuidString
+            )
+            _ = try? snapshot.permissions.accept(code: invite.inviteCode, grantee: friend, now: .now)
+        }
+    }
+
+    func ringFromSimulatedFriend(immediately: Bool) {
+        guard let friend = snapshot.simulatedFriend else { return }
+        do {
+            let grant = try snapshot.permissions.authorize(sender: friend.id, recipient: snapshot.profile.id)
+            let alarm = Alarm(
+                id: UUID(),
+                schedule: immediately
+                    ? .oneShot(fireAt: Date().addingTimeInterval(3))
+                    : .wallClock(hour: remoteHour, minute: remoteMinute, repeatDays: []),
+                label: remoteLabel.trimmingCharacters(in: .whitespacesAndNewlines),
+                soundID: SoundCatalog.defaultID,
+                snoozeEnabled: true,
+                snoozeMinutes: 9,
+                isEnabled: true,
+                groupID: nil,
+                songLink: nil,
+                origin: .local,
+                resumeWhenGroupEnables: nil
+            )
+            let command = RemoteAlarmCommand(
+                id: UUID(),
+                grantID: grant.id,
+                senderID: friend.id,
+                recipientID: snapshot.profile.id,
+                action: immediately ? .triggerNow : .upsert,
+                createdAt: .now,
+                alarm: alarm,
+                alarmID: alarm.id,
+                enabled: true
+            )
+            var library = snapshot.library
+            try RemoteCommandApplier.apply(command: command, grant: grant, library: &library)
+            update { $0.library = library }
+            Task { await reschedule(requestAccess: true) }
+        } catch {
+            lastError = String(localized: "error.generic")
+        }
+    }
+
+    func createCloudInvite() async {
+        guard let cloudKit else {
+            lastError = RemoteBackendError.notConfigured.errorDescription
+            return
+        }
+        let pending = updateInvite()
+        do {
+            let shared = try await cloudKit.createShare(for: pending)
+            update { $0.permissions.replace(shared) }
+            shareURL = URL(string: shared.inviteCode)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func acceptPastedInvite() async {
+        guard let cloudKit else {
+            lastError = RemoteBackendError.notConfigured.errorDescription
+            return
+        }
+        guard let url = URL(string: pastedInvite.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+        do {
+            let grant = try await cloudKit.accept(url: url, grantee: snapshot.profile)
+            update { $0.permissions.replace(grant) }
+            pastedInvite = ""
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func refreshRemote() async {
+        guard let cloudKit else { return }
+        let grants = snapshot.permissions.grants.filter { $0.cloudKitRootRecordName != nil && $0.state != .revoked }
+        for grant in grants {
+            let asOwner = grant.owner.id == snapshot.profile.id
+            guard let (updated, commands) = try? await cloudKit.refresh(grant, asOwner: asOwner) else { continue }
+            var library = snapshot.library
+            var applied = snapshot.appliedCommandIDs
+            for command in commands where !applied.contains(command.id) {
+                if updated.state == .active {
+                    try? RemoteCommandApplier.apply(command: command, grant: updated, library: &library)
+                }
+                applied.append(command.id)
+            }
+            update {
+                $0.permissions.replace(updated)
+                $0.library = library
+                $0.appliedCommandIDs = applied
+            }
+        }
+        await reschedule(requestAccess: false)
+    }
+
+    func revoke(grantID: UUID) async {
+        guard let existing = snapshot.permissions.grant(id: grantID) else { return }
+        var revoked: ShareGrant?
+        update { snapshot in
+            revoked = try? snapshot.permissions.revoke(grantID: grantID, by: snapshot.profile.id)
+        }
+        guard let revoked, let cloudKit, existing.cloudKitRootRecordName != nil, existing.owner.id == snapshot.profile.id else {
+            return
+        }
+        try? await cloudKit.revoke(revoked)
+    }
+
+    func sendToPhone(grantID: UUID, immediately: Bool) async {
+        guard let grant = snapshot.permissions.grant(id: grantID), let cloudKit else { return }
+        let alarm = Alarm(
+            id: UUID(),
+            schedule: immediately
+                ? .oneShot(fireAt: Date().addingTimeInterval(3))
+                : .wallClock(hour: remoteHour, minute: remoteMinute, repeatDays: []),
+            label: remoteLabel,
+            soundID: SoundCatalog.defaultID,
+            snoozeEnabled: true,
+            snoozeMinutes: 9,
+            isEnabled: true,
+            groupID: nil,
+            songLink: nil,
+            origin: .local,
+            resumeWhenGroupEnables: nil
+        )
+        let command = RemoteAlarmCommand(
+            id: UUID(),
+            grantID: grant.id,
+            senderID: snapshot.profile.id,
+            recipientID: grant.owner.id,
+            action: immediately ? .triggerNow : .upsert,
+            createdAt: .now,
+            alarm: alarm,
+            alarmID: alarm.id,
+            enabled: true
+        )
+        do {
+            _ = try snapshot.permissions.authorize(sender: snapshot.profile.id, recipient: grant.owner.id)
+            try await cloudKit.append(command: command, grant: grant, asOwner: false)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func stopRinging() async {
+        guard let id = ringingAlarmID else { return }
+        await coordinator.stop(id: id)
+        ringingAlarmID = nil
+    }
+
+    func snoozeRinging() async {
+        guard let alarm = ringingAlarm else { return }
+        await coordinator.snooze(alarm, customSounds: snapshot.customSounds)
+        ringingAlarmID = nil
+    }
+
+    func playSong(of alarm: Alarm) async {
+        guard let link = alarm.songLink else { return }
+        await coordinator.stop(id: alarm.id)
+        ringingAlarmID = nil
+        await UIApplication.shared.open(link.url)
+    }
+
+    func handle(url: URL) {
+        guard url.scheme?.lowercased() == "wakemeup" else {
+            if SongLink.parse(url.absoluteString) != nil {
+                UIApplication.shared.open(url)
+            }
+            return
+        }
+        if let id = UUID(uuidString: url.lastPathComponent) {
+            ringingAlarmID = id
+        }
+        if let song = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "song" })?
+            .value,
+           let songURL = URL(string: song) {
+            UIApplication.shared.open(songURL)
+        }
+    }
+
+    func handleNotification(_ response: UNNotificationResponse) async {
+        let info = response.notification.request.content.userInfo
+        let alarmID = (info["alarmID"] as? String).flatMap(UUID.init(uuidString:))
+        switch response.actionIdentifier {
+        case NotificationAction.playSong:
+            if let alarmID { ringingAlarmID = alarmID }
+            if let song = info["song"] as? String, let url = URL(string: song) {
+                await coordinator.stop(id: alarmID ?? UUID())
+                await UIApplication.shared.open(url)
+            }
+        case NotificationAction.snooze:
+            if let alarmID, let alarm = snapshot.library.alarm(alarmID) {
+                await coordinator.snooze(alarm, customSounds: snapshot.customSounds)
+            }
+        case NotificationAction.stop, UNNotificationDismissActionIdentifier:
+            if let alarmID { await coordinator.stop(id: alarmID) }
+        default:
+            if let alarmID { ringingAlarmID = alarmID }
+        }
+    }
+
+    func dismissRinging() {
+        ringingAlarmID = nil
+    }
+
+    private func reschedule(requestAccess: Bool) async {
+        guard !suppressPermissionBanner else { return }
+        if requestAccess {
+            authorization = await coordinator.requestAccess()
+        } else {
+            authorization = coordinator.accessState()
+        }
+        await coordinator.sync(alarms: snapshot.library.alarms, customSounds: snapshot.customSounds)
+    }
+
+    private func update(_ body: (inout LibrarySnapshot) -> Void) {
+        var copy = snapshot
+        body(&copy)
+        snapshot = copy
+        if !suppressPermissionBanner {
+            store.save(copy)
+        }
+    }
+
+    private func updateInvite() -> ShareGrant {
+        var created: ShareGrant?
+        update { snapshot in
+            created = snapshot.permissions.createInvite(
+                owner: snapshot.profile,
+                now: .now,
+                code: InviteCode.make(),
+                secret: UUID().uuidString
+            )
+        }
+        return created ?? snapshot.permissions.grants.last!
+    }
+}
