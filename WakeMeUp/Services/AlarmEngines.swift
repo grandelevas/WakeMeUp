@@ -5,6 +5,9 @@ import Foundation
 import SwiftUI
 import UserNotifications
 
+/// Our model is also named `Alarm`, so AlarmKit's type has to be qualified.
+private typealias SystemAlarm = AlarmKit.Alarm
+
 enum AlarmAccessState: Equatable {
     case unknown
     case notDetermined
@@ -126,8 +129,8 @@ final class AlarmKitEngine {
         )
         let soundName = SoundFiles.alarmKitName(for: alarm.soundID, customSounds: customSounds)
         let sound: AlertConfiguration.AlertSound = soundName.isEmpty ? .default : .named(soundName)
-        let countdown: Alarm.CountdownDuration? = alarm.snoozeEnabled
-            ? Alarm.CountdownDuration(preAlert: nil, postAlert: TimeInterval(alarm.snoozeMinutes * 60))
+        let countdown: SystemAlarm.CountdownDuration? = alarm.snoozeEnabled
+            ? SystemAlarm.CountdownDuration(preAlert: nil, postAlert: TimeInterval(alarm.snoozeMinutes * 60))
             : nil
         let intent: (any LiveActivityIntent)? = {
             guard let link = alarm.songLink else { return nil }
@@ -143,11 +146,11 @@ final class AlarmKitEngine {
         )
     }
 
-    private func systemSchedule(for alarm: Alarm) -> Alarm.Schedule {
+    private func systemSchedule(for alarm: Alarm) -> SystemAlarm.Schedule {
         switch alarm.schedule {
         case let .wallClock(hour, minute, days):
             let weekdays = days.map(\.localeWeekday)
-            let repeats: Alarm.Schedule.Relative.Recurrence = weekdays.isEmpty ? .never : .weekly(weekdays)
+            let repeats: SystemAlarm.Schedule.Relative.Recurrence = weekdays.isEmpty ? .never : .weekly(weekdays)
             return .relative(.init(time: .init(hour: hour, minute: minute), repeats: repeats))
         case let .oneShot(fireAt):
             return .fixed(fireAt)

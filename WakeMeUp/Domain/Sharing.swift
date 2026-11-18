@@ -36,7 +36,7 @@ enum PermissionError: Error, Equatable {
     case grantNotFound
 }
 
-struct PermissionCenter: Equatable {
+struct PermissionCenter: Codable, Equatable {
     var grants: [ShareGrant] = []
 
     func grant(id: UUID) -> ShareGrant? {
