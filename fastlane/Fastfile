@@ -14,6 +14,31 @@ def team_id
   ENV.fetch("APPLE_TEAM_ID")
 end
 
+# setup_ci in fastlane 2.242 has no keychain_password option. It always creates
+# this keychain with an empty password and records that in MATCH_KEYCHAIN_PASSWORD.
+CI_KEYCHAIN_NAME = "fastlane_tmp_keychain"
+CI_KEYCHAIN_PASSWORD = ""
+
+def prepare_ci_keychain
+  setup_ci(
+    force: true,
+    keychain_name: CI_KEYCHAIN_NAME
+  )
+end
+
+def ci_keychain_path
+  candidates = [
+    File.expand_path("~/Library/Keychains/#{CI_KEYCHAIN_NAME}-db"),
+    File.expand_path("~/Library/Keychains/#{CI_KEYCHAIN_NAME}.keychain-db"),
+    File.expand_path("~/Library/Keychains/#{CI_KEYCHAIN_NAME}")
+  ]
+  found = candidates.find { |path| File.exist?(path) }
+  unless found
+    UI.user_error!("setup_ci did not create #{CI_KEYCHAIN_NAME}. Tried #{candidates.join(', ')}")
+  end
+  found
+end
+
 # produce cannot take an API key in fastlane 2.242 (that support was rolled back).
 # cert, sigh, and upload_to_testflight can. The App Store Connect app record is
 # created through Spaceship, which uses the same key.
@@ -113,7 +138,7 @@ platform :ios do
   desc "Check the portal, create the App Store record, then the distribution certificate and profiles"
   lane :bootstrap_signing do
     key = asc_key
-    setup_ci(keychain_name: "fastlane_tmp_keychain", keychain_password: "ci")
+    prepare_ci_keychain
 
     # Everything above cert can fail without using a certificate slot.
     require_portal_bundle_ids!
@@ -124,7 +149,9 @@ platform :ios do
       development: false,
       force: false,
       team_id: team_id,
-      output_path: "signing-out"
+      output_path: "signing-out",
+      keychain_path: ci_keychain_path,
+      keychain_password: CI_KEYCHAIN_PASSWORD
     )
     export_distribution_p12("signing-out")
 
@@ -145,12 +172,12 @@ platform :ios do
   desc "Archive a Release build and upload it to TestFlight"
   lane :beta do
     key = asc_key
-    setup_ci(keychain_name: "fastlane_tmp_keychain", keychain_password: "ci")
+    prepare_ci_keychain
     import_certificate(
       certificate_path: "signing/distribution.p12",
       certificate_password: ENV.fetch("DISTRIBUTION_CERTIFICATE_PASSWORD"),
-      keychain_name: "fastlane_tmp_keychain",
-      keychain_password: "ci"
+      keychain_path: ci_keychain_path,
+      keychain_password: CI_KEYCHAIN_PASSWORD
     )
     sigh(
       api_key: key,
