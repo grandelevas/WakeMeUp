@@ -1,0 +1,114 @@
+name: TestFlight
+
+# Stays red on purpose until the Apple Developer secrets in the README exist.
+# Run it by hand, or push a v* tag after those secrets are set.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: bootstrap-signing creates a distribution certificate. upload-testflight ships a build.
+        type: choice
+        options:
+          - upload-testflight
+          - bootstrap-signing
+        default: upload-testflight
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  preflight:
+    name: Check Apple secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the App Store Connect API key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          DISTRIBUTION_CERTIFICATE_P12_BASE64: ${{ secrets.DISTRIBUTION_CERTIFICATE_P12_BASE64 }}
+          DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          ACTION: ${{ github.event_name == 'workflow_dispatch' && inputs.action || 'upload-testflight' }}
+        run: |
+          set -euo pipefail
+          missing=0
+          require() {
+            local name="$1"
+            local value="$2"
+            if [ -z "${value}" ]; then
+              echo "::error::Missing GitHub secret ${name}. See README.md, App Store release."
+              missing=1
+            fi
+          }
+          require ASC_KEY_ID "${ASC_KEY_ID}"
+          require ASC_ISSUER_ID "${ASC_ISSUER_ID}"
+          require ASC_PRIVATE_KEY "${ASC_PRIVATE_KEY}"
+          require APPLE_TEAM_ID "${APPLE_TEAM_ID}"
+          require DISTRIBUTION_CERTIFICATE_PASSWORD "${DISTRIBUTION_CERTIFICATE_PASSWORD}"
+          if [ "${ACTION}" = "upload-testflight" ]; then
+            require DISTRIBUTION_CERTIFICATE_P12_BASE64 "${DISTRIBUTION_CERTIFICATE_P12_BASE64}"
+          fi
+          exit "${missing}"
+
+  sign-and-upload:
+    name: Sign and upload
+    needs: preflight
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      BUNDLE_ID: ${{ vars.BUNDLE_ID }}
+      DISTRIBUTION_CERTIFICATE_P12_BASE64: ${{ secrets.DISTRIBUTION_CERTIFICATE_P12_BASE64 }}
+      DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.DISTRIBUTION_CERTIFICATE_PASSWORD }}
+      ACTION: ${{ github.event_name == 'workflow_dispatch' && inputs.action || 'upload-testflight' }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          if [ -d /Applications/Xcode_26.6.app ]; then
+            sudo xcode-select -s /Applications/Xcode_26.6.app
+          elif [ -d /Applications/Xcode_26.5.app ]; then
+            sudo xcode-select -s /Applications/Xcode_26.5.app
+          fi
+          xcodebuild -version
+
+      - name: Install XcodeGen and Fastlane
+        run: |
+          brew install xcodegen
+          gem install fastlane --no-document
+
+      - name: Generate the Xcode project
+        run: xcodegen generate
+
+      - name: Write the API key
+        run: |
+          set -euo pipefail
+          mkdir -p signing
+          printf '%s' "${ASC_PRIVATE_KEY}" > signing/AuthKey.p8
+          if [ -n "${DISTRIBUTION_CERTIFICATE_P12_BASE64}" ]; then
+            printf '%s' "${DISTRIBUTION_CERTIFICATE_P12_BASE64}" | base64 --decode > signing/distribution.p12
+          fi
+
+      - name: Bootstrap signing or upload
+        run: |
+          set -euo pipefail
+          if [ "${ACTION}" = "bootstrap-signing" ]; then
+            fastlane ios bootstrap_signing
+          else
+            fastlane ios beta
+          fi
+
+      - name: Upload signing material
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'bootstrap-signing' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: signing-bootstrap
+          path: signing-out
+          if-no-files-found: error

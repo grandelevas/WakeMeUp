@@ -1,0 +1,150 @@
+import AVFoundation
+import Foundation
+
+enum AudioTrimError: Error, Equatable {
+    case unreadable
+    case noAudioTrack
+    case exportFailed
+    case invalidWindow
+}
+
+enum AudioTrimmer {
+    static func duration(of url: URL) throws -> TimeInterval {
+        let file = try AVAudioFile(forReading: url)
+        let rate = file.processingFormat.sampleRate
+        guard rate > 0 else { throw AudioTrimError.unreadable }
+        return Double(file.length) / rate
+    }
+
+    static func trim(source: URL, window: TrimWindow, destination: URL) async throws {
+        let ext = source.pathExtension.lowercased()
+        if ["wav", "caf", "aiff", "aif"].contains(ext) {
+            try trimPCM(source: source, window: window, destination: destination)
+            return
+        }
+        try await trimCompressed(source: source, window: window, destination: destination)
+    }
+
+    static func trimPCM(source: URL, window: TrimWindow, destination: URL) throws {
+        let input = try AVAudioFile(forReading: source)
+        let format = input.processingFormat
+        let rate = format.sampleRate
+        guard rate > 0 else { throw AudioTrimError.unreadable }
+        let assetDuration = Double(input.length) / rate
+        guard let window = window.clamped(to: assetDuration) else { throw AudioTrimError.invalidWindow }
+        let frames = AVAudioFrameCount(((window.end - window.start) * rate).rounded(.down))
+        guard frames > 0, let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames) else {
+            throw AudioTrimError.exportFailed
+        }
+        input.framePosition = AVAudioFramePosition((window.start * rate).rounded(.down))
+        try input.read(into: buffer, frameCount: frames)
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        let outputSettings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: rate,
+            AVNumberOfChannelsKey: Int(format.channelCount),
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false,
+        ]
+        let output = try AVAudioFile(
+            forWriting: destination,
+            settings: outputSettings,
+            commonFormat: .pcmFormatInt16,
+            interleaved: true
+        )
+        guard let converted = convert(buffer, to: output.processingFormat) else {
+            throw AudioTrimError.exportFailed
+        }
+        try output.write(from: converted)
+    }
+
+    private static func convert(_ buffer: AVAudioPCMBuffer, to format: AVAudioFormat) -> AVAudioPCMBuffer? {
+        if buffer.format == format { return buffer }
+        guard let converter = AVAudioConverter(from: buffer.format, to: format) else { return nil }
+        let ratio = format.sampleRate / buffer.format.sampleRate
+        let capacity = AVAudioFrameCount(max(1, (ratio * Double(buffer.frameLength)).rounded(.up)))
+        guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return nil }
+        var consumed = false
+        var error: NSError?
+        let status = converter.convert(to: output, error: &error) { _, statusOut in
+            if consumed {
+                statusOut.pointee = .endOfStream
+                return nil
+            }
+            consumed = true
+            statusOut.pointee = .haveData
+            return buffer
+        }
+        guard status != .error, error == nil else { return nil }
+        return output
+    }
+
+    /// Imports MP3 and other compressed files as 16-bit mono CAF in `Library/Sounds`.
+    private static func trimCompressed(source: URL, window: TrimWindow, destination: URL) async throws {
+        let asset = AVURLAsset(url: source)
+        let duration = try await asset.load(.duration)
+        let seconds = duration.seconds
+        guard let window = window.clamped(to: seconds) else { throw AudioTrimError.invalidWindow }
+        let tracks = try await asset.loadTracks(withMediaType: .audio)
+        guard let track = tracks.first else { throw AudioTrimError.noAudioTrack }
+        let reader = try AVAssetReader(asset: asset)
+        let start = CMTime(seconds: window.start, preferredTimescale: 44_100)
+        let length = CMTime(seconds: window.duration, preferredTimescale: 44_100)
+        reader.timeRange = CMTimeRange(start: start, duration: length)
+        let outputSettings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: 44_100,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false,
+        ]
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: outputSettings)
+        output.alwaysCopiesSampleData = false
+        guard reader.canAdd(output) else { throw AudioTrimError.exportFailed }
+        reader.add(output)
+        guard reader.startReading() else { throw AudioTrimError.exportFailed }
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        guard let format = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 44_100, channels: 1, interleaved: true) else {
+            throw AudioTrimError.exportFailed
+        }
+        let file = try AVAudioFile(forWriting: destination, settings: format.settings, commonFormat: .pcmFormatInt16, interleaved: true)
+        while let sample = output.copyNextSampleBuffer() {
+            if let buffer = pcmBuffer(from: sample, format: format) {
+                try file.write(from: buffer)
+            }
+        }
+        if reader.status == .failed { throw AudioTrimError.exportFailed }
+    }
+
+    private static func pcmBuffer(from sampleBuffer: CMSampleBuffer, format: AVAudioFormat) -> AVAudioPCMBuffer? {
+        guard let block = CMSampleBufferGetDataBuffer(sampleBuffer) else { return nil }
+        var length = 0
+        var dataPointer: UnsafeMutablePointer<Int8>?
+        let status = CMBlockBufferGetDataPointer(
+            block,
+            atOffset: 0,
+            lengthAtOffsetOut: nil,
+            totalLengthOut: &length,
+            dataPointerOut: &dataPointer
+        )
+        guard status == kCMBlockBufferNoErr, let dataPointer, length > 0 else { return nil }
+        let bytesPerFrame = Int(format.streamDescription.pointee.mBytesPerFrame)
+        guard bytesPerFrame > 0 else { return nil }
+        let frameCount = AVAudioFrameCount(length / bytesPerFrame)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else { return nil }
+        buffer.frameLength = frameCount
+        guard let destination = buffer.int16ChannelData?.pointee else { return nil }
+        dataPointer.withMemoryRebound(to: Int16.self, capacity: Int(frameCount)) { source in
+            destination.update(from: source, count: Int(frameCount))
+        }
+        return buffer
+    }
+}
