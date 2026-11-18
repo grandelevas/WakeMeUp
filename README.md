@@ -139,25 +139,28 @@ Never commit the `.p8`, the `.p12`, or a provisioning profile. `.gitignore` alre
 
 In [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources):
 
-1. Register the app id and the widget app id (the bootstrap lane calls `produce`, which can do this).
-2. Create an iCloud container `iCloud.<bundle id>` and enable CloudKit on it.
-3. Create an App Group `group.<bundle id>`.
-4. On the app id, enable Push Notifications, iCloud (CloudKit, that container), and App Groups (that group).
-5. On the widget id, no extra capability is required.
+1. Register the app id `com.grandelevas.wakemeup` and the widget app id `com.grandelevas.wakemeup.widget`. The bootstrap lane does not create these. `produce` cannot authenticate with an API key in fastlane 2.242.
+2. Create an iCloud container `iCloud.<bundle id>` and an App Group `group.<bundle id>`.
+3. On the app id, enable Push Notifications, iCloud (CloudKit, that container), and App Groups (that group). The container and the group have to be checked on the app id, not only created.
+4. On the widget id, no extra capability is required.
 
 There is nothing to enable for AlarmKit. If a form or an old note mentions `com.apple.developer.alarmkit`, ignore it. That entitlement does not exist, and putting it in the file makes device signing fail.
 
+The App Store Connect app record (the entry under Apps, not the App ID) is created by the bootstrap lane through the API. If the name WakeMeUp is already taken, the lane stops before creating a certificate and tells you to add the record yourself: Apps → + → New App, iOS, bundle ID `com.grandelevas.wakemeup`, SKU `wakemeup-ios`. Do not make an App Store record for the widget.
+
 ### 5. Bootstrap the certificate, then upload
 
-Actions → **TestFlight** → Run workflow.
+Actions → **TestFlight** → Run workflow. Branch `main`. Action **bootstrap-signing** (not the default upload).
 
-1. Choose **bootstrap-signing**. This creates an Apple Distribution certificate and App Store profiles on the runner, and uploads a `signing-bootstrap` artifact containing the `.p12`. Download it, base64-encode the p12 (`base64 -i distribution.p12` on any machine, or a browser tool you trust), and store it as `DISTRIBUTION_CERTIFICATE_P12_BASE64`. The password is the one you already saved.
-2. Run the workflow again with **upload-testflight**. Fastlane imports the p12, downloads the profiles, archives Release, and uploads to TestFlight. The build will not appear for your testers until App Store Connect finishes processing. The lane does not wait.
-3. Later uploads can also be started by pushing a tag `v1.0.1`. Do not push a tag until the secrets exist. The workflow fails the preflight job with the name of each missing secret.
+The lane checks the two bundle IDs, creates the App Store Connect app record if it is missing, and only then creates one Apple Distribution certificate. It wraps that key in `distribution.p12` using `DISTRIBUTION_CERTIFICATE_PASSWORD`. Profiles are created after the p12. If profiles fail, the workflow still uploads the `signing-bootstrap` artifact. Encode **distribution.p12** only. Do not run bootstrap again once that file exists.
 
-`fastlane/Fastfile` is the whole lane. It uses the App Store Connect API key, `cert`, `sigh`, and `upload_to_testflight`. It does not use match and it does not need a second git repo.
+1. After a successful bootstrap, download `signing-bootstrap`, base64-encode `distribution.p12`, and store it as `DISTRIBUTION_CERTIFICATE_P12_BASE64`. On iPhone, Shortcuts → Select File (the p12) → Base64 Encode (No Line Breaks, if shown) → Copy to Clipboard, then paste into the GitHub secret. Clear the clipboard afterward. Do not paste the file into chat.
+2. Run the workflow again with **upload-testflight**. Fastlane imports the p12, downloads the profiles, archives Release, and uploads to TestFlight. The build will not appear for testers until App Store Connect finishes processing. The lane does not wait.
+3. Later uploads can also be started by pushing a tag `v1.0.1`. Do not push a tag until the p12 secret exists. The workflow fails the preflight job with the name of each missing secret.
 
-If bootstrap fails while enabling iCloud or App Groups, create those records in the portal (step 4) and run it again. Apple only allows a few distribution certificates per team. Do not run bootstrap over and over.
+`fastlane/Fastfile` is the whole lane. It uses the App Store Connect API key with `cert`, `sigh`, and `upload_to_testflight`. It does not call `produce`. It does not use match and it does not need a second git repo.
+
+Apple only allows a few distribution certificates per team. Do not run bootstrap twice. If the run fails before it says it created a certificate, it is safe to fix the cause and run bootstrap once more. If `distribution.p12` was uploaded, stop and store that secret instead.
 
 ### 6. App Store Connect metadata
 
