@@ -82,7 +82,9 @@ jobs:
       - name: Install XcodeGen and Fastlane
         run: |
           brew install xcodegen
-          gem install fastlane --no-document
+          gem install bundler --no-document
+          bundle config set --local path vendor/bundle
+          bundle install
 
       - name: Generate the Xcode project
         run: xcodegen generate
@@ -100,15 +102,17 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${ACTION}" = "bootstrap-signing" ]; then
-            fastlane ios bootstrap_signing
+            bundle exec fastlane ios bootstrap_signing
           else
-            fastlane ios beta
+            bundle exec fastlane ios beta
           fi
 
+      # Upload even when profile creation fails after the certificate exists,
+      # so the private key is not left only on the runner.
       - name: Upload signing material
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'bootstrap-signing' }}
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.action == 'bootstrap-signing' }}
         uses: actions/upload-artifact@v4
         with:
           name: signing-bootstrap
           path: signing-out
-          if-no-files-found: error
+          if-no-files-found: ignore

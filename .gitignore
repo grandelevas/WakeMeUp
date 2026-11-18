@@ -10,9 +10,10 @@ build/
 *.dSYM
 *.dSYM.zip
 
-# Swift Package Manager
+# Swift Package Manager / Bundler
 .build/
 .swiftpm/
+vendor/bundle/
 
 # macOS
 .DS_Store

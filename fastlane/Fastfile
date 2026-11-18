@@ -1,5 +1,7 @@
 default_platform(:ios)
 
+require "openssl"
+
 def bundle_id
   ENV.fetch("BUNDLE_ID", "com.grandelevas.wakemeup")
 end
@@ -8,6 +10,13 @@ def widget_id
   "#{bundle_id}.widget"
 end
 
+def team_id
+  ENV.fetch("APPLE_TEAM_ID")
+end
+
+# produce cannot take an API key in fastlane 2.242 (that support was rolled back).
+# cert, sigh, and upload_to_testflight can. The App Store Connect app record is
+# created through Spaceship, which uses the same key.
 def asc_key
   app_store_connect_api_key(
     key_id: ENV.fetch("ASC_KEY_ID"),
@@ -18,59 +27,125 @@ def asc_key
   )
 end
 
+def require_portal_bundle_ids!
+  [bundle_id, widget_id].each do |identifier|
+    found = Spaceship::ConnectAPI::BundleId.find(identifier)
+    next if found
+
+    UI.user_error!(<<~MSG)
+      Bundle ID #{identifier} is not registered on the developer team.
+      On iPhone, Safari → developer.apple.com/account/resources/identifiers → App IDs → +.
+      Register #{identifier} before rerunning bootstrap-signing.
+      No certificate was created.
+    MSG
+  end
+end
+
+def ensure_app_store_record!
+  if Spaceship::ConnectAPI::App.find(bundle_id)
+    UI.success("App Store Connect already has #{bundle_id}")
+    return
+  end
+
+  UI.message("Creating the App Store Connect app record for #{bundle_id}")
+  begin
+    Spaceship::ConnectAPI::App.create(
+      name: "WakeMeUp",
+      version_string: "1.0",
+      sku: "wakemeup-ios",
+      primary_locale: "en-US",
+      bundle_id: bundle_id,
+      platforms: ["IOS"]
+    )
+  rescue StandardError => error
+    UI.user_error!(<<~MSG)
+      Could not create the App Store Connect app record: #{error.message}
+      Create it yourself, then rerun bootstrap-signing. No certificate was created.
+      iPhone: App Store Connect → Apps → the + button → New App.
+      Platform iOS, name WakeMeUp (pick another name if that one is taken),
+      primary language English (U.S.), bundle ID #{bundle_id}, SKU wakemeup-ios.
+      Do not create an App Store record for the widget.
+    MSG
+  end
+end
+
+# fastlane cert writes the private key to a file ending in .p12, but the bytes
+# are a PEM key, not a PKCS#12 archive. import_certificate needs a real p12
+# encrypted with DISTRIBUTION_CERTIFICATE_PASSWORD. Build that here, in process,
+# so the password is not passed on a command line.
+def export_distribution_p12(output_dir)
+  password = ENV.fetch("DISTRIBUTION_CERTIFICATE_PASSWORD")
+  UI.user_error!("DISTRIBUTION_CERTIFICATE_PASSWORD is empty") if password.empty?
+
+  certificate_path = Dir.glob(File.join(output_dir, "*.cer")).max_by { |path| File.mtime(path) }
+  key_path = Dir.glob(File.join(output_dir, "*.p12")).max_by { |path| File.mtime(path) }
+  unless certificate_path && key_path
+    UI.user_error!("cert did not leave a certificate and private key in #{output_dir}")
+  end
+
+  key = OpenSSL::PKey.read(File.binread(key_path))
+  certificate = OpenSSL::X509::Certificate.new(File.binread(certificate_path))
+  archive = OpenSSL::PKCS12.create(password, "WakeMeUp Distribution", key, certificate)
+  destination = File.join(output_dir, "distribution.p12")
+  File.binwrite(destination, archive.to_der)
+  File.chmod(0o600, destination)
+  File.delete(key_path) unless File.expand_path(key_path) == File.expand_path(destination)
+  File.write(
+    File.join(output_dir, "README.txt"),
+    "Encode distribution.p12 only, with the DISTRIBUTION_CERTIFICATE_PASSWORD already stored in GitHub. Do not paste the file into chat.\n"
+  )
+  UI.success("Wrote signing-out/distribution.p12")
+end
+
+def create_app_store_profile(key, identifier, filename)
+  sigh(
+    api_key: key,
+    app_identifier: identifier,
+    team_id: team_id,
+    platform: "ios",
+    force: true,
+    output_path: "signing-out",
+    filename: filename
+  )
+end
+
 platform :ios do
-  desc "Create the App ID, distribution certificate, and App Store profiles on the runner"
+  desc "Check the portal, create the App Store record, then the distribution certificate and profiles"
   lane :bootstrap_signing do
     key = asc_key
-    setup_ci
-    # produce is idempotent when the app already exists.
-    produce(
-      api_key: key,
-      app_identifier: bundle_id,
-      app_name: "WakeMeUp",
-      language: "en-US",
-      sku: bundle_id.gsub(".", "-"),
-      skip_itc: false,
-      enable_services: {
-        push_notification: "on",
-        icloud: "cloudkit",
-        app_group: "on"
-      }
-    )
-    produce(
-      api_key: key,
-      app_identifier: widget_id,
-      app_name: "WakeMeUp Widget",
-      language: "en-US",
-      sku: "#{bundle_id.gsub(".", "-")}-widget",
-      skip_itc: true
-    )
+    setup_ci(keychain_name: "fastlane_tmp_keychain", keychain_password: "ci")
+
+    # Everything above cert can fail without using a certificate slot.
+    require_portal_bundle_ids!
+    ensure_app_store_record!
+
     cert(
       api_key: key,
       development: false,
       force: false,
-      output_path: "signing-out",
-      p12_password: ENV.fetch("DISTRIBUTION_CERTIFICATE_PASSWORD")
-    )
-    sigh(
-      api_key: key,
-      app_identifier: bundle_id,
-      force: true,
+      team_id: team_id,
       output_path: "signing-out"
     )
-    sigh(
-      api_key: key,
-      app_identifier: widget_id,
-      force: true,
-      output_path: "signing-out"
-    )
-    UI.important("Download the signing-out artifact. Add the .p12 as DISTRIBUTION_CERTIFICATE_P12_BASE64 and its password as DISTRIBUTION_CERTIFICATE_PASSWORD. Do not commit the files.")
+    export_distribution_p12("signing-out")
+
+    # Profiles are replaceable. If they fail, distribution.p12 is already on disk
+    # and the workflow uploads signing-out even when this lane exits non-zero.
+    begin
+      create_app_store_profile(key, bundle_id, "app.mobileprovision")
+      create_app_store_profile(key, widget_id, "widget.mobileprovision")
+    rescue StandardError => error
+      UI.error("Profiles were not created (#{error.message}).")
+      UI.error("distribution.p12 is in the signing-bootstrap artifact. Do not run bootstrap-signing again.")
+      raise
+    end
+
+    UI.success("Bootstrap finished. Download signing-bootstrap and encode distribution.p12 only.")
   end
 
   desc "Archive a Release build and upload it to TestFlight"
   lane :beta do
     key = asc_key
-    setup_ci
+    setup_ci(keychain_name: "fastlane_tmp_keychain", keychain_password: "ci")
     import_certificate(
       certificate_path: "signing/distribution.p12",
       certificate_password: ENV.fetch("DISTRIBUTION_CERTIFICATE_PASSWORD"),
@@ -80,6 +155,8 @@ platform :ios do
     sigh(
       api_key: key,
       app_identifier: bundle_id,
+      team_id: team_id,
+      platform: "ios",
       force: false,
       output_path: "signing-out",
       filename: "app.mobileprovision"
@@ -88,6 +165,8 @@ platform :ios do
     sigh(
       api_key: key,
       app_identifier: widget_id,
+      team_id: team_id,
+      platform: "ios",
       force: false,
       output_path: "signing-out",
       filename: "widget.mobileprovision"
@@ -96,7 +175,7 @@ platform :ios do
     update_code_signing_settings(
       use_automatic_signing: false,
       path: "WakeMeUp.xcodeproj",
-      team_id: ENV.fetch("APPLE_TEAM_ID"),
+      team_id: team_id,
       code_sign_identity: "Apple Distribution",
       targets: ["WakeMeUp"],
       profile_name: app_profile_name,
@@ -105,7 +184,7 @@ platform :ios do
     update_code_signing_settings(
       use_automatic_signing: false,
       path: "WakeMeUp.xcodeproj",
-      team_id: ENV.fetch("APPLE_TEAM_ID"),
+      team_id: team_id,
       code_sign_identity: "Apple Distribution",
       targets: ["WakeMeUpWidget"],
       profile_name: widget_profile_name,
@@ -116,16 +195,16 @@ platform :ios do
       scheme: "WakeMeUp",
       configuration: "Release",
       export_method: "app-store",
-      export_team_id: ENV.fetch("APPLE_TEAM_ID"),
+      export_team_id: team_id,
       export_options: {
         signingStyle: "manual",
-        teamID: ENV.fetch("APPLE_TEAM_ID"),
+        teamID: team_id,
         provisioningProfiles: {
           bundle_id => app_profile_name,
           widget_id => widget_profile_name
         }
       },
-      xcargs: "DEVELOPMENT_TEAM=#{ENV.fetch("APPLE_TEAM_ID")} CODE_SIGN_STYLE=Manual"
+      xcargs: "DEVELOPMENT_TEAM=#{team_id} CODE_SIGN_STYLE=Manual"
     )
     upload_to_testflight(
       api_key: key,
