@@ -13,7 +13,7 @@ build/
 # Swift Package Manager / Bundler
 .build/
 .swiftpm/
-vendor/bundle/
+vendor/
 
 # macOS
 .DS_Store

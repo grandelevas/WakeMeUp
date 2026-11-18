@@ -9,6 +9,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  fastlane-options:
+    name: Check fastlane 2.242 options
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+      - name: Reject unknown fastlane options
+        run: bundle exec ruby scripts/check-fastlane-options.rb
+
   build-and-test:
     name: Build and test (iOS Simulator)
     runs-on: macos-26
