@@ -9,12 +9,15 @@ struct WakeMeUpApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = AppModel()
     @State private var appearance = AppearanceSettings.load()
+    @State private var subscriptions = SubscriptionManager()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
+                .environment(subscriptions)
                 .environment(appearance)
+                .task { await subscriptions.start() }
                 .environment(\.appAccent, appearance.accent.color)
                 .tint(appearance.accent.color)
                 .preferredColorScheme(appearance.theme.colorScheme)

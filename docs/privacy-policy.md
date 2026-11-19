@@ -20,6 +20,10 @@ Remote alarms are optional. When CloudKit is configured and you accept an invite
 
 You can revoke a person at any time. Revoking stops new commands. It does not delete alarms that were already created.
 
+## Subscription
+
+Wakito is sold as an annual auto-renewable subscription through Apple. Apple processes the payment. Wakito does not collect a card number. The developer sees subscription status from Apple, not a payment method. There is no free trial. Mateusz gives half of the subscription proceeds to causes he chooses. The Achievements tab shows what he records. The app does not collect donations.
+
 ## Notifications and alarms
 
 If you allow alarms, iOS schedules them with AlarmKit so they can ring while the phone is locked or silenced. If you deny that and allow notifications instead, iOS shows ordinary notifications, which do not override the silent switch. Wakito does not request tracking permission and does not include advertising.

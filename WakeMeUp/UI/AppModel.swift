@@ -114,6 +114,7 @@ final class AppModel {
         update { $0.permissions.removeUnsharedInvites() }
         authorization = coordinator.accessState()
         notificationAllowed = await coordinator.notificationStatus() == .authorized
+        // A missing subscription must not cancel alarms. They stay scheduled so a billing lapse cannot silence a wake-up.
         await reschedule(requestAccess: false)
         if let handoff = LaunchHandoff.consume() {
             ringingAlarmID = handoff.alarmID

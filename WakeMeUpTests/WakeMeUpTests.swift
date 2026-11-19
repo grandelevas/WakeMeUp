@@ -736,3 +736,18 @@ enum WAVFixture {
         return withUnsafeBytes(of: &little) { Data($0) }
     }
 }
+
+final class PaywallPolicyTests: XCTestCase {
+    func testActiveEntitlementOpensTheApp() {
+        XCTAssertEqual(PaywallPolicy.mode(hasActiveEntitlement: true, hasExistingAlarms: false), .none)
+        XCTAssertEqual(PaywallPolicy.mode(hasActiveEntitlement: true, hasExistingAlarms: true), .none)
+    }
+
+    func testFirstLaunchWithoutAlarmsIsAHardPaywall() {
+        XCTAssertEqual(PaywallPolicy.mode(hasActiveEntitlement: false, hasExistingAlarms: false), .subscribe)
+    }
+
+    func testLapseKeepsTheRenewWallInsteadOfClearingAlarms() {
+        XCTAssertEqual(PaywallPolicy.mode(hasActiveEntitlement: false, hasExistingAlarms: true), .renew)
+    }
+}

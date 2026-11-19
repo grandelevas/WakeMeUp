@@ -101,6 +101,7 @@ schemes:
         WakeMeUpTests: [test]
     run:
       config: Debug
+      storeKitConfiguration: WakeMeUp/Wakito.storekit
     test:
       config: Debug
       targets:

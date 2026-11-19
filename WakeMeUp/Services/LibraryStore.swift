@@ -36,6 +36,10 @@ final class LibraryStore {
 }
 
 enum AppConfig {
+    static var privacyPolicyURL: String {
+        string(named: "PrivacyPolicyURL")
+    }
+
     static var achievementsContentURL: String {
         guard let url = Bundle.main.url(forResource: "WakeMeUpConfig", withExtension: "plist"),
               let data = try? Data(contentsOf: url),
@@ -54,6 +58,16 @@ enum AppConfig {
             return ""
         }
         return identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func string(named key: String) -> String {
+        guard let url = Bundle.main.url(forResource: "WakeMeUpConfig", withExtension: "plist"),
+              let data = try? Data(contentsOf: url),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+              let value = plist[key] as? String else {
+            return ""
+        }
+        return value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     static var usesCloudKit: Bool {

@@ -1,0 +1,33 @@
+name: subscription
+
+on:
+  workflow_dispatch:
+
+jobs:
+  steps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check the StoreKit product
+        run: |
+          python3 - << 'PY'
+          import json
+          from pathlib import Path
+          doc = json.loads(Path("WakeMeUp/Wakito.storekit").read_text())
+          groups = doc["subscriptionGroups"]
+          assert groups[0]["name"] == "Wakito"
+          product = groups[0]["subscriptions"][0]
+          assert product["productID"] == "com.grandelevas.wakemeup.yearly"
+          assert product["recurringSubscriptionPeriod"] == "P1Y"
+          assert product["introductoryOffer"] is None
+          print("StoreKit file matches com.grandelevas.wakemeup.yearly")
+          PY
+      - name: App Store Connect steps
+        run: |
+          echo "Fastlane 2.242 cannot create a subscription group with the API key."
+          echo "Do not run bootstrap-signing. Do not create a certificate."
+          echo "Follow docs/subscription-setup.md on iPhone Safari:"
+          echo "1. Accept the Paid Applications Agreement and add bank and tax info."
+          echo "2. Enroll in the App Store Small Business Program if eligible."
+          echo "3. Create subscription group Wakito and product com.grandelevas.wakemeup.yearly for 1 year at about 2.99 EUR. No free trial."
+          echo "TestFlight purchases are free sandbox purchases."

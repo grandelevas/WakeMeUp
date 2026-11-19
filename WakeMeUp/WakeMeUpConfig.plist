@@ -4,6 +4,8 @@
 <dict>
 	<key>CloudKitContainerID</key>
 	<string>iCloud.com.grandelevas.wakemeup</string>
+	<key>PrivacyPolicyURL</key>
+	<string>https://grandelevas.github.io/wakito-content/privacy</string>
 	<key>AchievementsContentURL</key>
 	<string>https://raw.githubusercontent.com/grandelevas/wakito-content/main/achievements.json</string>
 </dict>

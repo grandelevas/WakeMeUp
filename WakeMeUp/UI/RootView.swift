@@ -2,7 +2,9 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(SubscriptionManager.self) private var subscriptions
     @Environment(\.scenePhase) private var scenePhase
+    @State private var showingAchievements = false
 
     var body: some View {
         @Bindable var model = model
@@ -18,6 +20,21 @@ struct RootView: View {
                 .tag(AppTab.achievements)
         }
         .readableWidth()
+        .overlay {
+            if paywallMode != .none, model.ringingAlarmID == nil {
+                PaywallView(mode: paywallMode) { showingAchievements = true }
+            }
+        }
+        .sheet(isPresented: $showingAchievements) {
+            NavigationStack {
+                AchievementsView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("alarms.done") { showingAchievements = false }
+                        }
+                    }
+            }
+        }
         .sheet(item: $model.editor) { draft in
             AlarmEditorView(draft: draft)
                 .readableWidth()
@@ -46,6 +63,14 @@ struct RootView: View {
             Task { await model.refreshRemote() }
         }
         .task { await model.start() }
+    }
+
+    private var paywallMode: PaywallMode {
+        if LaunchConfiguration.seedDemo { return .none }
+        return PaywallPolicy.mode(
+            hasActiveEntitlement: subscriptions.isEntitled,
+            hasExistingAlarms: !model.library.alarms.isEmpty
+        )
     }
 
     private var ringingPresented: Binding<Bool> {

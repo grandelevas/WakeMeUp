@@ -37,6 +37,7 @@ capture() {
   xcrun simctl io "${UDID}" screenshot "${OUT}/${name}.png"
 }
 
+capture paywall-en
 capture alarms-en -WakeMeUpDemo -WakeMeUpScreen alarms
 capture editor-en -WakeMeUpDemo -WakeMeUpScreen editor
 capture groups-en -WakeMeUpDemo -WakeMeUpScreen groups
