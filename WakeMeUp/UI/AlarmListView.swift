@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct AlarmListView: View {
     @Environment(AppModel.self) private var model
@@ -52,7 +53,23 @@ struct AlarmListView: View {
 
     private var list: some View {
         List {
-            if !model.suppressPermissionBanner && model.authorization != .authorized {
+            if !model.suppressPermissionBanner && model.authorization == .denied {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("settings.systemAlarm.denied")
+                        Text("settings.systemAlarm.fallback")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Button("settings.open") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                    }
+                }
+            } else if !model.suppressPermissionBanner && model.authorization != .authorized {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("settings.banner")
@@ -63,6 +80,13 @@ struct AlarmListView: View {
                         .tint(.orange)
                     }
                     .font(.subheadline)
+                }
+            }
+            if let failure = model.scheduleFailure, !model.suppressPermissionBanner {
+                Section {
+                    Text(failure)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
             ForEach(model.library.groups) { group in

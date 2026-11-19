@@ -2,17 +2,21 @@ import ActivityKit
 import AlarmKit
 import AppIntents
 import Foundation
+import os
 import SwiftUI
 import UserNotifications
 
 /// Our model is also named `Alarm`, so AlarmKit's type has to be qualified.
 private typealias SystemAlarm = AlarmKit.Alarm
 
-enum AlarmAccessState: Equatable {
-    case unknown
-    case notDetermined
-    case authorized
-    case denied
+private let alarmLog = Logger(subsystem: "com.grandelevas.wakemeup", category: "AlarmKit")
+
+struct AlarmKitAttempt: Equatable {
+    var permission: AlarmAccessState
+    /// Set when the named file could not be scheduled. Nil means that attempt succeeded.
+    var namedSoundError: String?
+    /// Set when the system alarm sound also failed. Nil means it was not needed or it succeeded.
+    var defaultSoundError: String?
 }
 
 @MainActor
@@ -20,39 +24,109 @@ final class AlarmKitEngine {
     private let manager = AlarmManager.shared
 
     func accessState() -> AlarmAccessState {
-        switch manager.authorizationState {
-        case .notDetermined: .notDetermined
-        case .authorized: .authorized
-        case .denied: .denied
-        @unknown default: .unknown
-        }
+        map(manager.authorizationState)
     }
 
     func requestAccess() async -> AlarmAccessState {
+        if Bundle.main.object(forInfoDictionaryKey: "NSAlarmKitUsageDescription") == nil {
+            alarmLog.error("NSAlarmKitUsageDescription is missing from the built app")
+        }
         switch manager.authorizationState {
         case .authorized:
             return .authorized
         case .denied:
             return .denied
         case .notDetermined:
-            let state = try? await manager.requestAuthorization()
-            return state == .authorized ? .authorized : .denied
+            do {
+                let state = try await manager.requestAuthorization()
+                let mapped = map(state)
+                alarmLog.info("AlarmKit authorization is \(String(describing: mapped), privacy: .public)")
+                return mapped
+            } catch {
+                alarmLog.error("AlarmKit authorization failed: \(error.localizedDescription, privacy: .public)")
+                return map(manager.authorizationState)
+            }
         @unknown default:
             return .unknown
         }
     }
 
-    /// Schedules with AlarmKit. Returns false when the system will not ring it
-    /// (authorization denied, or the framework rejected the configuration).
-    @discardableResult
-    func schedule(_ alarm: Alarm, customSounds: [CustomSound]) async -> Bool {
-        guard await requestAccess() == .authorized else { return false }
+    /// Schedules a full-screen AlarmKit alarm. A missing custom sound retries with the system sound.
+    /// This does not schedule a notification.
+    func schedule(_ alarm: Alarm, customSounds: [CustomSound]) async -> AlarmKitAttempt {
+        let permission = await requestAccess()
+        guard permission == .authorized else {
+            alarmLog.error("AlarmKit schedule skipped; authorization is \(String(describing: permission), privacy: .public)")
+            return AlarmKitAttempt(permission: permission, namedSoundError: nil, defaultSoundError: nil)
+        }
+        cancel(id: alarm.id)
+        let filename = SoundFiles.alarmKitName(for: alarm.soundID, customSounds: customSounds)
+        let choice = AlarmSoundResolver.choose(
+            preferredFilename: filename,
+            present: presentSoundNames(preferred: filename)
+        )
+        switch choice {
+        case .named(let name):
+            do {
+                try await submit(alarm, sound: .named(name))
+                alarmLog.info("Scheduled AlarmKit alarm \(alarm.id.uuidString, privacy: .public) with \(name, privacy: .public)")
+                return AlarmKitAttempt(permission: .authorized, namedSoundError: nil, defaultSoundError: nil)
+            } catch {
+                let namedError = error.localizedDescription
+                alarmLog.error("AlarmKit sound \(name, privacy: .public) failed: \(namedError, privacy: .public)")
+                return await scheduleSystemSound(alarm, namedError: namedError)
+            }
+        case .systemDefault:
+            let namedError = "No alarm file named \(filename) in the app bundle or Library/Sounds."
+            alarmLog.error("\(namedError, privacy: .public)")
+            return await scheduleSystemSound(alarm, namedError: namedError)
+        }
+    }
+
+    private func scheduleSystemSound(
+        _ alarm: Alarm,
+        namedError: String
+    ) async -> AlarmKitAttempt {
         do {
-            let configuration = try makeConfiguration(for: alarm, customSounds: customSounds)
-            _ = try await manager.schedule(id: alarm.id, configuration: configuration)
-            return true
+            try await submit(alarm, sound: .default)
+            alarmLog.info("Scheduled AlarmKit alarm \(alarm.id.uuidString, privacy: .public) with the system sound")
+            return AlarmKitAttempt(permission: .authorized, namedSoundError: namedError, defaultSoundError: nil)
         } catch {
-            return false
+            let message = error.localizedDescription
+            alarmLog.error("AlarmKit system sound failed: \(message, privacy: .public)")
+            return AlarmKitAttempt(permission: .authorized, namedSoundError: namedError, defaultSoundError: message)
+        }
+    }
+
+    private func submit(
+        _ alarm: Alarm,
+        sound: AlertConfiguration.AlertSound
+    ) async throws {
+        let configuration = makeConfiguration(for: alarm, sound: sound)
+        _ = try await manager.schedule(id: alarm.id, configuration: configuration)
+    }
+
+    /// Names AlarmKit can load: bundle root, or a file already in Library/Sounds.
+    private func presentSoundNames(preferred: String) -> Set<String> {
+        var names = Set<String>()
+        let base = (preferred as NSString).deletingPathExtension
+        let ext = (preferred as NSString).pathExtension
+        if !ext.isEmpty, Bundle.main.url(forResource: base, withExtension: ext) != nil {
+            names.insert(preferred)
+        }
+        if let directory = try? SoundFiles.librarySoundsDirectory(),
+           FileManager.default.fileExists(atPath: directory.appendingPathComponent(preferred).path) {
+            names.insert(preferred)
+        }
+        return names
+    }
+
+    private func map(_ state: AlarmManager.AuthorizationState) -> AlarmAccessState {
+        switch state {
+        case .notDetermined: .notDetermined
+        case .authorized: .authorized
+        case .denied: .denied
+        @unknown default: .unknown
         }
     }
 
@@ -77,8 +151,8 @@ final class AlarmKitEngine {
 
     private func makeConfiguration(
         for alarm: Alarm,
-        customSounds: [CustomSound]
-    ) throws -> AlarmManager.AlarmConfiguration<WakeMeUpAlarmMetadata> {
+        sound: AlertConfiguration.AlertSound
+    ) -> AlarmManager.AlarmConfiguration<WakeMeUpAlarmMetadata> {
         let title = alarm.label.isEmpty ? String(localized: "alarm.defaultLabel") : alarm.label
         let localizedTitle = LocalizedStringResource(stringLiteral: title)
         let wantsSong = alarm.songLink != nil
@@ -127,9 +201,6 @@ final class AlarmKitEngine {
             ),
             tintColor: .orange
         )
-        // `.named` looks up this filename in the main bundle or Library/Sounds.
-        let soundName = SoundFiles.alarmKitName(for: alarm.soundID, customSounds: customSounds)
-        let sound: AlertConfiguration.AlertSound = soundName.isEmpty ? .default : .named(soundName)
         let countdown: SystemAlarm.CountdownDuration? = alarm.snoozeEnabled
             ? SystemAlarm.CountdownDuration(preAlert: nil, postAlert: TimeInterval(alarm.snoozeMinutes * 60))
             : nil
@@ -242,6 +313,17 @@ final class NotificationAlarmEngine {
         }
     }
 
+    /// Drops every quiet banner this app scheduled, including alarms that were deleted.
+    func cancelAllAlarmNotifications() async {
+        let pending = await center.pendingNotificationRequests()
+        let identifiers = pending.filter {
+            $0.content.categoryIdentifier == NotificationAction.categoryPlain
+                || $0.content.categoryIdentifier == NotificationAction.categorySong
+        }.map(\.identifier)
+        center.removePendingNotificationRequests(withIdentifiers: identifiers)
+        center.removeDeliveredNotifications(withIdentifiers: identifiers)
+    }
+
     func cancel(id: UUID) async {
         let pending = await center.pendingNotificationRequests()
         let identifiers = pending.map(\.identifier).filter { $0.hasPrefix(id.uuidString) }
@@ -283,6 +365,7 @@ final class AlarmCoordinator {
     private let notifications = NotificationAlarmEngine()
     private var lastSynced: [Alarm] = []
     private var alarmKitIDs = Set<UUID>()
+    private var notificationIDs = Set<UUID>()
 
     func accessState() -> AlarmAccessState {
         alarmKit.accessState()
@@ -296,26 +379,44 @@ final class AlarmCoordinator {
         await notifications.authorizationStatus()
     }
 
-    func sync(alarms: [Alarm], customSounds: [CustomSound]) async {
+    /// Re-schedules enabled alarms through AlarmKit and removes pending notification banners.
+    /// Returns the first AlarmKit failure that was not replaced by the system alarm sound.
+    func sync(alarms: [Alarm], customSounds: [CustomSound]) async -> String? {
         let plan = AlarmSyncPlan.make(previous: lastSynced, current: alarms)
         let byID = Dictionary(uniqueKeysWithValues: alarms.map { ($0.id, $0) })
+        await notifications.cancelAllAlarmNotifications()
         for id in plan.cancel {
             alarmKit.cancel(id: id)
-            await notifications.cancel(id: id)
             alarmKitIDs.remove(id)
+            notificationIDs.remove(id)
         }
+        var failure: String?
         for id in plan.schedule {
             guard let alarm = byID[id] else { continue }
-            await notifications.cancel(id: id)
-            let scheduled = await alarmKit.schedule(alarm, customSounds: customSounds)
-            if scheduled {
+            let attempt = await alarmKit.schedule(alarm, customSounds: customSounds)
+            let delivery = AlarmDeliveryPolicy.decide(
+                permission: attempt.permission,
+                alarmKitAvailable: true,
+                namedSoundError: attempt.namedSoundError,
+                defaultSoundError: attempt.defaultSoundError
+            )
+            switch delivery {
+            case .alarmKit, .alarmKitSystemSound:
                 alarmKitIDs.insert(id)
-            } else {
+                notificationIDs.remove(id)
+            case .notificationFallback:
                 alarmKitIDs.remove(id)
+                notificationIDs.insert(id)
                 await notifications.schedule(alarm, customSounds: customSounds)
+            case .blocked(let message):
+                alarmKitIDs.remove(id)
+                notificationIDs.remove(id)
+                alarmLog.error("AlarmKit schedule blocked: \(message, privacy: .public)")
+                if failure == nil { failure = message }
             }
         }
         lastSynced = alarms
+        return failure
     }
 
     func stop(id: UUID) async {
@@ -326,7 +427,7 @@ final class AlarmCoordinator {
     func snooze(_ alarm: Alarm, customSounds: [CustomSound]) async {
         if alarmKitIDs.contains(alarm.id) {
             alarmKit.snooze(id: alarm.id)
-        } else {
+        } else if notificationIDs.contains(alarm.id) {
             await notifications.scheduleSnooze(alarm, customSounds: customSounds)
         }
     }

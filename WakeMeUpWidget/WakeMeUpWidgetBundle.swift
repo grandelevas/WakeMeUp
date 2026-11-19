@@ -2,8 +2,8 @@ import AlarmKit
 import SwiftUI
 import WidgetKit
 
-/// AlarmKit uses this Live Activity for the snooze countdown. The alerting UI
-/// itself is drawn by the system from `AlarmPresentation`.
+/// AlarmKit requires this Live Activity to present the countdown. The alerting
+/// UI itself is drawn by the system from `AlarmPresentation`.
 struct WakeMeUpAlarmLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: AlarmAttributes<WakeMeUpAlarmMetadata>.self) { context in

@@ -23,6 +23,7 @@ final class AppModel {
     var selectedTab: AppTab = .alarms
     var authorization: AlarmAccessState = .unknown
     var notificationAllowed = false
+    var scheduleFailure: String?
     var lastError: String?
     var shareURL: URL?
     var pastedInvite = ""
@@ -406,7 +407,14 @@ final class AppModel {
         } else {
             authorization = coordinator.accessState()
         }
-        await coordinator.sync(alarms: snapshot.library.alarms, customSounds: snapshot.customSounds)
+        if let failure = await coordinator.sync(
+            alarms: snapshot.library.alarms,
+            customSounds: snapshot.customSounds
+        ) {
+            scheduleFailure = String(format: String(localized: "settings.systemAlarm.failed"), failure)
+        } else {
+            scheduleFailure = nil
+        }
     }
 
     private func update(_ body: (inout LibrarySnapshot) -> Void) {

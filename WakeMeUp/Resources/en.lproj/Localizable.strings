@@ -108,7 +108,12 @@
 "settings.alarmAccess.notDetermined" = "Not asked yet";
 "settings.alarmAccess.unknown" = "Checking…";
 "settings.notifications" = "Notification fallback";
-"settings.notifications.help" = "Used only if alarm access is denied. Notifications do not ring through the silent switch.";
+"settings.notifications.help" = "Used only if system alarms are off. A notification is quieter and does not take over the screen.";
+"settings.systemAlarm.on" = "System alarm: on";
+"settings.systemAlarm.denied" = "System alarm: no permission";
+"settings.systemAlarm.ask" = "System alarm: not asked yet";
+"settings.systemAlarm.fallback" = "Wakito is using a normal notification because system alarms are off. That banner is quieter and does not take over the screen. Turn on Alarms for Wakito in Settings.";
+"settings.systemAlarm.failed" = "The system alarm was not scheduled: %@";
 "settings.backend" = "Remote backend";
 "settings.backend.preview" = "Preview on this device";
 "settings.backend.cloudkit" = "CloudKit";

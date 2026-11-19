@@ -53,11 +53,11 @@
 "sound.empty" = "Nie ma jeszcze własnych dźwięków";
 "sound.importTitle" = "Importuj dźwięk";
 
-"song.play" = "Odtwórz moją piosenkę";
+"song.play" = "Zagraj moją piosenkę";
 "song.stop" = "Zatrzymaj";
 "ringing.snooze" = "Drzemka";
 "ringing.title" = "Alarm";
-"ringing.note" = "„Odtwórz moją piosenkę” zatrzymuje alarm i otwiera link.";
+"ringing.note" = "„Zagraj moją piosenkę” zatrzymuje alarm i otwiera link.";
 
 "groups.title" = "Grupy";
 "groups.add" = "Nowa grupa";
@@ -108,7 +108,12 @@
 "settings.alarmAccess.notDetermined" = "Jeszcze nie pytano";
 "settings.alarmAccess.unknown" = "Sprawdzanie…";
 "settings.notifications" = "Zapasowe powiadomienia";
-"settings.notifications.help" = "Tylko gdy brak dostępu do alarmów. Powiadomienia nie przebiją wyciszenia.";
+"settings.notifications.help" = "Tylko gdy systemowy budzik jest wyłączony. Powiadomienie jest cichsze i nie zajmuje całego ekranu.";
+"settings.systemAlarm.on" = "Systemowy budzik: włączony";
+"settings.systemAlarm.denied" = "Systemowy budzik: brak zgody";
+"settings.systemAlarm.ask" = "Systemowy budzik: jeszcze niepytany";
+"settings.systemAlarm.fallback" = "Wakito używa zwykłego powiadomienia, bo systemowy budzik jest wyłączony. Baner jest cichszy i nie zajmuje całego ekranu. Włącz Alarmy dla Wakito w Ustawieniach.";
+"settings.systemAlarm.failed" = "Nie udało się zaplanować systemowego budzika: %@";
 "settings.backend" = "Zdalne budzenie";
 "settings.backend.preview" = "Podgląd na tym urządzeniu";
 "settings.backend.cloudkit" = "CloudKit";
@@ -116,7 +121,7 @@
 "settings.about" = "O zdalnych alarmach";
 "settings.about.body" = "Ktoś może tu ustawić alarm dopiero, gdy zaakceptujesz zaproszenie. Możesz je w każdej chwili cofnąć. Wakito nie ma własnego serwera. Po skonfigurowaniu CloudKit polecenia idą przez Twoje konto iCloud. iOS dostarcza je cichym powiadomieniem w tle, które nie zawsze przychodzi od razu.";
 "settings.privacy" = "Prywatność";
-"settings.privacy.body" = "Alarmy zostają na tym iPhonie. Link do piosenki otwiera się dopiero, gdy stukniesz „Odtwórz moją piosenkę”. Gdy włączysz udostępnianie iCloud, etykiety i linki synchronizują się przez Twoją prywatną bazę iCloud.";
+"settings.privacy.body" = "Alarmy zostają na tym iPhonie. Link do piosenki otwiera się dopiero, gdy stukniesz „Zagraj moją piosenkę”. Gdy włączysz udostępnianie iCloud, etykiety i linki synchronizują się przez Twoją prywatną bazę iCloud.";
 "settings.version" = "Wersja";
 "settings.allow" = "Pozwól na alarmy";
 "settings.banner" = "Alarmy nie zadzwonią, dopóki nie pozwolisz Wakito ich planować.";
