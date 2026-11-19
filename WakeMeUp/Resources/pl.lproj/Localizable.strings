@@ -161,9 +161,9 @@
 "demo.me" = "Maja";
 "demo.friend" = "Ola";
 
-"achievements.disclosure" = "Mateusz przekazuje 50% przychodu z aplikacji na wybrane cele. Nie zbieramy darowizn w aplikacji.";
+"achievements.disclosure" = "Mateusz przekazuje 50% przychodu z subskrypcji na wybrane cele. Nie zbieramy darowizn w aplikacji.";
 "achievements.together" = "Nasz wspólny sukces";
-"achievements.badge" = "Jesteś częścią tego. Twój zakup pomaga.";
+"achievements.support" = "Twoje wsparcie pomaga";
 "achievements.campaign" = "Aktualna zbiórka";
 "achievements.more" = "Więcej";
 "achievements.total" = "Razem przekazaliśmy %@";
@@ -171,9 +171,11 @@
 "achievements.history" = "Historia";
 "achievements.history.empty" = "Jeszcze nie ma zapisanej pomocy.";
 "achievements.yours" = "Twoje odznaki";
-"achievements.badge.first" = "Pierwszy budzik";
-"achievements.badge.streak" = "7 dni bez drzemki";
-"achievements.badge.friend" = "Budzik dla kogoś";
+"achievements.tenure.month" = "1 miesiąc z Wakito";
+"achievements.tenure.sixMonths" = "6 miesięcy z Wakito";
+"achievements.tenure.year" = "1 rok z Wakito";
+"achievements.tenure.twoYears" = "2 lata z Wakito";
+"achievements.tenure.threeYears" = "3 lata z Wakito";
 "achievements.unlocked" = "Odblokowana";
 "achievements.locked" = "Zablokowana";
 "achievements.goalMissing" = "Cel jeszcze nieustawiony. Zebrana kwota zostaje 0, dopóki Mateusz nie zapisze prawdziwej sumy.";

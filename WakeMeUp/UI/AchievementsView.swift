@@ -1,9 +1,9 @@
 import SwiftUI
 
 struct AchievementsView: View {
-    @Environment(AppModel.self) private var model
     @Environment(\.appAccent) private var appAccent
     @State private var document: AchievementsDocument?
+    @State private var firstUse = Date()
 
     var body: some View {
         NavigationStack {
@@ -42,7 +42,7 @@ struct AchievementsView: View {
             Label("achievements.together", systemImage: "heart.fill")
                 .font(.headline)
                 .foregroundStyle(appAccent)
-            Text("achievements.badge")
+            Text("achievements.support")
                 .font(.subheadline)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -136,10 +136,25 @@ struct AchievementsView: View {
             Text("achievements.yours")
                 .font(.headline)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                badge("achievements.badge.first", symbol: "alarm.fill", unlocked: model.localAchievements.firstAlarm)
-                badge("achievements.badge.streak", symbol: "sun.max.fill", unlocked: model.localAchievements.sevenDayStreak)
-                badge("achievements.badge.friend", symbol: "person.2.fill", unlocked: model.localAchievements.friendAlarm)
+                badge("achievements.support", symbol: "heart.fill", unlocked: true)
+                ForEach(SupportMilestone.allCases) { milestone in
+                    badge(
+                        tenureTitle(milestone),
+                        symbol: "calendar",
+                        unlocked: milestone.isUnlocked(firstUse: firstUse, now: .now)
+                    )
+                }
             }
+        }
+    }
+
+    private func tenureTitle(_ milestone: SupportMilestone) -> LocalizedStringKey {
+        switch milestone {
+        case .oneMonth: "achievements.tenure.month"
+        case .sixMonths: "achievements.tenure.sixMonths"
+        case .oneYear: "achievements.tenure.year"
+        case .twoYears: "achievements.tenure.twoYears"
+        case .threeYears: "achievements.tenure.threeYears"
         }
     }
 
@@ -175,6 +190,7 @@ struct AchievementsView: View {
     }
 
     private func reload() async {
+        firstUse = SupportTenureStore.ensureFirstUse()
         if document == nil {
             document = AchievementsContentStore.startingDocument()
         }

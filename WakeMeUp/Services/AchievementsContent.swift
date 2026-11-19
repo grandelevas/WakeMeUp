@@ -51,19 +51,42 @@ enum AchievementsContentStore {
     }
 }
 
-enum LocalAchievementsStore {
-    private static let key = "wakito.localAchievements"
+protocol FirstUseStore {
+    func object(forKey key: String) -> Any?
+    func set(_ value: Any?, forKey key: String)
+}
 
-    static func load() -> LocalAchievements {
-        guard let data = UserDefaults.standard.data(forKey: key),
-              let decoded = try? JSONDecoder().decode(LocalAchievements.self, from: data) else {
-            return LocalAchievements()
-        }
-        return decoded
+extension UserDefaults: FirstUseStore {}
+extension NSUbiquitousKeyValueStore: FirstUseStore {}
+
+enum SupportTenureStore {
+    static let key = "wakito.firstUse"
+
+    /// The earlier of the local date and iCloud Key-Value Storage, so a new phone keeps the original start.
+    static func ensureFirstUse(
+        now: Date = .now,
+        local: FirstUseStore = UserDefaults.standard,
+        cloud: FirstUseStore = NSUbiquitousKeyValueStore.default
+    ) -> Date {
+        let localDate = date(in: local)
+        let cloudDate = date(in: cloud)
+        let first = [localDate, cloudDate].compactMap { $0 }.min() ?? now
+        write(first, to: local)
+        write(first, to: cloud)
+        return first
     }
 
-    static func save(_ value: LocalAchievements) {
-        guard let data = try? JSONEncoder().encode(value) else { return }
-        UserDefaults.standard.set(data, forKey: key)
+    private static func date(in store: FirstUseStore) -> Date? {
+        if let number = store.object(forKey: key) as? NSNumber {
+            return Date(timeIntervalSince1970: number.doubleValue)
+        }
+        if let value = store.object(forKey: key) as? Double {
+            return Date(timeIntervalSince1970: value)
+        }
+        return nil
+    }
+
+    private static func write(_ date: Date, to store: FirstUseStore) {
+        store.set(date.timeIntervalSince1970, forKey: key)
     }
 }

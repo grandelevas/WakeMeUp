@@ -217,37 +217,40 @@ final class ShareInviteCleanupTests: XCTestCase {
     }
 }
 
+final class SupportTenureTests: XCTestCase {
+    func testMilestonesFollowTheFirstUseDate() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let start = calendar.date(from: DateComponents(year: 2024, month: 1, day: 15))!
+        let afterFiveMonths = calendar.date(from: DateComponents(year: 2024, month: 6, day: 15))!
+        XCTAssertTrue(SupportMilestone.oneMonth.isUnlocked(firstUse: start, now: afterFiveMonths, calendar: calendar))
+        XCTAssertFalse(SupportMilestone.sixMonths.isUnlocked(firstUse: start, now: afterFiveMonths, calendar: calendar))
+        let afterTwoYears = calendar.date(from: DateComponents(year: 2026, month: 1, day: 15))!
+        XCTAssertTrue(SupportMilestone.twoYears.isUnlocked(firstUse: start, now: afterTwoYears, calendar: calendar))
+        XCTAssertFalse(SupportMilestone.threeYears.isUnlocked(firstUse: start, now: afterTwoYears, calendar: calendar))
+    }
+
+    func testFirstUseKeepsTheEarlierDate() {
+        let local = UserDefaults(suiteName: "wakito.tenure.local.\(UUID().uuidString)")!
+        let cloud = MemoryFirstUseStore()
+        let older = Date(timeIntervalSince1970: 1_700_000_000)
+        let newer = Date(timeIntervalSince1970: 1_800_000_000)
+        local.set(newer.timeIntervalSince1970, forKey: SupportTenureStore.key)
+        cloud.set(older.timeIntervalSince1970, forKey: SupportTenureStore.key)
+        let first = SupportTenureStore.ensureFirstUse(now: Date(), local: local, cloud: cloud)
+        XCTAssertEqual(first.timeIntervalSince1970, older.timeIntervalSince1970, accuracy: 0.5)
+        let stored = (local.object(forKey: SupportTenureStore.key) as? NSNumber)?.doubleValue ?? 0
+        XCTAssertEqual(stored, older.timeIntervalSince1970, accuracy: 0.5)
+    }
+}
+
+private final class MemoryFirstUseStore: FirstUseStore {
+    var values: [String: Any] = [:]
+    func object(forKey key: String) -> Any? { values[key] }
+    func set(_ value: Any?, forKey key: String) { values[key] = value }
+}
+
 final class LocalAchievementTests: XCTestCase {
-    func testSevenConsecutiveWakeDaysUnlockTheStreak() {
-        var badges = LocalAchievements()
-        let days = (1...7).map { String(format: "2026-11-%02d", $0) }
-        for day in days {
-            badges.recordWake(on: day)
-        }
-        XCTAssertTrue(badges.firstAlarm == false)
-        XCTAssertEqual(badges.bestStreak, 7)
-        XCTAssertTrue(badges.sevenDayStreak)
-    }
-
-    func testSnoozeBreaksThatDayAndAGapDoesNotCount() {
-        var badges = LocalAchievements()
-        badges.recordWake(on: "2026-11-01")
-        badges.recordWake(on: "2026-11-02")
-        badges.recordSnooze(on: "2026-11-02")
-        badges.recordWake(on: "2026-11-02")
-        badges.recordWake(on: "2026-11-04")
-        XCTAssertFalse(badges.wakeDays.contains("2026-11-02"))
-        XCTAssertEqual(badges.bestStreak, 1)
-        XCTAssertFalse(badges.sevenDayStreak)
-    }
-
-    func testFirstAlarmAndFriendStayUnlocked() {
-        var badges = LocalAchievements()
-        badges.recordFirstAlarm()
-        badges.recordFriendAlarm()
-        XCTAssertTrue(badges.firstAlarm)
-        XCTAssertTrue(badges.friendAlarm)
-    }
 
     func testPlaceholderContentDecodesWithZeroRaised() throws {
         let json = """
