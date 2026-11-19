@@ -39,6 +39,14 @@ struct AlarmListView: View {
                     }
                     .accessibilityLabel("alarms.groups")
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        SettingsView()
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityLabel("settings.title")
+                }
             }
             .navigationDestination(isPresented: groupsPresented) {
                 GroupListView()
