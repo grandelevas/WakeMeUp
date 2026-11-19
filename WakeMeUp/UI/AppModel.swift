@@ -7,6 +7,7 @@ import UserNotifications
 enum AppTab: Hashable {
     case alarms
     case sharing
+    case achievements
 }
 
 struct PreparedShare: Identifiable {
@@ -39,6 +40,7 @@ final class AppModel {
     var remoteLabel = ""
     var remoteHour = 7
     var remoteMinute = 0
+    var localAchievements = LocalAchievementsStore.load()
     let suppressPermissionBanner: Bool
 
     private let store: LibraryStore
@@ -144,6 +146,7 @@ final class AppModel {
             return
         }
         update { $0.library.upsert(alarm) }
+        recordAchievement { $0.recordFirstAlarm() }
         editor = nil
         Task { await reschedule(requestAccess: true) }
     }
@@ -389,6 +392,7 @@ final class AppModel {
         do {
             _ = try snapshot.permissions.authorize(sender: snapshot.profile.id, recipient: grant.owner.id)
             try await cloudKit.append(command: command, grant: grant, asOwner: false)
+            recordAchievement { $0.recordFriendAlarm() }
         } catch {
             lastError = error.localizedDescription
         }
@@ -397,12 +401,18 @@ final class AppModel {
     func stopRinging() async {
         guard let id = ringingAlarmID else { return }
         await coordinator.stop(id: id)
+        recordAchievement {
+            $0.recordWake(on: LocalAchievements.dayKey(for: .now, calendar: .current))
+        }
         ringingAlarmID = nil
     }
 
     func snoozeRinging() async {
         guard let alarm = ringingAlarm else { return }
         await coordinator.snooze(alarm, customSounds: snapshot.customSounds)
+        recordAchievement {
+            $0.recordSnooze(on: LocalAchievements.dayKey(for: .now, calendar: .current))
+        }
         ringingAlarmID = nil
     }
 
@@ -446,7 +456,15 @@ final class AppModel {
             if let alarmID, let alarm = snapshot.library.alarm(alarmID) {
                 await coordinator.snooze(alarm, customSounds: snapshot.customSounds)
             }
-        case NotificationAction.stop, UNNotificationDismissActionIdentifier:
+            recordAchievement {
+                $0.recordSnooze(on: LocalAchievements.dayKey(for: .now, calendar: .current))
+            }
+        case NotificationAction.stop:
+            if let alarmID { await coordinator.stop(id: alarmID) }
+            recordAchievement {
+                $0.recordWake(on: LocalAchievements.dayKey(for: .now, calendar: .current))
+            }
+        case UNNotificationDismissActionIdentifier:
             if let alarmID { await coordinator.stop(id: alarmID) }
         default:
             if let alarmID { ringingAlarmID = alarmID }
@@ -489,6 +507,13 @@ final class AppModel {
         } else {
             scheduleFailure = nil
         }
+    }
+
+    private func recordAchievement(_ change: (inout LocalAchievements) -> Void) {
+        var copy = localAchievements
+        change(&copy)
+        localAchievements = copy
+        LocalAchievementsStore.save(copy)
     }
 
     private func update(_ body: (inout LibrarySnapshot) -> Void) {
