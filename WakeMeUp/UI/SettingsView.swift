@@ -14,15 +14,22 @@ struct SettingsView: View {
             }
             Section("settings.alarmAccess") {
                 LabeledContent("settings.alarmAccess", value: accessText)
-                if model.authorization != .authorized {
+                if model.authorization == .denied {
+                    Text("settings.systemAlarm.fallback")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Button("settings.open") {
+                        openSystemSettings()
+                    }
+                } else if model.authorization != .authorized {
                     Button("settings.allow") {
                         Task { await model.allowAlarms() }
                     }
-                    Button("settings.open") {
-                        if let url = URL(string: UIApplication.openSettingsURLString) {
-                            UIApplication.shared.open(url)
-                        }
-                    }
+                }
+                if let failure = model.scheduleFailure {
+                    Text(failure)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
             Section {
@@ -54,11 +61,16 @@ struct SettingsView: View {
 
     private var accessText: String {
         switch model.authorization {
-        case .authorized: String(localized: "settings.alarmAccess.authorized")
-        case .denied: String(localized: "settings.alarmAccess.denied")
-        case .notDetermined: String(localized: "settings.alarmAccess.notDetermined")
+        case .authorized: String(localized: "settings.systemAlarm.on")
+        case .denied: String(localized: "settings.systemAlarm.denied")
+        case .notDetermined: String(localized: "settings.systemAlarm.ask")
         case .unknown: String(localized: "settings.alarmAccess.unknown")
         }
+    }
+
+    private func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
     }
 
     private var version: String {

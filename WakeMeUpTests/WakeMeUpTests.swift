@@ -191,6 +191,86 @@ final class AlarmLibraryTests: XCTestCase {
     }
 }
 
+final class AlarmDeliveryTests: XCTestCase {
+    func testGrantedPermissionNeverFallsBackToANotification() {
+        let scheduled = AlarmDeliveryPolicy.decide(
+            permission: .authorized,
+            alarmKitAvailable: true,
+            namedSoundError: nil,
+            defaultSoundError: nil
+        )
+        XCTAssertEqual(scheduled, .alarmKit)
+
+        let missingFile = AlarmDeliveryPolicy.decide(
+            permission: .authorized,
+            alarmKitAvailable: true,
+            namedSoundError: "sound not found",
+            defaultSoundError: nil
+        )
+        XCTAssertEqual(missingFile, .alarmKitSystemSound)
+
+        let bothFailed = AlarmDeliveryPolicy.decide(
+            permission: .authorized,
+            alarmKitAvailable: true,
+            namedSoundError: "sound not found",
+            defaultSoundError: "schedule rejected"
+        )
+        XCTAssertEqual(bothFailed, .blocked("schedule rejected"))
+    }
+
+    func testNotificationFallbackRequiresDeniedOrUnavailableAlarmKit() {
+        XCTAssertEqual(
+            AlarmDeliveryPolicy.decide(
+                permission: .denied,
+                alarmKitAvailable: true,
+                namedSoundError: nil,
+                defaultSoundError: nil
+            ),
+            .notificationFallback
+        )
+        XCTAssertEqual(
+            AlarmDeliveryPolicy.decide(
+                permission: .authorized,
+                alarmKitAvailable: false,
+                namedSoundError: nil,
+                defaultSoundError: nil
+            ),
+            .notificationFallback
+        )
+        XCTAssertEqual(
+            AlarmDeliveryPolicy.decide(
+                permission: .notDetermined,
+                alarmKitAvailable: true,
+                namedSoundError: nil,
+                defaultSoundError: nil
+            ),
+            .blocked("Alarm permission has not been granted.")
+        )
+    }
+
+    func testNamedSoundIsUsedWhenTheFileIsPresent() {
+        XCTAssertEqual(
+            AlarmSoundResolver.choose(preferredFilename: "classic.wav", present: ["classic.wav"]),
+            .named("classic.wav")
+        )
+        XCTAssertEqual(
+            AlarmSoundResolver.choose(preferredFilename: "clip.caf", present: ["clip.caf"]),
+            .named("clip.caf")
+        )
+    }
+
+    func testMissingSoundUsesTheSystemAlarmSound() {
+        XCTAssertEqual(
+            AlarmSoundResolver.choose(preferredFilename: "classic.wav", present: []),
+            .systemDefault
+        )
+        XCTAssertEqual(
+            AlarmSoundResolver.choose(preferredFilename: "missing.caf", present: ["classic.wav"]),
+            .systemDefault
+        )
+    }
+}
+
 final class AlarmSyncPlanTests: XCTestCase {
     func testFirstSyncSchedulesEnabledAlarmsOnly() {
         let on = sample(enabled: true)
