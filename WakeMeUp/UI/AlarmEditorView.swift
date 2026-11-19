@@ -182,51 +182,43 @@ struct DayPicker: View {
     @Binding var selection: Set<Weekday>
 
     var body: some View {
-        let calendar = Calendar.current
         VStack(alignment: .leading, spacing: 10) {
             ChipFlow(spacing: 8) {
                 ForEach(RepeatPreset.allCases, id: \.self) { preset in
-                    let selected = RepeatPatternClassifier.selectedPreset(selection) == preset
-                    Button {
-                        selection = RepeatPatternClassifier.toggle(preset, in: selection)
-                    } label: {
-                        Text(title(preset))
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(selected ? Color.orange : Color.secondary.opacity(0.15), in: Capsule())
-                            .foregroundStyle(selected ? Color.white : Color.primary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("repeat-\(presetIdentifier(preset))")
-                    .accessibilityAddTraits(selected ? .isSelected : [])
+                    RepeatPresetChip(preset: preset, selection: $selection)
                 }
             }
-            HStack {
-                ForEach(Weekday.ordered(calendar: calendar)) { day in
-                    let selected = selection.contains(day)
-                    Button {
-                        if selected {
-                            selection.remove(day)
-                        } else {
-                            selection.insert(day)
-                        }
-                    } label: {
-                        Text(day.veryShortSymbol(calendar: calendar))
-                            .font(.subheadline.weight(.semibold))
-                            .frame(width: 36, height: 36)
-                            .background(selected ? Color.orange : Color.secondary.opacity(0.15), in: Circle())
-                            .foregroundStyle(selected ? Color.white : Color.primary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(day.rawValue)
-                }
-            }
+            WeekdayCircles(selection: $selection)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
 
-    private func title(_ preset: RepeatPreset) -> LocalizedStringKey {
+private struct RepeatPresetChip: View {
+    let preset: RepeatPreset
+    @Binding var selection: Set<Weekday>
+
+    private var selected: Bool {
+        RepeatPatternClassifier.selectedPreset(selection) == preset
+    }
+
+    var body: some View {
+        Button {
+            selection = RepeatPatternClassifier.toggle(preset, in: selection)
+        } label: {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(fill, in: Capsule())
+                .foregroundStyle(foreground)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+        .accessibilityAddTraits(traits)
+    }
+
+    private var title: LocalizedStringKey {
         switch preset {
         case .everyDay: "repeat.everyDay"
         case .weekdays: "repeat.weekdays"
@@ -234,12 +226,73 @@ struct DayPicker: View {
         }
     }
 
-    private func presetIdentifier(_ preset: RepeatPreset) -> String {
+    private var identifier: String {
         switch preset {
-        case .everyDay: "every-day"
-        case .weekdays: "weekdays"
-        case .weekends: "weekend"
+        case .everyDay: "repeat-every-day"
+        case .weekdays: "repeat-weekdays"
+        case .weekends: "repeat-weekend"
         }
+    }
+
+    private var fill: Color {
+        selected ? .orange : Color.secondary.opacity(0.15)
+    }
+
+    private var foreground: Color {
+        selected ? .white : .primary
+    }
+
+    private var traits: AccessibilityTraits {
+        selected ? .isSelected : []
+    }
+}
+
+private struct WeekdayCircles: View {
+    @Binding var selection: Set<Weekday>
+
+    var body: some View {
+        let calendar = Calendar.current
+        HStack {
+            ForEach(Weekday.ordered(calendar: calendar)) { day in
+                WeekdayCircle(day: day, calendar: calendar, selection: $selection)
+            }
+        }
+    }
+}
+
+private struct WeekdayCircle: View {
+    let day: Weekday
+    let calendar: Calendar
+    @Binding var selection: Set<Weekday>
+
+    private var selected: Bool {
+        selection.contains(day)
+    }
+
+    var body: some View {
+        Button {
+            if selected {
+                selection.remove(day)
+            } else {
+                selection.insert(day)
+            }
+        } label: {
+            Text(day.veryShortSymbol(calendar: calendar))
+                .font(.subheadline.weight(.semibold))
+                .frame(width: 36, height: 36)
+                .background(fill, in: Circle())
+                .foregroundStyle(foreground)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(day.rawValue)
+    }
+
+    private var fill: Color {
+        selected ? .orange : Color.secondary.opacity(0.15)
+    }
+
+    private var foreground: Color {
+        selected ? .white : .primary
     }
 }
 
