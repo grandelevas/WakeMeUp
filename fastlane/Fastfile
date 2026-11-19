@@ -140,10 +140,24 @@ def refuse_bootstrap_when_p12_present!
   MSG
 end
 
-def install_distribution_identity!
+def parsed_distribution_identity!
   password = ENV.fetch("DISTRIBUTION_CERTIFICATE_PASSWORD")
   der = WakeMeUpSigning.decode_p12_base64(ENV.fetch("DISTRIBUTION_CERTIFICATE_P12_BASE64"))
-  pkcs12 = WakeMeUpSigning.read_pkcs12(der, password)
+  [WakeMeUpSigning.read_pkcs12(der, password), password]
+rescue StandardError => error
+  UI.user_error!(error.message)
+end
+
+# Compare the secret to the certificate before any App Store Connect call.
+def require_certificate_team!(certificate)
+  WakeMeUpSigning.assert_team_matches_certificate!(certificate, ENV.fetch("APPLE_TEAM_ID"))
+rescue KeyError
+  UI.user_error!("APPLE_TEAM_ID is not set. No Apple API call was made and the certificate was not imported.")
+rescue StandardError => error
+  UI.user_error!(error.message)
+end
+
+def install_distribution_identity!(pkcs12, password)
   assert_expected_distribution_certificate!(pkcs12.certificate)
 
   FileUtils.mkdir_p(WakeMeUpSigning::SIGNING_DIR)
@@ -212,9 +226,11 @@ platform :ios do
 
   desc "Archive a Release build and upload it to TestFlight"
   lane :beta do
+    pkcs12, password = parsed_distribution_identity!
+    require_certificate_team!(pkcs12.certificate)
     key = asc_key
     prepare_ci_keychain
-    install_distribution_identity!
+    install_distribution_identity!(pkcs12, password)
     sigh(
       api_key: key,
       app_identifier: bundle_id,

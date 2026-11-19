@@ -127,7 +127,7 @@ GitHub repository secrets (Settings → Secrets and variables → Actions):
 | `ASC_KEY_ID` | Key ID, 10 characters |
 | `ASC_ISSUER_ID` | Issuer ID at the top of the keys page |
 | `ASC_PRIVATE_KEY` | The entire `.p8` file, including `BEGIN PRIVATE KEY` |
-| `APPLE_TEAM_ID` | Team ID from Membership details |
+| `APPLE_TEAM_ID` | Team ID from the distribution certificate. It is the OU on that certificate, the same 10 characters in parentheses after the name. Membership can list more than one team; this secret has to be the one that owns the certificate. The upload lane stops if they differ. |
 | `DISTRIBUTION_CERTIFICATE_PASSWORD` | A password you invent. Set this **before** bootstrap. It encrypts the .p12 |
 | `DISTRIBUTION_CERTIFICATE_P12_BASE64` | Added **after** bootstrap. Base64 of the .p12 from the artifact |
 

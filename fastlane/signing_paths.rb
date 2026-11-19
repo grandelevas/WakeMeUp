@@ -118,6 +118,35 @@ module WakeMeUpSigning
     destination
   end
 
+  # Apple Distribution certificates put the 10-character team id in OU.
+  def certificate_team_id(certificate)
+    units = certificate.subject.to_a.filter_map do |name, value, _type|
+      text = value.to_s.strip
+      text if name == "OU" && !text.empty?
+    end
+    team_ids = units.grep(/\A[A-Z0-9]{10}\z/)
+    return team_ids.first if team_ids.length == 1
+
+    subject = certificate.subject.to_s
+    if team_ids.length > 1
+      raise "The distribution certificate has more than one team id in OU (#{team_ids.join(', ')}). Subject: #{subject}"
+    end
+    raise "The distribution certificate has no team id in its OU. Subject: #{subject}"
+  end
+
+  def assert_team_matches_certificate!(certificate, configured_team_id)
+    ou = certificate_team_id(certificate)
+    configured = configured_team_id.to_s.strip
+    return if configured == ou
+
+    shown = configured.empty? ? "(empty)" : configured
+    raise <<~MSG.strip
+      APPLE_TEAM_ID is #{shown}, but the imported distribution certificate's OU is #{ou}.
+      Update the APPLE_TEAM_ID secret to #{ou} and rerun upload-testflight.
+      No Apple API call was made and the certificate was not imported.
+    MSG
+  end
+
   def scrub(text, password)
     cleaned = text.to_s
     cleaned = cleaned.gsub(password, "[redacted]") unless password.to_s.empty?
