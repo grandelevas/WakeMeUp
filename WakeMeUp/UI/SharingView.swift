@@ -78,7 +78,6 @@ struct SharingView: View {
                     }
                 Button("sharing.schedule") { model.ringFromSimulatedFriend(immediately: false) }
                 Button("sharing.ringNow") { model.ringFromSimulatedFriend(immediately: true) }
-                    .tint(.orange)
             } else {
                 TextField("sharing.friendName", text: Binding(
                     get: { model.friendDraftName },

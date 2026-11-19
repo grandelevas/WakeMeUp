@@ -101,6 +101,26 @@
 "sharing.signIn" = "Sign in to iCloud to share alarms.";
 
 "settings.title" = "Settings";
+"settings.appearance" = "Appearance";
+"settings.appearance.theme" = "Theme";
+"settings.appearance.system" = "System";
+"settings.appearance.light" = "Light";
+"settings.appearance.dark" = "Dark";
+"settings.appearance.accent" = "Accent color";
+"settings.appearance.orange" = "Orange";
+"settings.appearance.blue" = "Blue";
+"settings.appearance.green" = "Green";
+"settings.appearance.purple" = "Purple";
+"settings.appearance.pink" = "Pink";
+"settings.appearance.red" = "Red";
+"settings.appearance.teal" = "Teal";
+"settings.appearance.indigo" = "Indigo";
+"settings.appearance.icon" = "App icon";
+"settings.appearance.icon.primary" = "Default";
+"settings.appearance.icon.dark" = "Dark";
+"settings.appearance.icon.minimal" = "Light";
+"settings.appearance.icon.color" = "Color";
+"settings.appearance.icon.unavailable" = "The icon can be changed on an iPhone. The Simulator keeps the default icon.";
 "settings.tagline" = "Remind me of";
 "settings.alarmAccess" = "Alarm access";
 "settings.alarmAccess.authorized" = "Allowed";

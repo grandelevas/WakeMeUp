@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GroupListView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.appAccent) private var appAccent
     @State private var name = ""
     @State private var symbol = "folder"
     private let symbols = ["folder", "briefcase", "sun.max", "moon.stars", "figure.run", "book", "heart", "alarm"]
@@ -18,7 +19,7 @@ struct GroupListView: View {
                             } label: {
                                 Image(systemName: item)
                                     .frame(width: 40, height: 40)
-                                    .background(symbol == item ? Color.orange.opacity(0.25) : Color.clear, in: Circle())
+                                    .background(symbol == item ? appAccent.opacity(0.25) : Color.clear, in: Circle())
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(item)
@@ -45,7 +46,6 @@ struct GroupListView: View {
                             Text(group.name)
                         }
                         .labelsHidden()
-                        .tint(.orange)
                     }
                 }
                 .onDelete { offsets in

@@ -3,6 +3,8 @@ import UIKit
 
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(AppearanceSettings.self) private var appearance
+    @Environment(\.appAccent) private var appAccent
 
     var body: some View {
         Form {
@@ -12,6 +14,7 @@ struct SettingsView: View {
                 Text(version)
                     .foregroundStyle(.secondary)
             }
+            appearanceSection
             Section("settings.alarmAccess") {
                 LabeledContent("settings.alarmAccess", value: accessText)
                 if model.authorization == .denied {
@@ -57,6 +60,86 @@ struct SettingsView: View {
         }
         .navigationTitle("settings.title")
         .accessibilityIdentifier("settings-screen")
+    }
+
+    @ViewBuilder
+    private var appearanceSection: some View {
+        Section("settings.appearance") {
+            Picker("settings.appearance.theme", selection: Binding(
+                get: { appearance.theme },
+                set: { theme in
+                    appearance.theme = theme
+                    appearance.persist()
+                }
+            )) {
+                ForEach(AppTheme.allCases) { theme in
+                    Text(theme.title).tag(theme)
+                }
+            }
+            .pickerStyle(.segmented)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("settings.appearance.accent")
+                    .font(.subheadline)
+                ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(AppAccent.allCases) { accent in
+                        Button {
+                            appearance.accent = accent
+                            appearance.persist()
+                        } label: {
+                            ZStack {
+                                Circle()
+                                    .fill(accent.color)
+                                    .frame(width: 28, height: 28)
+                                if appearance.accent == accent {
+                                    Image(systemName: "checkmark")
+                                        .font(.caption.bold())
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text(accent.title))
+                        .accessibilityAddTraits(appearance.accent == accent ? .isSelected : AccessibilityTraits())
+                    }
+                }
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("settings.appearance.icon")
+                    .font(.subheadline)
+                HStack(spacing: 12) {
+                    ForEach(AppIconChoice.allCases) { icon in
+                        Button {
+                            appearance.chooseIcon(icon)
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(icon.preview)
+                                    .resizable()
+                                    .frame(width: 52, height: 52)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay {
+                                        if appearance.icon == icon {
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(appAccent, lineWidth: 3)
+                                        }
+                                    }
+                                Text(icon.title)
+                                    .font(.caption2)
+                                    .foregroundStyle(.primary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text(icon.title))
+                    }
+                }
+                if let iconMessage = appearance.iconMessage {
+                    Text(iconMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 
     private var accessText: String {

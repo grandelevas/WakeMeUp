@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RingingView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.appAccent) private var appAccent
     let alarm: Alarm
 
     var body: some View {
@@ -11,7 +12,7 @@ struct RingingView: View {
                 Spacer()
                 Image(systemName: "alarm.fill")
                     .font(.system(size: 44))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(appAccent)
                 Text(parts.time)
                     .font(.system(size: 84, weight: .thin))
                     .monospacedDigit()
@@ -26,7 +27,7 @@ struct RingingView: View {
                     .foregroundStyle(.white)
                 if let name = alarm.origin.senderName {
                     Text(String(format: String(localized: "sharing.remoteFrom"), name))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(appAccent)
                 }
                 Spacer()
                 if alarm.songLink != nil {
@@ -37,7 +38,6 @@ struct RingingView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.orange)
                     .controlSize(.large)
                     .accessibilityIdentifier("play-song")
                     Text("ringing.note")
@@ -64,7 +64,6 @@ struct RingingView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.orange)
                     .controlSize(.large)
                     .accessibilityIdentifier("stop-alarm")
                 }

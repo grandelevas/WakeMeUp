@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct AlarmEditorView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.appAccent) private var appAccent
     @Environment(\.dismiss) private var dismiss
     @State private var draft: AlarmDraft
     @State private var time: Date
@@ -48,7 +49,7 @@ struct AlarmEditorView: View {
                                 Spacer()
                                 if draft.soundID == sound.id {
                                     Image(systemName: "checkmark")
-                                        .foregroundStyle(.orange)
+                                        .foregroundStyle(appAccent)
                                 }
                             }
                         }
@@ -62,7 +63,7 @@ struct AlarmEditorView: View {
                                 Text(sound.displayName)
                                 Spacer()
                                 if draft.soundID == sound.id {
-                                    Image(systemName: "checkmark").foregroundStyle(.orange)
+                                    Image(systemName: "checkmark").foregroundStyle(appAccent)
                                 }
                             }
                         }
@@ -73,7 +74,6 @@ struct AlarmEditorView: View {
 
                 Section {
                     Toggle("alarm.snooze", isOn: $draft.snoozeEnabled)
-                        .tint(.orange)
                     if draft.snoozeEnabled {
                         Stepper(value: $draft.snoozeMinutes, in: 1...30) {
                             Text(String(format: String(localized: "alarm.snooze.minutes"), draft.snoozeMinutes))
@@ -195,6 +195,7 @@ struct DayPicker: View {
 }
 
 private struct RepeatPresetChip: View {
+    @Environment(\.appAccent) private var appAccent
     let preset: RepeatPreset
     @Binding var selection: Set<Weekday>
 
@@ -237,7 +238,7 @@ private struct RepeatPresetChip: View {
     }
 
     private var fill: Color {
-        selected ? .orange : Color.secondary.opacity(0.15)
+        selected ? appAccent : Color.secondary.opacity(0.15)
     }
 
     private var foreground: Color {
@@ -263,6 +264,7 @@ private struct WeekdayCircles: View {
 }
 
 private struct WeekdayCircle: View {
+    @Environment(\.appAccent) private var appAccent
     let day: Weekday
     let calendar: Calendar
     @Binding var selection: Set<Weekday>
@@ -290,7 +292,7 @@ private struct WeekdayCircle: View {
     }
 
     private var fill: Color {
-        selected ? .orange : Color.secondary.opacity(0.15)
+        selected ? appAccent : Color.secondary.opacity(0.15)
     }
 
     private var foreground: Color {
