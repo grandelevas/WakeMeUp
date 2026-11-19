@@ -56,6 +56,49 @@ final class SchedulingTests: XCTestCase {
         XCTAssertEqual(RepeatPatternClassifier.classify([.monday]), .custom)
     }
 
+    func testEveryDayPresetTurnsAllDaysOnAndClearsThemAgain() {
+        XCTAssertEqual(RepeatPatternClassifier.toggle(.everyDay, in: []), Set(Weekday.allCases))
+        XCTAssertEqual(RepeatPatternClassifier.toggle(.everyDay, in: [.monday]), Set(Weekday.allCases))
+        XCTAssertEqual(RepeatPatternClassifier.toggle(.everyDay, in: Set(Weekday.allCases)), [])
+        XCTAssertEqual(RepeatPatternClassifier.selectedPreset(Set(Weekday.allCases)), .everyDay)
+        XCTAssertNil(RepeatPatternClassifier.selectedPreset([.monday]))
+    }
+
+    func testWeekdayPresetReplacesTheSelectionAndClearsAnExactMatch() {
+        XCTAssertEqual(RepeatPatternClassifier.toggle(.weekdays, in: []), RepeatPatternClassifier.weekdays)
+        XCTAssertEqual(
+            RepeatPatternClassifier.toggle(.weekdays, in: Set(Weekday.allCases)),
+            RepeatPatternClassifier.weekdays
+        )
+        XCTAssertEqual(RepeatPatternClassifier.toggle(.weekdays, in: RepeatPatternClassifier.weekdays), [])
+        XCTAssertEqual(RepeatPatternClassifier.selectedPreset(RepeatPatternClassifier.weekdays), .weekdays)
+        XCTAssertNil(RepeatPatternClassifier.selectedPreset(RepeatPatternClassifier.weekdays.union([.saturday])))
+    }
+
+    func testWeekendPresetReplacesTheSelectionAndClearsAnExactMatch() {
+        XCTAssertEqual(RepeatPatternClassifier.toggle(.weekends, in: []), RepeatPatternClassifier.weekends)
+        XCTAssertEqual(
+            RepeatPatternClassifier.toggle(.weekends, in: [.monday, .saturday]),
+            RepeatPatternClassifier.weekends
+        )
+        XCTAssertEqual(RepeatPatternClassifier.toggle(.weekends, in: RepeatPatternClassifier.weekends), [])
+        XCTAssertEqual(RepeatPatternClassifier.selectedPreset(RepeatPatternClassifier.weekends), .weekends)
+    }
+
+    func testWeekdayOrderFollowsTheLocaleFirstWeekday() {
+        var unitedStates = Calendar(identifier: .gregorian)
+        unitedStates.locale = Locale(identifier: "en_US")
+        XCTAssertEqual(Weekday.ordered(calendar: unitedStates).first, .sunday)
+
+        var poland = Calendar(identifier: .gregorian)
+        poland.locale = Locale(identifier: "pl_PL")
+        XCTAssertEqual(Weekday.ordered(calendar: poland).first, .monday)
+        XCTAssertEqual(
+            Weekday.sorted([.sunday, .monday, .wednesday], calendar: poland),
+            [.monday, .wednesday, .sunday]
+        )
+    }
+
     private func date(year: Int, month: Int, day: Int, hour: Int, minute: Int) -> Date {
         calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute))!
     }

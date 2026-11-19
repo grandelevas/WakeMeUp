@@ -33,7 +33,7 @@
 "repeat.never" = "Never";
 "repeat.everyDay" = "Every day";
 "repeat.weekdays" = "Weekdays";
-"repeat.weekends" = "Weekends";
+"repeat.weekends" = "Weekend";
 
 "sound.classic" = "Classic";
 "sound.chime" = "Chime";

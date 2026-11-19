@@ -55,6 +55,13 @@ enum Weekday: String, Codable, CaseIterable, Identifiable, Hashable {
             return allCases.first { $0.gregorianIndex == index }
         }
     }
+
+    static func sorted(_ days: some Sequence<Weekday>, calendar: Calendar) -> [Weekday] {
+        let order = ordered(calendar: calendar)
+        return days.sorted { lhs, rhs in
+            (order.firstIndex(of: lhs) ?? 0) < (order.firstIndex(of: rhs) ?? 0)
+        }
+    }
 }
 
 extension Array where Element == Weekday {
