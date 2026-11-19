@@ -183,7 +183,7 @@ struct DayPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ChipFlow(spacing: 8) {
+            HStack(spacing: 8) {
                 ForEach(RepeatPreset.allCases, id: \.self) { preset in
                     RepeatPresetChip(preset: preset, selection: $selection)
                 }
@@ -208,6 +208,8 @@ private struct RepeatPresetChip: View {
         } label: {
             Text(title)
                 .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(fill, in: Capsule())
@@ -296,58 +298,3 @@ private struct WeekdayCircle: View {
     }
 }
 
-/// Lays chips in rows when the form is narrower than all three labels.
-private struct ChipFlow: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? .greatestFiniteMagnitude
-        let wrapped = rows(maxWidth: width, subviews: subviews)
-        let height = wrapped.reduce(CGFloat(0)) { partial, row in
-            partial + (row.map(\.size.height).max() ?? 0)
-        } + spacing * CGFloat(max(wrapped.count - 1, 0))
-        let used = wrapped.map { row in
-            row.map(\.size.width).reduce(0, +) + spacing * CGFloat(max(row.count - 1, 0))
-        }.max() ?? 0
-        return CGSize(width: min(used, width), height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var y = bounds.minY
-        for row in rows(maxWidth: bounds.width, subviews: subviews) {
-            var x = bounds.minX
-            let rowHeight = row.map(\.size.height).max() ?? 0
-            for item in row {
-                item.view.place(
-                    at: CGPoint(x: x, y: y),
-                    proposal: ProposedViewSize(width: item.size.width, height: item.size.height)
-                )
-                x += item.size.width + spacing
-            }
-            y += rowHeight + spacing
-        }
-    }
-
-    private struct Item {
-        let view: LayoutSubview
-        let size: CGSize
-    }
-
-    private func rows(maxWidth: CGFloat, subviews: Subviews) -> [[Item]] {
-        var rows: [[Item]] = [[]]
-        var rowWidth: CGFloat = 0
-        for view in subviews {
-            let size = view.sizeThatFits(.unspecified)
-            let item = Item(view: view, size: size)
-            let next = rowWidth == 0 ? size.width : rowWidth + spacing + size.width
-            if next > maxWidth, !rows[rows.count - 1].isEmpty {
-                rows.append([item])
-                rowWidth = size.width
-            } else {
-                rows[rows.count - 1].append(item)
-                rowWidth = next
-            }
-        }
-        return rows
-    }
-}
