@@ -114,5 +114,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: signing-bootstrap
+          # Repo root. The Fastfile uses the same absolute directory.
           path: signing-out
           if-no-files-found: ignore
