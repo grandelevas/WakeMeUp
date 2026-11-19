@@ -62,9 +62,10 @@ Dir.mktmpdir("wakemeup-security-import") do |dir|
     unless certificates.include?("BEGIN CERTIFICATE")
       raise "security import did not store the certificate:\n#{certificates}"
     end
-    keys = `security find-key -a #{Shellwords.escape(keychain)}`
-    unless keys.include?("key")
-      raise "security import did not store the private key:\n#{keys}"
+    # find-key searches the login keychain. dump-keychain reads this file.
+    dumped = `security dump-keychain #{Shellwords.escape(keychain)}`
+    unless dumped.include?("Imported Private Key")
+      raise "security import did not store the private key:\n#{dumped}"
     end
     puts "security import accepted the legacy p12"
   ensure
