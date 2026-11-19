@@ -14,6 +14,29 @@ def team_id
   ENV.fetch("APPLE_TEAM_ID")
 end
 
+def marketing_version
+  project = File.read(File.join(WakeMeUpSigning::REPO_ROOT, "project.yml"))
+  found = project[/^[ \t]*MARKETING_VERSION:[ \t]*"([^"]+)"/, 1]
+  UI.user_error!("project.yml is missing MARKETING_VERSION") if found.to_s.empty?
+  found
+end
+
+# A rejected upload can still occupy a build number. Take the higher of this
+# workflow run and one past the newest TestFlight build for the same version.
+def next_bundle_version(key)
+  latest = latest_testflight_build_number(
+    api_key: key,
+    app_identifier: bundle_id,
+    version: marketing_version,
+    platform: "ios",
+    initial_build_number: 0
+  )
+  chosen = [ENV["GITHUB_RUN_NUMBER"].to_i, latest.to_i + 1].max
+  UI.user_error!("CFBundleVersion must be at least 1") if chosen < 1
+  UI.message("CFBundleVersion #{chosen} (workflow run #{ENV['GITHUB_RUN_NUMBER'] || 'unset'}, TestFlight latest #{latest})")
+  chosen.to_s
+end
+
 # setup_ci in fastlane 2.242 has no keychain_password option. It always creates
 # this keychain with an empty password and records that in MATCH_KEYCHAIN_PASSWORD.
 CI_KEYCHAIN_NAME = "fastlane_tmp_keychain"
@@ -251,6 +274,7 @@ platform :ios do
       filename: "widget.mobileprovision"
     )
     widget_profile_name = lane_context[SharedValues::SIGH_NAME]
+    bundle_version = next_bundle_version(key)
     update_code_signing_settings(
       use_automatic_signing: false,
       path: WakeMeUpSigning::XCODEPROJ,
@@ -284,7 +308,7 @@ platform :ios do
           widget_id => widget_profile_name
         }
       },
-      xcargs: "DEVELOPMENT_TEAM=#{team_id} CODE_SIGN_STYLE=Manual"
+      xcargs: "DEVELOPMENT_TEAM=#{team_id} CODE_SIGN_STYLE=Manual CURRENT_PROJECT_VERSION=#{bundle_version}"
     )
     upload_to_testflight(
       api_key: key,

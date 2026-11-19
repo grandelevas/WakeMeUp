@@ -64,6 +64,7 @@ jobs:
       BUNDLE_ID: ${{ vars.BUNDLE_ID }}
       DISTRIBUTION_CERTIFICATE_P12_BASE64: ${{ secrets.DISTRIBUTION_CERTIFICATE_P12_BASE64 }}
       DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.DISTRIBUTION_CERTIFICATE_PASSWORD }}
+      GITHUB_RUN_NUMBER: ${{ github.run_number }}
       ACTION: ${{ github.event_name == 'workflow_dispatch' && inputs.action || 'upload-testflight' }}
     steps:
       - name: Check out
