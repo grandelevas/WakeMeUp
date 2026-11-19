@@ -50,7 +50,16 @@ def main() -> int:
             print(f"widget extension must not declare {key}", file=sys.stderr)
             return 1
 
-    print("app Info.plist keeps iPhone portrait and all four iPad orientations")
+    for label, plist in (("app", app), ("widget", widget)):
+        for key in ("CFBundleDisplayName", "CFBundleName"):
+            if plist.get(key) != "Wakito":
+                print(f"{label} {key} must be Wakito, got {plist.get(key)!r}", file=sys.stderr)
+                return 1
+    if "PRODUCT_BUNDLE_IDENTIFIER: com.grandelevas.wakemeup" not in project:
+        print("bundle id must stay com.grandelevas.wakemeup", file=sys.stderr)
+        return 1
+
+    print("app Info.plist keeps iPhone portrait, all four iPad orientations, and the Wakito name")
     return 0
 
 

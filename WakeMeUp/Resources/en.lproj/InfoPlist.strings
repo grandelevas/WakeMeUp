@@ -1,2 +1,3 @@
-"NSAlarmKitUsageDescription" = "WakeMeUp schedules alarms so a wake-up you set still rings when iPhone is locked or on silent.";
-"CFBundleDisplayName" = "WakeMeUp";
+"NSAlarmKitUsageDescription" = "Wakito schedules alarms so a wake-up you set still rings when iPhone is locked or on silent.";
+"CFBundleDisplayName" = "Wakito";
+"CFBundleName" = "Wakito";

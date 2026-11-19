@@ -35,7 +35,7 @@ enum LaunchHandoff {
 
 struct PlaySongIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "Play my song"
-    static var description = IntentDescription("Stops the WakeMeUp alarm and opens the linked song.")
+    static var description = IntentDescription("Stops the Wakito alarm and opens the linked song.")
     static var openAppWhenRun: Bool = true
 
     @Parameter(title: "Alarm ID")
