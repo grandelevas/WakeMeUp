@@ -1,6 +1,6 @@
 default_platform(:ios)
 
-require "openssl"
+require_relative "signing_paths"
 
 def bundle_id
   ENV.fetch("BUNDLE_ID", "com.grandelevas.wakemeup")
@@ -46,7 +46,7 @@ def asc_key
   app_store_connect_api_key(
     key_id: ENV.fetch("ASC_KEY_ID"),
     issuer_id: ENV.fetch("ASC_ISSUER_ID"),
-    key_filepath: "signing/AuthKey.p8",
+    key_filepath: File.join(WakeMeUpSigning::SIGNING_DIR, "AuthKey.p8"),
     duration: 1200,
     in_house: false
   )
@@ -94,32 +94,27 @@ def ensure_app_store_record!
   end
 end
 
-# fastlane cert writes the private key to a file ending in .p12, but the bytes
-# are a PEM key, not a PKCS#12 archive. import_certificate needs a real p12
-# encrypted with DISTRIBUTION_CERTIFICATE_PASSWORD. Build that here, in process,
-# so the password is not passed on a command line.
+# cert's lane context points at the .cer. The PEM private key sits beside it
+# with the same id and a .p12 suffix. Both paths are absolute because cert
+# runs from the repo root.
 def export_distribution_p12(output_dir)
-  password = ENV.fetch("DISTRIBUTION_CERTIFICATE_PASSWORD")
-  UI.user_error!("DISTRIBUTION_CERTIFICATE_PASSWORD is empty") if password.empty?
-
-  certificate_path = Dir.glob(File.join(output_dir, "*.cer")).max_by { |path| File.mtime(path) }
-  key_path = Dir.glob(File.join(output_dir, "*.p12")).max_by { |path| File.mtime(path) }
-  unless certificate_path && key_path
-    UI.user_error!("cert did not leave a certificate and private key in #{output_dir}")
+  certificate_path = Actions.lane_context[SharedValues::CERT_FILE_PATH]
+  if certificate_path.to_s.empty?
+    UI.user_error!("cert did not set CERT_FILE_PATH")
   end
-
-  key = OpenSSL::PKey.read(File.binread(key_path))
-  certificate = OpenSSL::X509::Certificate.new(File.binread(certificate_path))
-  archive = OpenSSL::PKCS12.create(password, "WakeMeUp Distribution", key, certificate)
-  destination = File.join(output_dir, "distribution.p12")
-  File.binwrite(destination, archive.to_der)
-  File.chmod(0o600, destination)
-  File.delete(key_path) unless File.expand_path(key_path) == File.expand_path(destination)
-  File.write(
-    File.join(output_dir, "README.txt"),
-    "Encode distribution.p12 only, with the DISTRIBUTION_CERTIFICATE_PASSWORD already stored in GitHub. Do not paste the file into chat.\n"
-  )
-  UI.success("Wrote signing-out/distribution.p12")
+  certificate_path = WakeMeUpSigning.absolute_repo_path(certificate_path)
+  key_path = certificate_path.sub(/\.cer\z/, ".p12")
+  begin
+    destination = WakeMeUpSigning.export_distribution_p12(
+      output_dir: output_dir,
+      certificate_path: certificate_path,
+      key_path: key_path,
+      password: ENV.fetch("DISTRIBUTION_CERTIFICATE_PASSWORD")
+    )
+  rescue StandardError => error
+    UI.user_error!(error.message)
+  end
+  UI.success("Wrote #{destination}")
 end
 
 def create_app_store_profile(key, identifier, filename)
@@ -129,7 +124,7 @@ def create_app_store_profile(key, identifier, filename)
     team_id: team_id,
     platform: "ios",
     force: true,
-    output_path: "signing-out",
+    output_path: WakeMeUpSigning::SIGNING_OUT,
     filename: filename
   )
 end
@@ -149,11 +144,11 @@ platform :ios do
       development: false,
       force: false,
       team_id: team_id,
-      output_path: "signing-out",
+      output_path: WakeMeUpSigning::SIGNING_OUT,
       keychain_path: ci_keychain_path,
       keychain_password: CI_KEYCHAIN_PASSWORD
     )
-    export_distribution_p12("signing-out")
+    export_distribution_p12(WakeMeUpSigning::SIGNING_OUT)
 
     # Profiles are replaceable. If they fail, distribution.p12 is already on disk
     # and the workflow uploads signing-out even when this lane exits non-zero.
@@ -174,7 +169,7 @@ platform :ios do
     key = asc_key
     prepare_ci_keychain
     import_certificate(
-      certificate_path: "signing/distribution.p12",
+      certificate_path: File.join(WakeMeUpSigning::SIGNING_DIR, "distribution.p12"),
       certificate_password: ENV.fetch("DISTRIBUTION_CERTIFICATE_PASSWORD"),
       keychain_path: ci_keychain_path,
       keychain_password: CI_KEYCHAIN_PASSWORD
@@ -185,7 +180,7 @@ platform :ios do
       team_id: team_id,
       platform: "ios",
       force: false,
-      output_path: "signing-out",
+      output_path: WakeMeUpSigning::SIGNING_OUT,
       filename: "app.mobileprovision"
     )
     app_profile_name = lane_context[SharedValues::SIGH_NAME]
@@ -195,13 +190,13 @@ platform :ios do
       team_id: team_id,
       platform: "ios",
       force: false,
-      output_path: "signing-out",
+      output_path: WakeMeUpSigning::SIGNING_OUT,
       filename: "widget.mobileprovision"
     )
     widget_profile_name = lane_context[SharedValues::SIGH_NAME]
     update_code_signing_settings(
       use_automatic_signing: false,
-      path: "WakeMeUp.xcodeproj",
+      path: WakeMeUpSigning::XCODEPROJ,
       team_id: team_id,
       code_sign_identity: "Apple Distribution",
       targets: ["WakeMeUp"],
@@ -210,7 +205,7 @@ platform :ios do
     )
     update_code_signing_settings(
       use_automatic_signing: false,
-      path: "WakeMeUp.xcodeproj",
+      path: WakeMeUpSigning::XCODEPROJ,
       team_id: team_id,
       code_sign_identity: "Apple Distribution",
       targets: ["WakeMeUpWidget"],
@@ -218,9 +213,10 @@ platform :ios do
       build_configurations: ["Release"]
     )
     build_app(
-      project: "WakeMeUp.xcodeproj",
+      project: WakeMeUpSigning::XCODEPROJ,
       scheme: "WakeMeUp",
       configuration: "Release",
+      output_directory: WakeMeUpSigning::BUILD_DIR,
       export_method: "app-store",
       export_team_id: team_id,
       export_options: {
