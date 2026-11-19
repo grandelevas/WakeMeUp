@@ -94,9 +94,8 @@ jobs:
           set -euo pipefail
           mkdir -p signing
           printf '%s' "${ASC_PRIVATE_KEY}" > signing/AuthKey.p8
-          if [ -n "${DISTRIBUTION_CERTIFICATE_P12_BASE64}" ]; then
-            printf '%s' "${DISTRIBUTION_CERTIFICATE_P12_BASE64}" | base64 --decode > signing/distribution.p12
-          fi
+          # The p12 secret is decoded in the Fastfile so wrapped base64 and
+          # OpenSSL 3 PKCS#12 files can be normalized before `security import`.
 
       - name: Bootstrap signing or upload
         run: |

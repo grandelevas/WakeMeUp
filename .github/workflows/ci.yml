@@ -32,6 +32,9 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
+      - name: security import accepts the legacy p12
+        run: ruby scripts/check-macos-p12-import.rb
+
       - name: Select Xcode
         run: |
           set -euo pipefail

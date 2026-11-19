@@ -70,6 +70,23 @@ def action_calls(source)
   calls
 end
 
+def distribution_certificate(team_id)
+  key = OpenSSL::PKey::RSA.new(2048)
+  certificate = OpenSSL::X509::Certificate.new
+  certificate.version = 2
+  certificate.serial = 1
+  parts = [["CN", "Apple Distribution: Example#{team_id ? " (#{team_id})" : ""}"]]
+  parts << ["OU", team_id] if team_id
+  parts.push(["O", "Example"], ["C", "US"])
+  certificate.subject = OpenSSL::X509::Name.new(parts)
+  certificate.issuer = certificate.subject
+  certificate.public_key = key.public_key
+  certificate.not_before = Time.now - 60
+  certificate.not_after = Time.now + 3600
+  certificate.sign(key, OpenSSL::Digest::SHA256.new)
+  certificate
+end
+
 calls = action_calls(SOURCE)
 abort("No fastlane action calls found in #{FASTFILE}") if calls.empty?
 
@@ -123,6 +140,35 @@ unless SOURCE.include?("WakeMeUpSigning::SIGNING_OUT") &&
   failures << "bootstrap must export the p12 from CERT_FILE_PATH into SIGNING_OUT"
 end
 
+bootstrap = SOURCE[/lane :bootstrap_signing do(.*?)(?=\n  desc |\n  lane :beta)/m]
+guard_at = bootstrap.to_s.index("refuse_bootstrap_when_p12_present!")
+token_at = bootstrap.to_s.index("asc_key")
+if guard_at.nil? || token_at.nil? || guard_at > token_at
+  failures << "bootstrap_signing must refuse a stored p12 secret before app_store_connect_api_key"
+end
+
+beta = SOURCE[/lane :beta do(.*)\z/m].to_s
+team_at = beta.index("require_certificate_team!")
+beta_token_at = beta.index("asc_key")
+if team_at.nil? || beta_token_at.nil? || team_at > beta_token_at
+  failures << "beta must compare APPLE_TEAM_ID to the certificate OU before app_store_connect_api_key"
+end
+unless SOURCE.match?(/def team_id\n  ENV\.fetch\("APPLE_TEAM_ID"\)\nend/)
+  failures << "team_id must be ENV.fetch(\"APPLE_TEAM_ID\") with no default"
+end
+
+forbidden_team = %w[T9M8 DVS2UD].join
+Dir.glob(File.join(ROOT, "**/*.{rb,yml,yaml,md,plist,swift,entitlements,sh,py,txt,json}")).each do |path|
+  next if path.include?("/vendor/") || path.include?("/.git/")
+  next unless File.file?(path)
+
+  relative = path.delete_prefix("#{ROOT}/")
+  failures << "#{relative} hardcodes #{forbidden_team}" if File.read(path).include?(forbidden_team)
+end
+if File.read(File.join(ROOT, "project.yml")).match?(/^\s*DEVELOPMENT_TEAM:/)
+  failures << "project.yml must not set DEVELOPMENT_TEAM. Release signing uses APPLE_TEAM_ID."
+end
+
 require_relative "../fastlane/signing_paths"
 
 expected_out = File.join(ROOT, "signing-out")
@@ -171,6 +217,51 @@ begin
     opened = OpenSSL::PKCS12.new(File.binread(archive_path), password)
     raise "certificate did not round-trip" unless opened.certificate.to_der == certificate.to_der
     raise "private key did not round-trip" unless opened.key.to_pem == key.to_pem
+
+    modern = OpenSSL::PKCS12.create(password, "WakeMeUp Distribution", key, certificate)
+    wrapped = Base64.encode64(modern.to_der)
+    der = WakeMeUpSigning.decode_p12_base64("\n#{wrapped.scan(/.{1,64}/).join("\n")}\n")
+    parsed = WakeMeUpSigning.read_pkcs12(der, password)
+    legacy_path = File.join(dir, "from-wrapped.p12")
+    WakeMeUpSigning.write_legacy_p12(
+      key: parsed.key,
+      certificate: parsed.certificate,
+      password: password,
+      destination: legacy_path
+    )
+    legacy = OpenSSL::PKCS12.new(File.binread(legacy_path), password)
+    raise "wrapped base64 cert mismatch" unless legacy.certificate.to_der == certificate.to_der
+
+    begin
+      WakeMeUpSigning.read_pkcs12(der, "not-the-password")
+      raise "wrong password was accepted"
+    rescue RuntimeError => error
+      raise "password error was unclear: #{error.message}" unless error.message.include?("DISTRIBUTION_CERTIFICATE_PASSWORD")
+    end
+
+    begin
+      WakeMeUpSigning.decode_p12_base64("!!!!")
+      raise "invalid base64 was accepted"
+    rescue RuntimeError => error
+      raise "base64 error was unclear: #{error.message}" unless error.message.include?("not valid base64")
+    end
+
+    matching = distribution_certificate("AAAAAAAAAA")
+    WakeMeUpSigning.assert_team_matches_certificate!(matching, "AAAAAAAAAA")
+    begin
+      WakeMeUpSigning.assert_team_matches_certificate!(matching, "BBBBBBBBBB")
+      raise "a different team id was accepted"
+    rescue RuntimeError => error
+      unless error.message.include?("APPLE_TEAM_ID is BBBBBBBBBB") && error.message.include?("OU is AAAAAAAAAA")
+        raise "team mismatch did not print both ids: #{error.message}"
+      end
+    end
+    begin
+      WakeMeUpSigning.certificate_team_id(distribution_certificate(nil))
+      raise "a certificate without OU was accepted"
+    rescue RuntimeError => error
+      raise "missing OU error was unclear: #{error.message}" unless error.message.include?("no team id")
+    end
   end
 rescue StandardError => error
   failures << "export_distribution_p12 round-trip failed: #{error.message}"
