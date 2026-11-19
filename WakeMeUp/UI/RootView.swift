@@ -13,7 +13,6 @@ struct RootView: View {
                 .tabItem { Label("tab.sharing", systemImage: "person.2.fill") }
                 .tag(AppTab.sharing)
         }
-        .tint(.orange)
         .readableWidth()
         .sheet(item: $model.editor) { draft in
             AlarmEditorView(draft: draft)

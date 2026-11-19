@@ -191,6 +191,42 @@ final class AlarmLibraryTests: XCTestCase {
     }
 }
 
+final class AppearanceTests: XCTestCase {
+    func testDefaultsAreSystemOrangeAndPrimaryIcon() {
+        let defaults = UserDefaults(suiteName: "wakito.appearance.\(UUID().uuidString)")!
+        XCTAssertEqual(AppearanceRecord.load(from: defaults), .default)
+        XCTAssertEqual(AppearanceRecord.default.accent, .orange)
+        XCTAssertNil(AppTheme.system.colorScheme)
+        XCTAssertEqual(AppTheme.light.colorScheme, .light)
+        XCTAssertEqual(AppTheme.dark.colorScheme, .dark)
+    }
+
+    func testAppearanceRoundTrip() {
+        let defaults = UserDefaults(suiteName: "wakito.appearance.\(UUID().uuidString)")!
+        let record = AppearanceRecord(theme: .dark, accent: .teal, icon: .minimal)
+        record.save(to: defaults)
+        XCTAssertEqual(AppearanceRecord.load(from: defaults), record)
+    }
+
+    func testUnknownStoredValuesFallBack() {
+        let defaults = UserDefaults(suiteName: "wakito.appearance.\(UUID().uuidString)")!
+        defaults.set("nope", forKey: AppearanceKeys.theme)
+        defaults.set("nope", forKey: AppearanceKeys.accent)
+        defaults.set("nope", forKey: AppearanceKeys.icon)
+        XCTAssertEqual(AppearanceRecord.load(from: defaults), .default)
+    }
+
+    func testAlternateIconNamesMatchTheAssetCatalog() {
+        XCTAssertNil(AppIconChoice.primary.alternateName)
+        XCTAssertEqual(AppIconChoice.dark.alternateName, "Dark")
+        XCTAssertEqual(AppIconChoice.minimal.alternateName, "Minimal")
+        XCTAssertEqual(AppIconChoice.color.alternateName, "Color")
+        XCTAssertEqual(AppIconChoice.matching(alternateName: "Color"), .color)
+        XCTAssertEqual(AppIconChoice.matching(alternateName: nil), .primary)
+        XCTAssertEqual(AppAccent.allCases.count, 8)
+    }
+}
+
 final class AlarmDeliveryTests: XCTestCase {
     func testGrantedPermissionNeverFallsBackToANotification() {
         let scheduled = AlarmDeliveryPolicy.decide(

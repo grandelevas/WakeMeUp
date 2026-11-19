@@ -6,11 +6,16 @@ import UserNotifications
 struct WakeMeUpApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = AppModel()
+    @State private var appearance = AppearanceSettings.load()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
+                .environment(appearance)
+                .environment(\.appAccent, appearance.accent.color)
+                .tint(appearance.accent.color)
+                .preferredColorScheme(appearance.theme.colorScheme)
         }
     }
 }

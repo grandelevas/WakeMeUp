@@ -199,7 +199,7 @@ final class AlarmKitEngine {
                 label: title,
                 songURL: alarm.songLink?.url.absoluteString
             ),
-            tintColor: .orange
+            tintColor: AppearanceSettings.storedAccent.color
         )
         let countdown: SystemAlarm.CountdownDuration? = alarm.snoozeEnabled
             ? SystemAlarm.CountdownDuration(preAlert: nil, postAlert: TimeInterval(alarm.snoozeMinutes * 60))

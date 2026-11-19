@@ -56,6 +56,8 @@ targets:
         INFOPLIST_FILE: WakeMeUp/Info.plist
         PRODUCT_NAME: WakeMeUp
         ENABLE_PREVIEWS: YES
+        ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: Dark Minimal Color
       configs:
         Release:
           CODE_SIGN_ENTITLEMENTS: Config/Release.entitlements

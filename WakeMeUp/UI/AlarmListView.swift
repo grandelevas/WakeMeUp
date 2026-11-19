@@ -66,7 +66,6 @@ struct AlarmListView: View {
                             }
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(.orange)
                     }
                 }
             } else if !model.suppressPermissionBanner && model.authorization != .authorized {
@@ -77,7 +76,6 @@ struct AlarmListView: View {
                             Task { await model.allowAlarms() }
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(.orange)
                     }
                     .font(.subheadline)
                 }
@@ -154,7 +152,6 @@ struct AlarmListView: View {
                         Text(title)
                     }
                     .labelsHidden()
-                    .tint(.orange)
                     .accessibilityIdentifier("group-toggle-\(group.id.uuidString)")
                 }
             }
@@ -179,6 +176,7 @@ struct AlarmListView: View {
 }
 
 struct AlarmRow: View {
+    @Environment(\.appAccent) private var appAccent
     let alarm: Alarm
     let enabled: Bool
 
@@ -201,7 +199,7 @@ struct AlarmRow: View {
                 if let name = alarm.origin.senderName {
                     Text(String(format: String(localized: "sharing.remoteFrom"), name))
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(appAccent)
                 }
             }
             Spacer(minLength: 8)
@@ -212,7 +210,6 @@ struct AlarmRow: View {
                 Text(alarm.label)
             }
             .labelsHidden()
-            .tint(.orange)
             .disabled(groupDisabled)
         }
         .padding(.vertical, 4)

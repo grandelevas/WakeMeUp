@@ -101,6 +101,26 @@
 "sharing.signIn" = "Zaloguj się do iCloud, aby udostępniać alarmy.";
 
 "settings.title" = "Ustawienia";
+"settings.appearance" = "Wygląd";
+"settings.appearance.theme" = "Motyw";
+"settings.appearance.system" = "Systemowy";
+"settings.appearance.light" = "Jasny";
+"settings.appearance.dark" = "Ciemny";
+"settings.appearance.accent" = "Kolor akcentu";
+"settings.appearance.orange" = "Pomarańczowy";
+"settings.appearance.blue" = "Niebieski";
+"settings.appearance.green" = "Zielony";
+"settings.appearance.purple" = "Fioletowy";
+"settings.appearance.pink" = "Różowy";
+"settings.appearance.red" = "Czerwony";
+"settings.appearance.teal" = "Turkusowy";
+"settings.appearance.indigo" = "Indygo";
+"settings.appearance.icon" = "Ikona";
+"settings.appearance.icon.primary" = "Domyślna";
+"settings.appearance.icon.dark" = "Ciemna";
+"settings.appearance.icon.minimal" = "Jasna";
+"settings.appearance.icon.color" = "Kolorowa";
+"settings.appearance.icon.unavailable" = "Ikonę można zmienić na iPhonie. Symulator zostawia ikonę domyślną.";
 "settings.tagline" = "Przypomnij mi o";
 "settings.alarmAccess" = "Dostęp do alarmów";
 "settings.alarmAccess.authorized" = "Dozwolony";
