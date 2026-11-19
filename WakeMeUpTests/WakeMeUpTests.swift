@@ -466,6 +466,36 @@ final class AudioTrimmerTests: XCTestCase {
         try await AudioTrimmer.trim(source: source, window: TrimWindow(start: 0.5, end: 1.5), destination: destination)
         let after = try AudioTrimmer.duration(of: destination)
         XCTAssertEqual(after, 1, accuracy: 0.08)
+        let peak = try Self.peak(of: destination)
+        XCTAssertGreaterThan(peak, 0.45)
+        XCTAssertLessThan(peak, 0.95)
+    }
+
+    func testSpikyAudioStopsAtThePeakCeiling() {
+        let gain = AlarmLoudness.gain(peak: 0.5, meanSquare: 0.001)
+        XCTAssertEqual(gain * 0.5, AlarmLoudness.peakCeiling, accuracy: 0.001)
+    }
+
+    func testSoundFilenamesIncludeTheExtension() {
+        let custom = CustomSound(id: "abc", displayName: "Clip", filename: "abc.caf")
+        XCTAssertEqual(SoundFiles.alarmKitName(for: "classic", customSounds: []), "classic.wav")
+        XCTAssertEqual(SoundFiles.notificationName(for: "classic", customSounds: []), "classic.wav")
+        XCTAssertEqual(SoundFiles.alarmKitName(for: "abc", customSounds: [custom]), "abc.caf")
+        XCTAssertEqual(SoundFiles.notificationName(for: "abc", customSounds: [custom]), "abc.caf")
+    }
+
+    private static func peak(of url: URL) throws -> Float {
+        let file = try AVAudioFile(forReading: url)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)) else {
+            return 0
+        }
+        try file.read(into: buffer)
+        guard let channels = buffer.floatChannelData else { return 0 }
+        var peak: Float = 0
+        for frame in 0..<Int(buffer.frameLength) {
+            peak = max(peak, abs(channels[0][frame]))
+        }
+        return peak
     }
 }
 

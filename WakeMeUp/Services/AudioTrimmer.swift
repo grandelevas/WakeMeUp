@@ -8,6 +8,23 @@ enum AudioTrimError: Error, Equatable {
     case invalidWindow
 }
 
+enum AlarmLoudness {
+    /// -1 dBFS. Alarm files must not reach full scale.
+    static let peakCeiling: Float = 0.891250938
+    /// -9 LUFS, as the mean square of samples in the -1...1 range.
+    static let targetMeanSquare: Float = 0.12589254
+
+    /// Raises a quiet clip toward -9 LUFS, but never past the peak ceiling.
+    static func gain(peak: Float, meanSquare: Float) -> Float {
+        guard peak > 0, meanSquare > 0 else { return 1 }
+        let peakGain = peakCeiling / peak
+        let loudnessGain = sqrt(targetMeanSquare / meanSquare)
+        let chosen = min(peakGain, loudnessGain)
+        guard chosen.isFinite, chosen > 0 else { return 1 }
+        return chosen
+    }
+}
+
 enum AudioTrimmer {
     static func duration(of url: URL) throws -> TimeInterval {
         let file = try AVAudioFile(forReading: url)
@@ -20,9 +37,10 @@ enum AudioTrimmer {
         let ext = source.pathExtension.lowercased()
         if ["wav", "caf", "aiff", "aif"].contains(ext) {
             try trimPCM(source: source, window: window, destination: destination)
-            return
+        } else {
+            try await trimCompressed(source: source, window: window, destination: destination)
         }
-        try await trimCompressed(source: source, window: window, destination: destination)
+        try normalizeAlarmLevel(at: destination)
     }
 
     static func trimPCM(source: URL, window: TrimWindow, destination: URL) throws {
@@ -53,6 +71,83 @@ enum AudioTrimmer {
         let output = try AVAudioFile(
             forWriting: destination,
             settings: outputSettings,
+            commonFormat: .pcmFormatInt16,
+            interleaved: true
+        )
+        guard let converted = convert(buffer, to: output.processingFormat) else {
+            throw AudioTrimError.exportFailed
+        }
+        try output.write(from: converted)
+    }
+
+    /// Rewrites a trimmed clip at alarm loudness. 16-bit PCM stays the on-disk format.
+    static func normalizeAlarmLevel(at url: URL) throws {
+        let buffer = try readFloatBuffer(at: url)
+        guard let buffer else { return }
+        guard let channels = buffer.floatChannelData else { throw AudioTrimError.exportFailed }
+        let channelCount = Int(buffer.format.channelCount)
+        let frameCount = Int(buffer.frameLength)
+        guard channelCount > 0, frameCount > 0 else { return }
+
+        var peak: Float = 0
+        var sum: Float = 0
+        let sampleCount = channelCount * frameCount
+        for channel in 0..<channelCount {
+            let samples = channels[channel]
+            for frame in 0..<frameCount {
+                let sample = samples[frame]
+                peak = max(peak, abs(sample))
+                sum += sample * sample
+            }
+        }
+        let gain = AlarmLoudness.gain(peak: peak, meanSquare: sum / Float(sampleCount))
+        guard abs(gain - 1) > 0.01 else { return }
+        for channel in 0..<channelCount {
+            let samples = channels[channel]
+            for frame in 0..<frameCount {
+                let scaled = samples[frame] * gain
+                samples[frame] = min(1, max(-1, scaled))
+            }
+        }
+
+        let outputSettings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: buffer.format.sampleRate,
+            AVNumberOfChannelsKey: channelCount,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false,
+        ]
+        let temporary = url.deletingLastPathComponent()
+            .appendingPathComponent("norm-\(UUID().uuidString)")
+            .appendingPathExtension(url.pathExtension.isEmpty ? "caf" : url.pathExtension)
+        try writeNormalized(buffer, to: temporary, settings: outputSettings)
+        if FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.removeItem(at: url)
+        }
+        try FileManager.default.moveItem(at: temporary, to: url)
+    }
+
+    private static func readFloatBuffer(at url: URL) throws -> AVAudioPCMBuffer? {
+        let input = try AVAudioFile(forReading: url)
+        guard input.length > 0, input.processingFormat.sampleRate > 0 else { return nil }
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: input.processingFormat,
+            frameCapacity: AVAudioFrameCount(input.length)
+        ) else { throw AudioTrimError.exportFailed }
+        try input.read(into: buffer)
+        return buffer
+    }
+
+    private static func writeNormalized(
+        _ buffer: AVAudioPCMBuffer,
+        to url: URL,
+        settings: [String: Any]
+    ) throws {
+        let output = try AVAudioFile(
+            forWriting: url,
+            settings: settings,
             commonFormat: .pcmFormatInt16,
             interleaved: true
         )

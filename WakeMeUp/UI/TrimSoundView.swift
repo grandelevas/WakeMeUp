@@ -74,9 +74,11 @@ struct TrimSoundView: View {
         let accessing = source.startAccessingSecurityScopedResource()
         defer { if accessing { source.stopAccessingSecurityScopedResource() } }
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-            try AVAudioSession.sharedInstance().setActive(true)
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setActive(true)
             let player = try AVAudioPlayer(contentsOf: source)
+            player.volume = 1
             player.currentTime = start
             player.play()
             self.player = player

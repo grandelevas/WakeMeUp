@@ -95,17 +95,20 @@ enum SoundFiles {
         return directory
     }
 
-    static func alarmKitName(for soundID: String, customSounds: [CustomSound]) -> String {
-        if let custom = customSounds.first(where: { $0.id == soundID }) {
-            return (custom.filename as NSString).deletingPathExtension
-        }
-        return soundID
-    }
-
-    static func notificationName(for soundID: String, customSounds: [CustomSound]) -> String {
+    /// AlarmKit `.named` and `UNNotificationSound` both need the filename,
+    /// including its extension, in the app bundle root or in Library/Sounds.
+    static func soundFilename(for soundID: String, customSounds: [CustomSound]) -> String {
         if let custom = customSounds.first(where: { $0.id == soundID }) {
             return custom.filename
         }
         return "\(soundID).wav"
+    }
+
+    static func alarmKitName(for soundID: String, customSounds: [CustomSound]) -> String {
+        soundFilename(for: soundID, customSounds: customSounds)
+    }
+
+    static func notificationName(for soundID: String, customSounds: [CustomSound]) -> String {
+        soundFilename(for: soundID, customSounds: customSounds)
     }
 }
