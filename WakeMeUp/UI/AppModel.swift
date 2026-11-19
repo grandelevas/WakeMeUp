@@ -7,6 +7,7 @@ import UserNotifications
 enum AppTab: Hashable {
     case alarms
     case sharing
+    case achievements
 }
 
 struct PreparedShare: Identifiable {

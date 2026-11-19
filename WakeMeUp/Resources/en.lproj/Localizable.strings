@@ -1,5 +1,6 @@
 "tab.alarms" = "Alarms";
 "tab.sharing" = "Sharing";
+"tab.achievements" = "Achievements";
 
 "alarms.title" = "Alarms";
 "alarms.empty.title" = "No Alarms";
@@ -160,6 +161,24 @@
 "demo.me" = "Maja";
 "demo.friend" = "Ola";
 
+"achievements.disclosure" = "Mateusz gives 50% of subscription proceeds to causes he chooses. The app does not collect donations.";
+"achievements.together" = "Our shared success";
+"achievements.support" = "Your support helps";
+"achievements.campaign" = "Current campaign";
+"achievements.more" = "Read more";
+"achievements.total" = "Together we have donated %@";
+"achievements.people" = "People helped: %d";
+"achievements.history" = "History";
+"achievements.history.empty" = "No gifts recorded yet.";
+"achievements.yours" = "Your badges";
+"achievements.tenure.month" = "1 month with Wakito";
+"achievements.tenure.sixMonths" = "6 months with Wakito";
+"achievements.tenure.year" = "1 year with Wakito";
+"achievements.tenure.twoYears" = "2 years with Wakito";
+"achievements.tenure.threeYears" = "3 years with Wakito";
+"achievements.unlocked" = "Unlocked";
+"achievements.locked" = "Locked";
+"achievements.goalMissing" = "Goal not set yet. Raised stays at 0 until Mateusz records a real amount.";
 "error.generic" = "Something went wrong.";
 "error.schedule" = "Could not schedule this alarm.";
 "editor.title.new" = "Add Alarm";

@@ -217,6 +217,53 @@ final class ShareInviteCleanupTests: XCTestCase {
     }
 }
 
+final class SupportTenureTests: XCTestCase {
+    func testMilestonesFollowTheFirstUseDate() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let start = calendar.date(from: DateComponents(year: 2024, month: 1, day: 15))!
+        let afterFiveMonths = calendar.date(from: DateComponents(year: 2024, month: 6, day: 15))!
+        XCTAssertTrue(SupportMilestone.oneMonth.isUnlocked(firstUse: start, now: afterFiveMonths, calendar: calendar))
+        XCTAssertFalse(SupportMilestone.sixMonths.isUnlocked(firstUse: start, now: afterFiveMonths, calendar: calendar))
+        let afterTwoYears = calendar.date(from: DateComponents(year: 2026, month: 1, day: 15))!
+        XCTAssertTrue(SupportMilestone.twoYears.isUnlocked(firstUse: start, now: afterTwoYears, calendar: calendar))
+        XCTAssertFalse(SupportMilestone.threeYears.isUnlocked(firstUse: start, now: afterTwoYears, calendar: calendar))
+    }
+
+    func testFirstUseKeepsTheEarlierDate() {
+        let local = UserDefaults(suiteName: "wakito.tenure.local.\(UUID().uuidString)")!
+        let cloud = MemoryFirstUseStore()
+        let older = Date(timeIntervalSince1970: 1_700_000_000)
+        let newer = Date(timeIntervalSince1970: 1_800_000_000)
+        local.set(newer.timeIntervalSince1970, forKey: SupportTenureStore.key)
+        cloud.set(older.timeIntervalSince1970, forKey: SupportTenureStore.key)
+        let first = SupportTenureStore.ensureFirstUse(now: Date(), local: local, cloud: cloud)
+        XCTAssertEqual(first.timeIntervalSince1970, older.timeIntervalSince1970, accuracy: 0.5)
+        let stored = (local.object(forKey: SupportTenureStore.key) as? NSNumber)?.doubleValue ?? 0
+        XCTAssertEqual(stored, older.timeIntervalSince1970, accuracy: 0.5)
+    }
+}
+
+private final class MemoryFirstUseStore: FirstUseStore {
+    var values: [String: Any] = [:]
+    func object(forKey key: String) -> Any? { values[key] }
+    func set(_ value: Any?, forKey key: String) { values[key] = value }
+}
+
+final class LocalAchievementTests: XCTestCase {
+
+    func testPlaceholderContentDecodesWithZeroRaised() throws {
+        let json = """
+        {"schemaVersion":1,"currency":"EUR","disclosure":{"en":"e","pl":"p"},"campaign":{"id":"placeholder","title":{"en":"t","pl":"t"},"who":{"en":"w","pl":"w"},"why":{"en":"y","pl":"y"},"photoURL":"","goalAmount":0,"raisedAmount":0,"date":"2026-11-19","linkURL":""},"history":[]}
+        """
+        let document = try AchievementsDocument.decode(Data(json.utf8))
+        XCTAssertEqual(document.campaign?.raisedAmount, 0)
+        XCTAssertEqual(document.totalDonated, 0)
+        XCTAssertEqual(document.peopleHelped, 0)
+        XCTAssertEqual(document.campaign?.progress, 0)
+    }
+}
+
 final class RemoteAlarmNoticeTests: XCTestCase {
     func testNoticeNamesTheSenderAndTheTime() {
         let text = RemoteAlarmNotice.text(
