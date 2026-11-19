@@ -78,75 +78,17 @@ enum AchievementsContentError: Error, Equatable {
     case unreadable
 }
 
-struct LocalAchievements: Codable, Equatable {
-    var firstAlarm = false
-    var friendAlarm = false
-    var wakeDays: [String] = []
-    var snoozeDays: [String] = []
-    var bestStreak = 0
+enum SupportMilestone: Int, CaseIterable, Identifiable {
+    case oneMonth = 1
+    case sixMonths = 6
+    case oneYear = 12
+    case twoYears = 24
+    case threeYears = 36
 
-    static let streakGoal = 7
+    var id: Int { rawValue }
 
-    var sevenDayStreak: Bool { bestStreak >= Self.streakGoal }
-
-    mutating func recordFirstAlarm() {
-        firstAlarm = true
-    }
-
-    mutating func recordFriendAlarm() {
-        friendAlarm = true
-    }
-
-    mutating func recordWake(on day: String) {
-        guard !snoozeDays.contains(day) else { return }
-        if !wakeDays.contains(day) {
-            wakeDays.append(day)
-        }
-        bestStreak = max(bestStreak, Self.longestStreak(wakeDays))
-    }
-
-    mutating func recordSnooze(on day: String) {
-        if !snoozeDays.contains(day) {
-            snoozeDays.append(day)
-        }
-        wakeDays.removeAll { $0 == day }
-        bestStreak = max(bestStreak, Self.longestStreak(wakeDays))
-    }
-
-    static func longestStreak(_ days: [String]) -> Int {
-        let unique = Array(Set(days)).sorted()
-        guard !unique.isEmpty else { return 0 }
-        let calendar = Calendar(identifier: .gregorian)
-        let formatter = DateFormatter()
-        formatter.calendar = calendar
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        var best = 1
-        var run = 1
-        for index in unique.indices.dropFirst() {
-            guard let previous = formatter.date(from: unique[index - 1]),
-                  let current = formatter.date(from: unique[index]),
-                  let gap = calendar.dateComponents([.day], from: previous, to: current).day else {
-                run = 1
-                continue
-            }
-            if gap == 1 {
-                run += 1
-                best = max(best, run)
-            } else if gap > 1 {
-                run = 1
-            }
-        }
-        return best
-    }
-
-    static func dayKey(for date: Date, calendar: Calendar) -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = calendar
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
+    func isUnlocked(firstUse: Date, now: Date, calendar: Calendar = .current) -> Bool {
+        guard let due = calendar.date(byAdding: .month, value: rawValue, to: firstUse) else { return false }
+        return now >= due
     }
 }

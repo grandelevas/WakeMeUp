@@ -26,8 +26,8 @@ The same file is bundled at `WakeMeUp/Resources/achievements.json`.
   "schemaVersion": 1,
   "currency": "EUR",
   "disclosure": {
-    "en": "Mateusz gives 50% of the app's proceeds to causes he chooses. The app does not collect donations.",
-    "pl": "Mateusz przekazuje 50% przychodu z aplikacji na wybrane cele. Nie zbieramy darowizn w aplikacji."
+    "en": "Mateusz gives 50% of subscription proceeds to causes he chooses. The app does not collect donations.",
+    "pl": "Mateusz przekazuje 50% przychodu z subskrypcji na wybrane cele. Nie zbieramy darowizn w aplikacji."
   },
   "campaign": {
     "id": "placeholder",
