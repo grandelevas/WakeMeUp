@@ -1,0 +1,13 @@
+{
+  "containerID": "iCloud.com.grandelevas.wakemeup",
+  "environmentNote": "TestFlight and the App Store use the Production environment. Create this type in Development in the CloudKit Console, then deploy the schema to Production. The API key cannot deploy the schema.",
+  "recordTypes": [
+    {
+      "name": "WMRoot",
+      "fields": [
+        { "name": "grantJSON", "type": "STRING" },
+        { "name": "commandsJSON", "type": "STRING" }
+      ]
+    }
+  ]
+}

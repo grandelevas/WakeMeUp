@@ -1,0 +1,25 @@
+name: CloudKit schema
+
+# Prints the Safari steps for deploying WMRoot. Does not create a certificate
+# and does not call Apple unless you add a management token later.
+on:
+  workflow_dispatch:
+
+jobs:
+  explain:
+    name: Schema deploy steps
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+      - name: Validate the schema file
+        run: python3 -c "import json; json.load(open('cloudkit/WMRoot.schema.json'))"
+      - name: How to deploy to Production
+        run: |
+          echo "TestFlight uses CloudKit Production."
+          echo "1. On iPhone Safari sign in at https://icloud.developer.apple.com/dashboard"
+          echo "2. Open container iCloud.com.grandelevas.wakemeup"
+          echo "3. Development → Schema → Record Types → + → name WMRoot"
+          echo "4. Add String fields grantJSON and commandsJSON. Save."
+          echo "5. Deploy Schema Changes… → Production."
+          echo "A GitHub runner cannot sign in to cktool. Do not run bootstrap-signing."

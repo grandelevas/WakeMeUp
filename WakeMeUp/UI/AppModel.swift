@@ -1,3 +1,4 @@
+import CloudKit
 import Foundation
 import Observation
 import UIKit
@@ -40,6 +41,15 @@ final class AppModel {
 
     var library: AlarmLibrary { snapshot.library }
     var usesCloudKit: Bool { cloudKit != nil }
+
+    /// Release and TestFlight never show the on-device friend. Debug builds use it only until CloudKit is on.
+    var showsSimulatedPreview: Bool {
+        #if DEBUG
+        cloudKit == nil
+        #else
+        false
+        #endif
+    }
     var profile: Participant { snapshot.profile }
     var simulatedFriend: Participant? { snapshot.simulatedFriend }
     var grants: [ShareGrant] { snapshot.permissions.grants }
@@ -251,6 +261,21 @@ final class AppModel {
         }
     }
 
+    func acceptCloudShare(_ metadata: CKShare.Metadata) async {
+        guard let cloudKit else {
+            lastError = RemoteBackendError.notConfigured.errorDescription
+            return
+        }
+        do {
+            let grant = try await cloudKit.accept(metadata: metadata, grantee: snapshot.profile)
+            update { $0.permissions.replace(grant) }
+            selectedTab = .sharing
+            await refreshRemote()
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
     func acceptPastedInvite() async {
         guard let cloudKit else {
             lastError = RemoteBackendError.notConfigured.errorDescription
@@ -274,11 +299,19 @@ final class AppModel {
             guard let (updated, commands) = try? await cloudKit.refresh(grant, asOwner: asOwner) else { continue }
             var library = snapshot.library
             var applied = snapshot.appliedCommandIDs
+            var notices: [String] = []
             for command in commands where !applied.contains(command.id) {
                 if updated.state == .active {
+                    if (command.action == .upsert || command.action == .triggerNow), let alarm = command.alarm {
+                        let sender = updated.grantee?.displayName ?? ""
+                        notices.append(RemoteAlarmNotice.text(sender: sender, schedule: alarm.schedule))
+                    }
                     try? RemoteCommandApplier.apply(command: command, grant: updated, library: &library)
                 }
                 applied.append(command.id)
+            }
+            if !notices.isEmpty {
+                Task { await postRemoteNotices(notices) }
             }
             update {
                 $0.permissions.replace(updated)
@@ -398,6 +431,23 @@ final class AppModel {
 
     func dismissRinging() {
         ringingAlarmID = nil
+    }
+
+    private func postRemoteNotices(_ notices: [String]) async {
+        let center = UNUserNotificationCenter.current()
+        _ = try? await center.requestAuthorization(options: [.alert, .sound])
+        for text in notices {
+            let content = UNMutableNotificationContent()
+            content.title = "Wakito"
+            content.body = text
+            content.sound = .default
+            let request = UNNotificationRequest(
+                identifier: "remote-\(UUID().uuidString)",
+                content: content,
+                trigger: nil
+            )
+            try? await center.add(request)
+        }
     }
 
     private func reschedule(requestAccess: Bool) async {

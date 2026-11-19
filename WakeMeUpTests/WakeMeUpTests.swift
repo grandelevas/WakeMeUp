@@ -191,6 +191,18 @@ final class AlarmLibraryTests: XCTestCase {
     }
 }
 
+final class RemoteAlarmNoticeTests: XCTestCase {
+    func testNoticeNamesTheSenderAndTheTime() {
+        let text = RemoteAlarmNotice.text(
+            sender: "Ola",
+            schedule: .wallClock(hour: 6, minute: 30, repeatDays: [])
+        )
+        let parts = ClockFormat.parts(hour: 6, minute: 30, locale: .current, timeZone: .current)
+        XCTAssertTrue(text.contains("Ola"))
+        XCTAssertTrue(text.contains(parts.time))
+    }
+}
+
 final class AppearanceTests: XCTestCase {
     func testDefaultsAreSystemOrangeAndPrimaryIcon() {
         let defaults = UserDefaults(suiteName: "wakito.appearance.\(UUID().uuidString)")!

@@ -65,6 +65,15 @@ final class CloudKitSharingClient {
     func accept(url: URL, grantee: Participant) async throws -> ShareGrant {
         try await requireAccount()
         let metadata = try await container.shareMetadata(for: url)
+        return try await accept(metadata: metadata, grantee: grantee, inviteURL: url)
+    }
+
+    func accept(metadata: CKShare.Metadata, grantee: Participant) async throws -> ShareGrant {
+        try await requireAccount()
+        return try await accept(metadata: metadata, grantee: grantee, inviteURL: metadata.share.url)
+    }
+
+    private func accept(metadata: CKShare.Metadata, grantee: Participant, inviteURL: URL?) async throws -> ShareGrant {
         _ = try await container.accept([metadata])
         guard let rootID = metadata.hierarchicalRootRecordID else {
             throw RemoteBackendError.missingRoot
@@ -76,7 +85,7 @@ final class CloudKitSharingClient {
         grant.cloudKitRootRecordName = rootID.recordName
         grant.cloudKitZoneName = rootID.zoneID.zoneName
         grant.cloudKitOwnerName = rootID.zoneID.ownerName
-        grant.inviteCode = url.absoluteString
+        grant.inviteCode = inviteURL?.absoluteString ?? grant.inviteCode
         try await save(grant, commands: readCommands(from: root), database: container.sharedCloudDatabase, record: root)
         return grant
     }
@@ -116,7 +125,10 @@ final class CloudKitSharingClient {
         let subscription = CKRecordZoneSubscription(zoneID: zoneID, subscriptionID: "wakemeup-zone")
         let info = CKSubscription.NotificationInfo()
         info.shouldSendContentAvailable = true
+        info.alertLocalizationKey = "sharing.push.generic"
+        info.soundName = "default"
         subscription.notificationInfo = info
+        try? await container.privateCloudDatabase.deleteSubscription(withID: subscription.subscriptionID)
         _ = try await container.privateCloudDatabase.save(subscription)
     }
 

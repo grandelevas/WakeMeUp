@@ -2,13 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!--
-	Leave this empty until the App Store Connect / Developer portal iCloud
-	container exists. When set, it must match the container in
-	Config/Release.entitlements, normally iCloud.$(PRODUCT_BUNDLE_IDENTIFIER),
-	for example iCloud.com.grandelevas.wakemeup.
-	-->
 	<key>CloudKitContainerID</key>
-	<string></string>
+	<string>iCloud.com.grandelevas.wakemeup</string>
 </dict>
 </plist>

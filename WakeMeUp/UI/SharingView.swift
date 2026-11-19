@@ -17,10 +17,10 @@ struct SharingView: View {
                     TextField("sharing.yourName", text: $name)
                         .onSubmit { model.rename(name) }
                 }
-                if model.usesCloudKit {
-                    cloudSection
-                } else {
+                if model.showsSimulatedPreview {
                     previewSection
+                } else {
+                    cloudSection
                 }
                 grantSection(title: "sharing.peopleWhoCanWakeMe", grants: incoming)
                 grantSection(title: "sharing.phonesICanWake", grants: outgoing)
@@ -35,7 +35,7 @@ struct SharingView: View {
                     }
                     .accessibilityLabel("settings.title")
                 }
-                if model.usesCloudKit {
+                if !model.showsSimulatedPreview {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("sharing.refresh") {
                             Task { await model.refreshRemote() }
@@ -90,6 +90,9 @@ struct SharingView: View {
 
     private var cloudSection: some View {
         Section("sharing.invite") {
+            Text("sharing.cloudSteps")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             Button("sharing.invite") {
                 Task { await model.createCloudInvite() }
             }

@@ -89,6 +89,46 @@ def require_portal_bundle_ids!
   end
 end
 
+# Turns on Push and iCloud for the existing App ID. Does not create a certificate.
+def ensure_sharing_capabilities!
+  UI.message("Enabling Push and iCloud on #{bundle_id}. No new certificate will be created.")
+  found = Spaceship::ConnectAPI::BundleId.find(bundle_id)
+  UI.user_error!("Bundle ID #{bundle_id} is not registered. No certificate was created.") unless found
+  existing = Spaceship::ConnectAPI::BundleIdCapability.all(bundle_id_id: found.id)
+  enabled = ->(type) { existing.any? { |item| item.is_type?(type) } }
+  unless enabled.call("PUSH_NOTIFICATIONS")
+    Spaceship::ConnectAPI::BundleIdCapability.create(
+      bundle_id_id: found.id,
+      capability_type: "PUSH_NOTIFICATIONS"
+    )
+  end
+  if enabled.call("ICLOUD")
+    UI.success("iCloud is already enabled on #{bundle_id}")
+    return
+  end
+  begin
+    Spaceship::ConnectAPI::BundleIdCapability.create(
+      bundle_id_id: found.id,
+      capability_type: "ICLOUD",
+      settings: [
+        {
+          key: "ICLOUD_VERSION",
+          options: [{ key: "XCODE_6" }]
+        }
+      ]
+    )
+  rescue StandardError => error
+    UI.user_error!(<<~MSG)
+      Could not enable iCloud on #{bundle_id}: #{error.message}
+      No certificate was created. Do not run bootstrap-signing.
+      On iPhone, Safari → developer.apple.com/account/resources/identifiers
+      → App IDs → #{bundle_id} → iCloud → include CloudKit
+      and the container iCloud.com.grandelevas.wakemeup.
+      Then run upload-testflight again.
+    MSG
+  end
+end
+
 def ensure_app_store_record!
   if Spaceship::ConnectAPI::App.find(bundle_id)
     UI.success("App Store Connect already has #{bundle_id}")
@@ -254,12 +294,13 @@ platform :ios do
     key = asc_key
     prepare_ci_keychain
     install_distribution_identity!(pkcs12, password)
+    ensure_sharing_capabilities!
     sigh(
       api_key: key,
       app_identifier: bundle_id,
       team_id: team_id,
       platform: "ios",
-      force: false,
+      force: true,
       output_path: WakeMeUpSigning::SIGNING_OUT,
       filename: "app.mobileprovision"
     )
