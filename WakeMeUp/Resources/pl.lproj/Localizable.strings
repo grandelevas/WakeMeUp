@@ -33,7 +33,7 @@
 "repeat.never" = "Nigdy";
 "repeat.everyDay" = "Codziennie";
 "repeat.weekdays" = "Dni robocze";
-"repeat.weekends" = "Weekendy";
+"repeat.weekends" = "Weekend";
 
 "sound.classic" = "Klasyczny";
 "sound.chime" = "Kurant";

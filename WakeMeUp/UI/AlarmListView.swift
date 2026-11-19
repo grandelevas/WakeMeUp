@@ -226,7 +226,9 @@ struct AlarmRow: View {
             case .weekdays: return String(localized: "repeat.weekdays")
             case .weekends: return String(localized: "repeat.weekends")
             case .custom:
-                return days.map { $0.veryShortSymbol(calendar: .current) }.joined(separator: " ")
+                return Weekday.sorted(days, calendar: .current)
+                    .map { $0.veryShortSymbol(calendar: .current) }
+                    .joined(separator: " ")
             }
         }
     }
