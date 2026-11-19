@@ -1,4 +1,5 @@
 import AVFoundation
+import CloudKit
 import XCTest
 @testable import WakeMeUp
 
@@ -188,6 +189,31 @@ final class AlarmLibraryTests: XCTestCase {
             origin: .local,
             resumeWhenGroupEnables: nil
         )
+    }
+}
+
+final class ShareInviteCleanupTests: XCTestCase {
+    func testFailedInviteIsNotKept() {
+        var center = PermissionCenter()
+        let owner = Participant(id: UUID(), displayName: "Maja")
+        _ = center.createInvite(owner: owner, now: .now, code: "ABC", secret: "secret")
+        center.removeUnsharedInvites()
+        XCTAssertTrue(center.grants.isEmpty)
+    }
+
+    func testSavedShareIsKept() {
+        var center = PermissionCenter()
+        var grant = center.createInvite(owner: Participant(id: UUID(), displayName: "Maja"), now: .now, code: "ABC", secret: "s")
+        grant.cloudKitRootRecordName = "grant-1"
+        center.replace(grant)
+        center.removeUnsharedInvites()
+        XCTAssertEqual(center.grants.count, 1)
+    }
+
+    func testCloudKitErrorIncludesTheCode() {
+        let error = CKError(.serverRejectedRequest)
+        let text = CloudKitErrorText.message(for: error)
+        XCTAssertTrue(text.contains("CKError \(CKError.Code.serverRejectedRequest.rawValue)"))
     }
 }
 

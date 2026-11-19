@@ -24,6 +24,9 @@ struct RootView: View {
                 RingingView(alarm: alarm)
             }
         }
+        .sheet(item: $model.preparedShare) { prepared in
+            CloudShareSheet(share: prepared.share, containerID: prepared.containerID)
+        }
         .sheet(isPresented: sharePresented) {
             if let url = model.shareURL {
                 ActivityShareSheet(items: [url])

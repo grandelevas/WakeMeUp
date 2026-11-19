@@ -9,6 +9,12 @@ enum AppTab: Hashable {
     case sharing
 }
 
+struct PreparedShare: Identifiable {
+    let id = UUID()
+    let share: CKShare
+    let containerID: String
+}
+
 @MainActor
 enum AppRuntime {
     static var model: AppModel?
@@ -27,6 +33,7 @@ final class AppModel {
     var scheduleFailure: String?
     var lastError: String?
     var shareURL: URL?
+    var preparedShare: PreparedShare?
     var pastedInvite = ""
     var friendDraftName = ""
     var remoteLabel = ""
@@ -103,6 +110,7 @@ final class AppModel {
         guard !started else { return }
         started = true
         guard !suppressPermissionBanner else { return }
+        update { $0.permissions.removeUnsharedInvites() }
         authorization = coordinator.accessState()
         notificationAllowed = await coordinator.notificationStatus() == .authorized
         await reschedule(requestAccess: false)
@@ -251,13 +259,29 @@ final class AppModel {
             lastError = RemoteBackendError.notConfigured.errorDescription
             return
         }
-        let pending = updateInvite()
+        let owner = snapshot.profile
+        let draft = ShareGrant(
+            id: UUID(),
+            inviteCode: "",
+            secret: UUID().uuidString,
+            owner: owner,
+            grantee: nil,
+            state: .pending,
+            createdAt: .now,
+            cloudKitRootRecordName: nil,
+            cloudKitZoneName: nil,
+            cloudKitOwnerName: nil
+        )
         do {
-            let shared = try await cloudKit.createShare(for: pending)
-            update { $0.permissions.replace(shared) }
-            shareURL = URL(string: shared.inviteCode)
+            let (shared, share) = try await cloudKit.createShare(for: draft)
+            update {
+                $0.permissions.removeUnsharedInvites()
+                $0.permissions.replace(shared)
+            }
+            preparedShare = PreparedShare(share: share, containerID: AppConfig.cloudKitContainerID)
         } catch {
-            lastError = error.localizedDescription
+            update { $0.permissions.removeUnsharedInvites() }
+            lastError = CloudKitErrorText.message(for: error)
         }
     }
 

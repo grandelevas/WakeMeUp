@@ -109,6 +109,11 @@ struct PermissionCenter: Codable, Equatable {
             grants.append(grant)
         }
     }
+
+    /// Drops invites that never received an iCloud share link.
+    mutating func removeUnsharedInvites() {
+        grants.removeAll { $0.state == .pending && $0.cloudKitRootRecordName == nil }
+    }
 }
 
 enum InviteCode {

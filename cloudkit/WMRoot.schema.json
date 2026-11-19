@@ -1,6 +1,6 @@
 {
   "containerID": "iCloud.com.grandelevas.wakemeup",
-  "environmentNote": "TestFlight and the App Store use the Production environment. Create this type in Development in the CloudKit Console, then deploy the schema to Production. The API key cannot deploy the schema.",
+  "environmentNote": "TestFlight uses Production. Create WMRoot in Development, then deploy the schema to Production. No other record types or queryable indexes are required: reads are by record ID, and the push is a zone subscription.",
   "recordTypes": [
     {
       "name": "WMRoot",

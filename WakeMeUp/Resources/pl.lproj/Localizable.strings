@@ -74,6 +74,7 @@
 "sharing.cloudSteps" = "Zaproś osobę, wyślij jej link w Wiadomościach i niech otworzy go na iPhonie z Wakito. Potem każde z was może ustawić budzik drugiemu.";
 "sharing.someone" = "Ktoś";
 "sharing.push.generic" = "Ktoś ustawił Ci budzik w Wakito. Otwórz aplikację, żeby go włączyć.";
+"sharing.cloudError" = "Nie udało się utworzyć zaproszenia iCloud.";
 "sharing.push.scheduled" = "%@ ustawił Ci budzik na %@.";
 "sharing.yourName" = "Twoje imię";
 "sharing.invite" = "Zaproś kogoś";
