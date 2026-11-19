@@ -1,6 +1,32 @@
 import CloudKit
 import Foundation
 
+enum CloudKitErrorText {
+    static func message(for error: Error) -> String {
+        let friendly = String(localized: "sharing.cloudError")
+        return "\(friendly)\n\(detail(for: error))"
+    }
+
+    static func detail(for error: Error) -> String {
+        if let backend = error as? RemoteBackendError, let text = backend.errorDescription {
+            return text
+        }
+        guard let cloudError = error as? CKError else {
+            return error.localizedDescription
+        }
+        var lines = ["CKError \(cloudError.code.rawValue): \(cloudError.localizedDescription)"]
+        if let partial = cloudError.partialErrorsByItemID {
+            for (identifier, itemError) in partial {
+                lines.append("\(identifier): \(detail(for: itemError))")
+            }
+        }
+        if let underlying = cloudError.userInfo[NSUnderlyingErrorKey] as? Error, !(underlying is CKError) {
+            lines.append(underlying.localizedDescription)
+        }
+        return lines.joined(separator: "\n")
+    }
+}
+
 enum RemoteBackendError: LocalizedError {
     case notConfigured
     case notSignedIn
@@ -15,7 +41,7 @@ enum RemoteBackendError: LocalizedError {
         case .notSignedIn:
             String(localized: "sharing.signIn")
         case .shareURLMissing:
-            "iCloud did not return a share link."
+            String(localized: "sharing.cloudError") + "\n" + "The saved share had no URL."
         case .missingRoot:
             "The shared alarm record is missing."
         case let .underlying(message):
@@ -40,11 +66,16 @@ final class CloudKitSharingClient {
         guard status == .available else { throw RemoteBackendError.notSignedIn }
     }
 
-    func createShare(for grant: ShareGrant) async throws -> ShareGrant {
+    func createShare(for grant: ShareGrant) async throws -> (ShareGrant, CKShare) {
         try await requireAccount()
         var grant = grant
+        let database = container.privateCloudDatabase
         let zoneID = CKRecordZone.ID(zoneName: "WakeMeUp", ownerName: CKCurrentUserDefaultName)
-        _ = try await container.privateCloudDatabase.save(CKRecordZone(zoneID: zoneID))
+        do {
+            _ = try await database.save(CKRecordZone(zoneID: zoneID))
+        } catch let error as CKError where error.code == .serverRecordChanged {
+            // The custom zone already exists. Shares cannot live in _defaultZone.
+        }
         let rootName = "grant-\(grant.id.uuidString)"
         let rootID = CKRecord.ID(recordName: rootName, zoneID: zoneID)
         let root = CKRecord(recordType: "WMRoot", recordID: rootID)
@@ -52,14 +83,32 @@ final class CloudKitSharingClient {
         let share = CKShare(rootRecord: root)
         share.publicPermission = .none
         share[CKShare.SystemFieldKey.title] = "Wakito" as NSString
-        _ = try await container.privateCloudDatabase.modifyRecords(saving: [root, share], deleting: [])
-        guard let url = share.url else { throw RemoteBackendError.shareURLMissing }
+        let (saveResults, _) = try await database.modifyRecords(saving: [root, share], deleting: [], savePolicy: .allKeys)
+        var savedShare: CKShare?
+        var failures: [Error] = []
+        for result in saveResults.values {
+            switch result {
+            case let .success(record):
+                if let saved = record as? CKShare {
+                    savedShare = saved
+                }
+            case let .failure(error):
+                failures.append(error)
+            }
+        }
+        if let error = failures.first {
+            throw error
+        }
+        // url is filled only on the share the server returns, not the local CKShare.
+        guard let savedShare, let url = savedShare.url else {
+            throw RemoteBackendError.shareURLMissing
+        }
         grant.inviteCode = url.absoluteString
         grant.cloudKitRootRecordName = rootName
         grant.cloudKitZoneName = zoneID.zoneName
         grant.cloudKitOwnerName = zoneID.ownerName
         try? await subscribe(zoneID: zoneID)
-        return grant
+        return (grant, savedShare)
     }
 
     func accept(url: URL, grantee: Participant) async throws -> ShareGrant {
