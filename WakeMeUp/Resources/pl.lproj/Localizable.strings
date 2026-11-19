@@ -70,7 +70,11 @@
 
 "sharing.title" = "Współpraca";
 "sharing.previewBanner" = "Przesyłanie między urządzeniami jest wyłączone, dopóki nie skonfigurujesz CloudKit. Pełny przepływ uprawnień możesz wypróbować z symulowaną osobą na tym iPhonie.";
-"sharing.cloudBanner" = "Osoby, które zaakceptujesz, mogą dodawać i kasować alarmy na tym iPhonie przez iCloud. Ciche powiadomienie planuje alarm. iOS może je opóźnić, a po wymuszonym zamknięciu aplikacji w ogóle go nie dostarczy.";
+"sharing.cloudBanner" = "Osoby, które zaakceptujesz, mogą dodawać i kasować alarmy na tym iPhonie przez iCloud. Powiadomienie prosi telefon, żeby zaplanował budzik. Jeśli wymusisz zamknięcie Wakito, otwórz powiadomienie, żeby budzik się włączył.";
+"sharing.cloudSteps" = "Zaproś osobę, wyślij jej link w Wiadomościach i niech otworzy go na iPhonie z Wakito. Potem każde z was może ustawić budzik drugiemu.";
+"sharing.someone" = "Ktoś";
+"sharing.push.generic" = "Ktoś ustawił Ci budzik w Wakito. Otwórz aplikację, żeby go włączyć.";
+"sharing.push.scheduled" = "%@ ustawił Ci budzik na %@.";
 "sharing.yourName" = "Twoje imię";
 "sharing.invite" = "Zaproś kogoś";
 "sharing.inviteCode" = "Kod zaproszenia";

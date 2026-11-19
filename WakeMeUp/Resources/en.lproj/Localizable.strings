@@ -70,7 +70,11 @@
 
 "sharing.title" = "Sharing";
 "sharing.previewBanner" = "Cross-device delivery is off until CloudKit is configured. You can try the full permission flow with a simulated friend on this iPhone.";
-"sharing.cloudBanner" = "People you accept can add and cancel alarms on this iPhone through iCloud. A silent push schedules the alarm. iOS may delay that push, and it will not arrive if the app was force-quit.";
+"sharing.cloudBanner" = "People you accept can add and cancel alarms on this iPhone through iCloud. A push asks this phone to schedule the alarm. If you force-quit Wakito, open the notification so the alarm is turned on.";
+"sharing.cloudSteps" = "Invite someone, send the link in Messages, and they open it on an iPhone that has Wakito. Then either of you can set an alarm for the other.";
+"sharing.someone" = "Someone";
+"sharing.push.generic" = "Someone set an alarm for you in Wakito. Open the app to turn it on.";
+"sharing.push.scheduled" = "%@ set an alarm for you at %@.";
 "sharing.yourName" = "Your name";
 "sharing.invite" = "Invite someone";
 "sharing.inviteCode" = "Invite code";

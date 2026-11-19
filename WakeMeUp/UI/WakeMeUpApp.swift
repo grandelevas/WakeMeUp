@@ -1,3 +1,5 @@
+import BackgroundTasks
+import CloudKit
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -26,10 +28,19 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
-        if AppConfig.usesCloudKit {
+        if AppConfig.activatesCloudKit {
             application.registerForRemoteNotifications()
+            RemoteRefresh.register()
+            RemoteRefresh.schedule()
         }
         return true
+    }
+
+    func application(_ application: UIApplication, userDidAcceptCloudKitShareWith metadata: CKShare.Metadata) {
+        Task {
+            guard let model = await MainActor.run(body: { AppRuntime.model }) else { return }
+            await model.acceptCloudShare(metadata)
+        }
     }
 
     func application(
@@ -56,5 +67,32 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         [.banner, .list, .sound]
+    }
+}
+
+enum RemoteRefresh {
+    static let taskID = "com.grandelevas.wakemeup.refresh"
+
+    static func register() {
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: taskID, using: nil) { task in
+            guard let refresh = task as? BGAppRefreshTask else { return }
+            let work = Task {
+                if let model = await MainActor.run(body: { AppRuntime.model }) {
+                    await model.refreshRemote()
+                }
+            }
+            refresh.expirationHandler = { work.cancel() }
+            Task {
+                _ = await work.value
+                refresh.setTaskCompleted(success: !work.isCancelled)
+                schedule()
+            }
+        }
+    }
+
+    static func schedule() {
+        let request = BGAppRefreshTaskRequest(identifier: taskID)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        try? BGTaskScheduler.shared.submit(request)
     }
 }

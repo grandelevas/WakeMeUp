@@ -51,6 +51,16 @@ enum AppConfig {
         return !identifier.isEmpty && !identifier.hasPrefix("REPLACE")
     }
 
+    /// Debug CI has no iCloud entitlement. Creating CKContainer there traps the test host.
+    /// Release and TestFlight use the real container.
+    static var activatesCloudKit: Bool {
+        #if DEBUG
+        false
+        #else
+        usesCloudKit
+        #endif
+    }
+
     static var appGroupID: String {
         "group.\(Bundle.main.bundleIdentifier ?? "com.grandelevas.wakemeup")"
     }

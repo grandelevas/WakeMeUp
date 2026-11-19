@@ -42,7 +42,7 @@ Limits, because this is iOS:
 - The silent push is **not guaranteed**. It can be delayed, dropped under Low Power Mode, or never delivered if the app was force-quit. A remote alarm for tomorrow is fine if the phone is online at some point before it. **Ring now** only rings when the push actually wakes the app, and it may be late.
 - Both people need to be signed into iCloud.
 - The container id in `WakeMeUp/WakeMeUpConfig.plist` must be set, and the Release entitlements must list the same container. Debug builds used by CI do not include the iCloud or push entitlements, so the Simulator tests do not need an Apple Developer account.
-- Development CloudKit creates the schema when the first record is saved. Before a production TestFlight build, deploy the schema in the CloudKit console (record type `WMRoot`, fields `grantJSON` and `commandsJSON`).
+- TestFlight uses the CloudKit **Production** environment. Create record type `WMRoot` (String fields `grantJSON` and `commandsJSON`) in the CloudKit Console, then deploy that schema to Production before the first shared alarm. A runner cannot sign in to `cktool`. The manual workflow **CloudKit schema** prints the same steps.
 
 ## Architecture
 
@@ -112,7 +112,7 @@ The project uses `com.grandelevas.wakemeup`. The widget is `com.grandelevas.wake
 | `WakeMeUp/WakeMeUpConfig.plist` | `iCloud.` plus the bundle id, for example `iCloud.com.grandelevas.wakemeup` |
 | GitHub Actions variable `BUNDLE_ID` | optional, defaults to `com.grandelevas.wakemeup` |
 
-Leave `CloudKitContainerID` **empty** until the container exists. An empty value keeps Sharing in on-device preview, including in TestFlight.
+`CloudKitContainerID` is `iCloud.com.grandelevas.wakemeup`. Release builds use that container. Debug screenshots still use the on-device preview.
 
 ### 3. App Store Connect API key
 
@@ -179,7 +179,7 @@ Apple only allows a few distribution certificates per team. Do not run bootstrap
 2. Set `CloudKitContainerID` in `WakeMeUp/WakeMeUpConfig.plist` to `iCloud.<bundle id>`.
 3. Ship a TestFlight build (Release entitlements already request CloudKit, push, and the app group).
 4. On a device signed into iCloud, open Sharing, create an invite, and send the link. The other phone pastes it and accepts.
-5. In the CloudKit console, deploy the development schema to production before you ship to the App Store. TestFlight against the development environment works without that deploy. App Store builds do not.
+5. In Safari on the iPhone, open [icloud.developer.apple.com/dashboard](https://icloud.developer.apple.com/dashboard), select `iCloud.com.grandelevas.wakemeup`, create `WMRoot` in Development, then deploy the schema to Production. TestFlight will not save the share until that deploy exists.
 
 ## iOS behavior worth knowing
 

@@ -138,6 +138,21 @@ struct RemoteAlarmCommand: Codable, Equatable, Identifiable {
     var enabled: Bool?
 }
 
+enum RemoteAlarmNotice {
+    /// Visible text after a remote alarm is stored, for example "Ola ustawił Ci budzik na 6:30".
+    static func text(sender: String, schedule: AlarmSchedule) -> String {
+        let parts = ClockFormat.parts(
+            hour: schedule.hour,
+            minute: schedule.minute,
+            locale: .current,
+            timeZone: .current
+        )
+        let time = parts.period.isEmpty ? parts.time : "\(parts.time) \(parts.period)"
+        let name = sender.isEmpty ? String(localized: "sharing.someone") : sender
+        return String(format: String(localized: "sharing.push.scheduled"), name, time)
+    }
+}
+
 enum ApplyError: Error, Equatable {
     case notAuthorized
     case missingAlarm
