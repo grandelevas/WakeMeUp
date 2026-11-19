@@ -217,6 +217,50 @@ final class ShareInviteCleanupTests: XCTestCase {
     }
 }
 
+final class LocalAchievementTests: XCTestCase {
+    func testSevenConsecutiveWakeDaysUnlockTheStreak() {
+        var badges = LocalAchievements()
+        let days = (1...7).map { String(format: "2026-11-%02d", $0) }
+        for day in days {
+            badges.recordWake(on: day)
+        }
+        XCTAssertTrue(badges.firstAlarm == false)
+        XCTAssertEqual(badges.bestStreak, 7)
+        XCTAssertTrue(badges.sevenDayStreak)
+    }
+
+    func testSnoozeBreaksThatDayAndAGapDoesNotCount() {
+        var badges = LocalAchievements()
+        badges.recordWake(on: "2026-11-01")
+        badges.recordWake(on: "2026-11-02")
+        badges.recordSnooze(on: "2026-11-02")
+        badges.recordWake(on: "2026-11-02")
+        badges.recordWake(on: "2026-11-04")
+        XCTAssertFalse(badges.wakeDays.contains("2026-11-02"))
+        XCTAssertEqual(badges.bestStreak, 1)
+        XCTAssertFalse(badges.sevenDayStreak)
+    }
+
+    func testFirstAlarmAndFriendStayUnlocked() {
+        var badges = LocalAchievements()
+        badges.recordFirstAlarm()
+        badges.recordFriendAlarm()
+        XCTAssertTrue(badges.firstAlarm)
+        XCTAssertTrue(badges.friendAlarm)
+    }
+
+    func testPlaceholderContentDecodesWithZeroRaised() throws {
+        let json = """
+        {"schemaVersion":1,"currency":"EUR","disclosure":{"en":"e","pl":"p"},"campaign":{"id":"placeholder","title":{"en":"t","pl":"t"},"who":{"en":"w","pl":"w"},"why":{"en":"y","pl":"y"},"photoURL":"","goalAmount":0,"raisedAmount":0,"date":"2026-11-19","linkURL":""},"history":[]}
+        """
+        let document = try AchievementsDocument.decode(Data(json.utf8))
+        XCTAssertEqual(document.campaign?.raisedAmount, 0)
+        XCTAssertEqual(document.totalDonated, 0)
+        XCTAssertEqual(document.peopleHelped, 0)
+        XCTAssertEqual(document.campaign?.progress, 0)
+    }
+}
+
 final class RemoteAlarmNoticeTests: XCTestCase {
     func testNoticeNamesTheSenderAndTheTime() {
         let text = RemoteAlarmNotice.text(

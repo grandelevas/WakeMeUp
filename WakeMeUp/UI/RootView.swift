@@ -13,6 +13,9 @@ struct RootView: View {
             SharingView()
                 .tabItem { Label("tab.sharing", systemImage: "person.2.fill") }
                 .tag(AppTab.sharing)
+            AchievementsView()
+                .tabItem { Label("tab.achievements", systemImage: "trophy.fill") }
+                .tag(AppTab.achievements)
         }
         .readableWidth()
         .sheet(item: $model.editor) { draft in

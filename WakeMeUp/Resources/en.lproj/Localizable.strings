@@ -1,5 +1,6 @@
 "tab.alarms" = "Alarms";
 "tab.sharing" = "Sharing";
+"tab.achievements" = "Achievements";
 
 "alarms.title" = "Alarms";
 "alarms.empty.title" = "No Alarms";
@@ -160,6 +161,22 @@
 "demo.me" = "Maja";
 "demo.friend" = "Ola";
 
+"achievements.disclosure" = "Mateusz gives 50% of the app's proceeds to causes he chooses. The app does not collect donations.";
+"achievements.together" = "Our shared success";
+"achievements.badge" = "You are part of this. Your purchase helps.";
+"achievements.campaign" = "Current campaign";
+"achievements.more" = "Read more";
+"achievements.total" = "Together we have donated %@";
+"achievements.people" = "People helped: %d";
+"achievements.history" = "History";
+"achievements.history.empty" = "No gifts recorded yet.";
+"achievements.yours" = "Your badges";
+"achievements.badge.first" = "First alarm";
+"achievements.badge.streak" = "7 days without snooze";
+"achievements.badge.friend" = "Alarm for a friend";
+"achievements.unlocked" = "Unlocked";
+"achievements.locked" = "Locked";
+"achievements.goalMissing" = "Goal not set yet. Raised stays at 0 until Mateusz records a real amount.";
 "error.generic" = "Something went wrong.";
 "error.schedule" = "Could not schedule this alarm.";
 "editor.title.new" = "Add Alarm";
