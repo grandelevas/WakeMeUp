@@ -28,7 +28,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
-        if AppConfig.usesCloudKit {
+        if AppConfig.activatesCloudKit {
             application.registerForRemoteNotifications()
             RemoteRefresh.register()
             RemoteRefresh.schedule()

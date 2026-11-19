@@ -72,7 +72,7 @@ final class AppModel {
         coordinator = AlarmCoordinator()
         if let explicitCloudKit {
             cloudKit = explicitCloudKit
-        } else if AppConfig.usesCloudKit && !screenshot {
+        } else if AppConfig.activatesCloudKit && !screenshot {
             cloudKit = CloudKitSharingClient(containerID: AppConfig.cloudKitContainerID)
         } else {
             cloudKit = nil
