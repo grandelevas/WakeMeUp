@@ -1,4 +1,4 @@
-WakeMeUp bundled alarm tones
+Wakito bundled alarm tones
 ============================
 
 The WAV files in this directory (classic.wav, chime.wav, rise.wav, pulse.wav,
@@ -8,4 +8,4 @@ recordings of anyone else's music or sound effects.
 License: CC0 1.0 Universal (public domain dedication)
 
 You can copy, modify, and ship these tones, including in a commercial App Store
-app, with no attribution required. Attribution to WakeMeUp is still welcome.
+app, with no attribution required. Attribution to Wakito is still welcome.

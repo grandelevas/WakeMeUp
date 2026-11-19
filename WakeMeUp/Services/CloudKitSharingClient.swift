@@ -51,7 +51,7 @@ final class CloudKitSharingClient {
         write(grant, commands: [], to: root)
         let share = CKShare(rootRecord: root)
         share.publicPermission = .none
-        share[CKShare.SystemFieldKey.title] = "WakeMeUp" as NSString
+        share[CKShare.SystemFieldKey.title] = "Wakito" as NSString
         _ = try await container.privateCloudDatabase.modifyRecords(saving: [root, share], deleting: [])
         guard let url = share.url else { throw RemoteBackendError.shareURLMissing }
         grant.inviteCode = url.absoluteString

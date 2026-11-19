@@ -12,9 +12,9 @@ struct WakeMeUpAlarmLiveActivity: Widget {
                     .font(.title2)
                     .foregroundStyle(context.attributes.tintColor)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(context.attributes.metadata?.label ?? "WakeMeUp")
+                    Text(context.attributes.metadata?.label ?? "Wakito")
                         .font(.headline)
-                    Text("WakeMeUp")
+                    Text("Wakito")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -29,7 +29,7 @@ struct WakeMeUpAlarmLiveActivity: Widget {
                         .foregroundStyle(context.attributes.tintColor)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text(context.attributes.metadata?.label ?? "WakeMeUp")
+                    Text(context.attributes.metadata?.label ?? "Wakito")
                         .lineLimit(1)
                 }
             } compactLeading: {
@@ -43,6 +43,8 @@ struct WakeMeUpAlarmLiveActivity: Widget {
             }
             .keylineTint(context.attributes.tintColor)
         }
+        .configurationDisplayName(Text("widget.displayName"))
+        .description(Text("widget.description"))
     }
 }
 

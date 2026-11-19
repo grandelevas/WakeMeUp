@@ -98,7 +98,7 @@ def ensure_app_store_record!
   UI.message("Creating the App Store Connect app record for #{bundle_id}")
   begin
     Spaceship::ConnectAPI::App.create(
-      name: "WakeMeUp",
+      name: "Wakito",
       version_string: "1.0",
       sku: "wakemeup-ios",
       primary_locale: "en-US",
@@ -110,7 +110,7 @@ def ensure_app_store_record!
       Could not create the App Store Connect app record: #{error.message}
       Create it yourself, then rerun bootstrap-signing. No certificate was created.
       iPhone: App Store Connect → Apps → the + button → New App.
-      Platform iOS, name WakeMeUp (pick another name if that one is taken),
+      Platform iOS, name Wakito (pick another name if that one is taken),
       primary language English (U.S.), bundle ID #{bundle_id}, SKU wakemeup-ios.
       Do not create an App Store record for the widget.
     MSG

@@ -1,8 +1,8 @@
-# WakeMeUp
+# Wakito
 
 An iPhone alarm app in the spirit of Clock → Alarms, plus groups, your own sounds, a one-tap link to a song, and alarms that another person can set after you let them.
 
-The working names are **Remind me of** and **Przypomnij mi o**. The home-screen name is WakeMeUp. The interface is SwiftUI, in English and Polish.
+The working names are **Remind me of** and **Przypomnij mi o**. The home-screen name is Wakito. The Xcode target and bundle id stay WakeMeUp and `com.grandelevas.wakemeup`. The interface is SwiftUI, in English and Polish.
 
 There is no Mac in the loop. GitHub Actions `macos-26` builds the app, runs the tests, and takes Simulator screenshots. A second workflow signs a Release build and uploads it to TestFlight once the Apple secrets below exist. That workflow is expected to fail until then.
 
@@ -25,7 +25,7 @@ AlarmKit's alert has a system Stop button and **one** optional second button.
 - No song link, snooze on: the second button is Snooze. Snooze length is the AlarmKit post-alert countdown. A widget extension draws that countdown, which AlarmKit expects whenever a countdown presentation is used.
 - Song link set: the second button is Play my song (`secondaryButtonBehavior: .custom`). Snooze is still on the in-app ringing screen. One system alert cannot show both.
 
-Play my song is a `LiveActivityIntent` (`PlaySongIntent`) with `openAppWhenRun`. It stops the AlarmKit alarm and opens the URL. The same hand-off is written to the app group `group.<bundle id>` so a tap that only brings WakeMeUp forward still opens the song.
+Play my song is a `LiveActivityIntent` (`PlaySongIntent`) with `openAppWhenRun`. It stops the AlarmKit alarm and opens the URL. The same hand-off is written to the app group `group.<bundle id>` so a tap that only brings Wakito forward still opens the song.
 
 ## Remote alarms and CloudKit
 
@@ -146,7 +146,7 @@ In [Certificates, Identifiers & Profiles](https://developer.apple.com/account/re
 
 There is nothing to enable for AlarmKit. If a form or an old note mentions `com.apple.developer.alarmkit`, ignore it. That entitlement does not exist, and putting it in the file makes device signing fail.
 
-The App Store Connect app record (the entry under Apps, not the App ID) is created by the bootstrap lane through the API. If the name WakeMeUp is already taken, the lane stops before creating a certificate and tells you to add the record yourself: Apps → + → New App, iOS, bundle ID `com.grandelevas.wakemeup`, SKU `wakemeup-ios`. Do not make an App Store record for the widget.
+The App Store Connect app record (the entry under Apps, not the App ID) is created by the bootstrap lane through the API. If the name Wakito is already taken, the lane stops before creating a certificate and tells you to add the record yourself: Apps → + → New App, iOS, name Wakito, bundle ID `com.grandelevas.wakemeup`, SKU `wakemeup-ios`. Do not make an App Store record for the widget.
 
 ### 5. Bootstrap the certificate, then upload
 
@@ -164,7 +164,7 @@ Apple only allows a few distribution certificates per team. Do not run bootstrap
 
 ### 6. App Store Connect metadata
 
-- Name: WakeMeUp. Subtitle ideas: Remind me of / Przypomnij mi o.
+- Name: Wakito. Subtitle ideas: Remind me of / Przypomnij mi o.
 - Primary category: Utilities or Health & Fitness.
 - Privacy policy URL. Host `docs/privacy-policy.md`, replace the contact address, and paste the URL. A privacy policy is required.
 - Age rating: no unrestricted web, no gambling, no user-generated public content. Song links open other apps.
@@ -186,7 +186,7 @@ Apple only allows a few distribution certificates per team. Do not run bootstrap
 - Minimum system is **iOS 26.1**. AlarmKit arrived in iOS 26.0, and the alert API this app uses (a system Stop button plus one secondary button) is the iOS 26.1 form. Supporting iOS 18 would mean those phones can only use notifications, which do not ring through Silent. The notification path is still in the app, but only as the fallback when AlarmKit access is denied.
 - A third-party app cannot become the system Clock and cannot start Spotify, YouTube, or Apple Music while the phone is locked unless the person taps a button. The button is the product.
 - Custom alert sounds should stay at or under 30 seconds. Import enforces that. The bundled tones are about 12 seconds, 22.05 kHz, 16-bit mono WAV.
-- Force-quitting WakeMeUp does not delete AlarmKit alarms that are already scheduled. It does stop the silent push that delivers a new remote alarm.
+- Force-quitting Wakito does not delete AlarmKit alarms that are already scheduled. It does stop the silent push that delivers a new remote alarm.
 - Polish and English follow the iPhone language. Day letters follow the calendar's first weekday, so a Polish phone starts the week on Monday.
 
 ## Project layout

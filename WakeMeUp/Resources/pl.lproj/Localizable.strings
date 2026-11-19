@@ -114,12 +114,12 @@
 "settings.backend.cloudkit" = "CloudKit";
 "settings.open" = "Otwórz Ustawienia";
 "settings.about" = "O zdalnych alarmach";
-"settings.about.body" = "Ktoś może tu ustawić alarm dopiero, gdy zaakceptujesz zaproszenie. Możesz je w każdej chwili cofnąć. WakeMeUp nie ma własnego serwera. Po skonfigurowaniu CloudKit polecenia idą przez Twoje konto iCloud. iOS dostarcza je cichym powiadomieniem w tle, które nie zawsze przychodzi od razu.";
+"settings.about.body" = "Ktoś może tu ustawić alarm dopiero, gdy zaakceptujesz zaproszenie. Możesz je w każdej chwili cofnąć. Wakito nie ma własnego serwera. Po skonfigurowaniu CloudKit polecenia idą przez Twoje konto iCloud. iOS dostarcza je cichym powiadomieniem w tle, które nie zawsze przychodzi od razu.";
 "settings.privacy" = "Prywatność";
 "settings.privacy.body" = "Alarmy zostają na tym iPhonie. Link do piosenki otwiera się dopiero, gdy stukniesz „Odtwórz moją piosenkę”. Gdy włączysz udostępnianie iCloud, etykiety i linki synchronizują się przez Twoją prywatną bazę iCloud.";
 "settings.version" = "Wersja";
 "settings.allow" = "Pozwól na alarmy";
-"settings.banner" = "Alarmy nie zadzwonią, dopóki nie pozwolisz WakeMeUp ich planować.";
+"settings.banner" = "Alarmy nie zadzwonią, dopóki nie pozwolisz Wakito ich planować.";
 
 "demo.morning" = "Poranek";
 "demo.work" = "Praca";

@@ -127,6 +127,7 @@ final class AlarmKitEngine {
             ),
             tintColor: .orange
         )
+        // `.named` looks up this filename in the main bundle or Library/Sounds.
         let soundName = SoundFiles.alarmKitName(for: alarm.soundID, customSounds: customSounds)
         let sound: AlertConfiguration.AlertSound = soundName.isEmpty ? .default : .named(soundName)
         let countdown: SystemAlarm.CountdownDuration? = alarm.snoozeEnabled
