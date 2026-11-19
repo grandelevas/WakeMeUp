@@ -55,11 +55,18 @@ Dir.mktmpdir("wakemeup-security-import") do |dir|
       "-k", "",
       keychain
     )
-    identities = `security find-identity -v -p codesigning #{Shellwords.escape(keychain)}`
-    unless identities.match?(/1 valid identities found/)
-      raise "keychain has no codesigning identity:\n#{identities}"
+    # A self-signed cert is not a valid codesigning identity. Import succeeding,
+    # and the certificate landing in the keychain, is what `security import`
+    # rejected with "MAC verification failed" for an OpenSSL 3 p12.
+    certificates = `security find-certificate -a -p #{Shellwords.escape(keychain)}`
+    unless certificates.include?("BEGIN CERTIFICATE")
+      raise "security import did not store the certificate:\n#{certificates}"
     end
-    puts identities
+    keys = `security find-key -a #{Shellwords.escape(keychain)}`
+    unless keys.include?("key")
+      raise "security import did not store the private key:\n#{keys}"
+    end
+    puts "security import accepted the legacy p12"
   ensure
     system("security", "delete-keychain", keychain)
   end
