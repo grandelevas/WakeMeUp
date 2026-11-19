@@ -123,6 +123,13 @@ unless SOURCE.include?("WakeMeUpSigning::SIGNING_OUT") &&
   failures << "bootstrap must export the p12 from CERT_FILE_PATH into SIGNING_OUT"
 end
 
+bootstrap = SOURCE[/lane :bootstrap_signing do(.*?)(?=\n  desc |\n  lane :beta)/m]
+guard_at = bootstrap.to_s.index("refuse_bootstrap_when_p12_present!")
+token_at = bootstrap.to_s.index("asc_key")
+if guard_at.nil? || token_at.nil? || guard_at > token_at
+  failures << "bootstrap_signing must refuse a stored p12 secret before app_store_connect_api_key"
+end
+
 require_relative "../fastlane/signing_paths"
 
 expected_out = File.join(ROOT, "signing-out")
@@ -171,6 +178,34 @@ begin
     opened = OpenSSL::PKCS12.new(File.binread(archive_path), password)
     raise "certificate did not round-trip" unless opened.certificate.to_der == certificate.to_der
     raise "private key did not round-trip" unless opened.key.to_pem == key.to_pem
+
+    modern = OpenSSL::PKCS12.create(password, "WakeMeUp Distribution", key, certificate)
+    wrapped = Base64.encode64(modern.to_der)
+    der = WakeMeUpSigning.decode_p12_base64("\n#{wrapped.scan(/.{1,64}/).join("\n")}\n")
+    parsed = WakeMeUpSigning.read_pkcs12(der, password)
+    legacy_path = File.join(dir, "from-wrapped.p12")
+    WakeMeUpSigning.write_legacy_p12(
+      key: parsed.key,
+      certificate: parsed.certificate,
+      password: password,
+      destination: legacy_path
+    )
+    legacy = OpenSSL::PKCS12.new(File.binread(legacy_path), password)
+    raise "wrapped base64 cert mismatch" unless legacy.certificate.to_der == certificate.to_der
+
+    begin
+      WakeMeUpSigning.read_pkcs12(der, "not-the-password")
+      raise "wrong password was accepted"
+    rescue RuntimeError => error
+      raise "password error was unclear: #{error.message}" unless error.message.include?("DISTRIBUTION_CERTIFICATE_PASSWORD")
+    end
+
+    begin
+      WakeMeUpSigning.decode_p12_base64("!!!!")
+      raise "invalid base64 was accepted"
+    rescue RuntimeError => error
+      raise "base64 error was unclear: #{error.message}" unless error.message.include?("not valid base64")
+    end
   end
 rescue StandardError => error
   failures << "export_distribution_p12 round-trip failed: #{error.message}"
