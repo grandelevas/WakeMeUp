@@ -40,6 +40,7 @@ targets:
       - path: WakeMeUp
         excludes:
           - Info.plist
+          - Wakito.storekit
       - path: Shared
     postBuildScripts:
       - name: Copy alarm sounds to bundle root
