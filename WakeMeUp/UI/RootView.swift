@@ -14,8 +14,10 @@ struct RootView: View {
                 .tag(AppTab.sharing)
         }
         .tint(.orange)
+        .readableWidth()
         .sheet(item: $model.editor) { draft in
             AlarmEditorView(draft: draft)
+                .readableWidth()
         }
         .fullScreenCover(isPresented: ringingPresented) {
             if let alarm = model.ringingAlarm {

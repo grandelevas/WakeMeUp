@@ -23,6 +23,8 @@ jobs:
           bundler-cache: true
       - name: Reject unknown fastlane options
         run: bundle exec ruby scripts/check-fastlane-options.rb
+      - name: Check iPad orientations in Info.plist
+        run: python3 scripts/check-info-plist.py
 
   build-and-test:
     name: Build and test (iOS Simulator)

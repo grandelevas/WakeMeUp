@@ -24,6 +24,7 @@ ACTIONS = %w[
   update_code_signing_settings
   build_app
   upload_to_testflight
+  latest_testflight_build_number
 ].freeze
 
 def action_calls(source)
@@ -152,6 +153,14 @@ team_at = beta.index("require_certificate_team!")
 beta_token_at = beta.index("asc_key")
 if team_at.nil? || beta_token_at.nil? || team_at > beta_token_at
   failures << "beta must compare APPLE_TEAM_ID to the certificate OU before app_store_connect_api_key"
+end
+version_at = beta.index("next_bundle_version")
+build_at = beta.index("build_app(")
+unless version_at && build_at && version_at < build_at && beta.include?("CURRENT_PROJECT_VERSION=")
+  failures << "beta must set CURRENT_PROJECT_VERSION from next_bundle_version before build_app"
+end
+unless beta.include?("GITHUB_RUN_NUMBER") || SOURCE.include?("GITHUB_RUN_NUMBER")
+  failures << "bundle versions must consider GITHUB_RUN_NUMBER"
 end
 unless SOURCE.match?(/def team_id\n  ENV\.fetch\("APPLE_TEAM_ID"\)\nend/)
   failures << "team_id must be ENV.fetch(\"APPLE_TEAM_ID\") with no default"

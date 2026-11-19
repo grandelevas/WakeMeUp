@@ -146,6 +146,7 @@ struct AlarmEditorView: View {
                         }
                     }
                 }
+                .readableWidth()
             }
         }
         .accessibilityIdentifier("alarm-editor")
