@@ -736,3 +736,23 @@ enum WAVFixture {
         return withUnsafeBytes(of: &little) { Data($0) }
     }
 }
+
+final class InviteLinkPolicyTests: XCTestCase {
+    func testPendingInviteStaysOpenToTheLink() {
+        XCTAssertTrue(InviteLinkPolicy.allowsAnyoneWithLink(grantState: .pending))
+    }
+
+    func testAcceptedOrRevokedInviteStopsNewPeople() {
+        XCTAssertFalse(InviteLinkPolicy.allowsAnyoneWithLink(grantState: .active))
+        XCTAssertFalse(InviteLinkPolicy.allowsAnyoneWithLink(grantState: .revoked))
+    }
+
+    func testOnlyHTTPSLinksCanBeCopied() {
+        XCTAssertEqual(
+            InviteLinkPolicy.url(from: " https://www.icloud.com/share/abc ")?.absoluteString,
+            "https://www.icloud.com/share/abc"
+        )
+        XCTAssertNil(InviteLinkPolicy.url(from: "OLA-DEMO"))
+        XCTAssertNil(InviteLinkPolicy.url(from: "http://example.com/share"))
+    }
+}

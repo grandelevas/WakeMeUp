@@ -27,13 +27,8 @@ struct RootView: View {
                 RingingView(alarm: alarm)
             }
         }
-        .sheet(item: $model.preparedShare) { prepared in
-            CloudShareSheet(share: prepared.share, containerID: prepared.containerID)
-        }
         .sheet(isPresented: sharePresented) {
-            if let url = model.shareURL {
-                ActivityShareSheet(items: [url])
-            }
+            ActivityShareSheet(items: shareItems)
         }
         .alert("error.generic", isPresented: errorPresented) {
             Button("alarms.done", role: .cancel) {}
@@ -62,10 +57,21 @@ struct RootView: View {
         )
     }
 
+    private var shareItems: [Any] {
+        var items: [Any] = []
+        if !model.shareMessage.isEmpty {
+            items.append(model.shareMessage)
+        }
+        if let url = model.shareURL {
+            items.append(url)
+        }
+        return items
+    }
+
     private var sharePresented: Binding<Bool> {
         Binding(
             get: { model.shareURL != nil },
-            set: { if !$0 { model.shareURL = nil } }
+            set: { if !$0 { model.shareURL = nil; model.shareMessage = "" } }
         )
     }
 }

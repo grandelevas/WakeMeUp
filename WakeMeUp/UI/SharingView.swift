@@ -122,6 +122,14 @@ struct SharingView: View {
                     Text(stateName(grant.state))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    if grant.owner.id == model.profile.id,
+                       grant.state == .pending,
+                       InviteLinkPolicy.url(from: grant.inviteCode) != nil {
+                        Button("sharing.copyLink") {
+                            model.copyInviteLink(grantID: grant.id)
+                        }
+                        .font(.footnote)
+                    }
                     if grant.grantee?.id == model.profile.id && model.usesCloudKit {
                         Button("sharing.schedule") {
                             Task { await model.sendToPhone(grantID: grant.id, immediately: false) }

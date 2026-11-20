@@ -79,6 +79,8 @@
 "sharing.push.scheduled" = "%@ set an alarm for you at %@.";
 "sharing.yourName" = "Your name";
 "sharing.invite" = "Invite someone";
+"sharing.inviteMessage" = "Open this link in Wakito to set alarms for me.";
+"sharing.copyLink" = "Copy link";
 "sharing.inviteCode" = "Invite code";
 "sharing.enterCode" = "Paste an invite link";
 "sharing.accept" = "Accept";

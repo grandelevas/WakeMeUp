@@ -79,6 +79,8 @@
 "sharing.push.scheduled" = "%@ ustawił Ci budzik na %@.";
 "sharing.yourName" = "Twoje imię";
 "sharing.invite" = "Zaproś kogoś";
+"sharing.inviteMessage" = "Otwórz ten link w Wakito, żeby ustawiać mi budziki.";
+"sharing.copyLink" = "Kopiuj link";
 "sharing.inviteCode" = "Kod zaproszenia";
 "sharing.enterCode" = "Wklej link zaproszenia";
 "sharing.accept" = "Akceptuj";
