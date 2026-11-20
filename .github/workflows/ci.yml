@@ -29,6 +29,8 @@ jobs:
         run: bundle exec ruby scripts/check-fastlane-options.rb
       - name: Check external TestFlight group selection
         run: ruby scripts/external-beta-groups.test.rb
+      - name: Check TestFlight distribution decisions
+        run: ruby scripts/testflight-distribution.test.rb
       - name: Check iPad orientations in Info.plist
         run: python3 scripts/check-info-plist.py
       - name: Check community count parsing

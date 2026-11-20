@@ -2,6 +2,7 @@ default_platform(:ios)
 
 require_relative "signing_paths"
 require_relative "external_beta_groups"
+require_relative "testflight_distribution"
 
 def bundle_id
   ENV.fetch("BUNDLE_ID", "com.grandelevas.wakemeup")
@@ -362,10 +363,12 @@ platform :ios do
   end
 end
 
-# The upload above has already succeeded. This waits for processing, sends the
-# build to every external TestFlight group, and submits it for Beta App Review.
+# The upload above has already succeeded. Distribution uses the App Store
+# Connect API directly. Pilot's distribute_only path is not used: with no ipa
+# it calls fetch_app_platform, which prompts for the platform and aborts in
+# non-interactive mode before it waits for processing.
 # No external groups, or missing Test Information, must not fail the upload.
-def distribute_to_external_testers(key, bundle_version)
+def distribute_to_external_testers(_key, bundle_version)
   app = Spaceship::ConnectAPI::App.find(bundle_id)
   raise "App Store Connect has no app for #{bundle_id}" unless app
 
@@ -379,27 +382,17 @@ def distribute_to_external_testers(key, bundle_version)
     raise "No external TestFlight groups (is_internal_group false). Groups found: #{found_text}"
   end
 
-  UI.message("Distributing TestFlight build #{bundle_version} to external groups: #{names.join(", ")}")
-  feedback = ENV["TESTFLIGHT_FEEDBACK_EMAIL"].to_s.strip
-  upload_to_testflight(
-    api_key: key,
-    app_identifier: bundle_id,
-    distribute_only: true,
-    app_version: marketing_version,
-    build_number: bundle_version,
-    skip_waiting_for_build_processing: false,
-    wait_processing_interval: 30,
-    wait_processing_timeout_duration: 2400,
-    distribute_external: true,
-    groups: names,
-    notify_external_testers: true,
-    submit_beta_review: true,
-    changelog: "Wakito TestFlight build.",
-    beta_app_description: "Wakito is an alarm app. This build is for the external TestFlight groups.",
-    uses_non_exempt_encryption: false,
-    **(feedback.empty? ? {} : { beta_app_feedback_email: feedback })
-  )
+  version = marketing_version
+  deadline = Time.now + (40 * 60)
+  build = wait_for_valid_testflight_build(app, version, bundle_version, deadline: deadline)
+  build = ensure_export_compliance(app, version, bundle_version, build, deadline: deadline)
+  set_beta_whats_new(build, "Wakito TestFlight build.")
+  fill_blank_test_information(app, ENV["TESTFLIGHT_FEEDBACK_EMAIL"].to_s.strip)
+  selected = groups.select { |group| names.include?(beta_group_name(group)) && external_beta_group?(group) }
+  build.add_beta_groups(beta_groups: selected)
+  enable_external_notifications(build)
   UI.success("Distributed TestFlight build #{bundle_version} to: #{names.join(", ")}")
+  submit_beta_review_or_warn(app, build)
 rescue StandardError => error
   warning = "WARNING: The TestFlight upload succeeded, but distribution to external groups failed: #{error.message}"
   UI.important(warning)
@@ -410,5 +403,123 @@ rescue StandardError => error
     Optional GitHub secret TESTFLIGHT_FEEDBACK_EMAIL fills the feedback email from this lane.
     The uploaded build is already in TestFlight.
   MSG
+  puts "::warning::#{warning}"
+end
+
+def wait_for_valid_testflight_build(app, version, build_number, deadline: Time.now + (40 * 60))
+  loop do
+    builds = Spaceship::ConnectAPI::Build.all(
+      app_id: app.id,
+      version: version,
+      build_number: build_number.to_s,
+      platform: Spaceship::ConnectAPI::Platform::IOS,
+      includes: Spaceship::ConnectAPI::Build::ESSENTIAL_INCLUDES
+    )
+    build = builds.find { |item| item.version.to_s == build_number.to_s }
+    state = build&.processing_state
+    UI.message("TestFlight build #{version} (#{build_number}) state: #{state || "not uploaded yet"}")
+    case build_processing_decision(state)
+    when :ready
+      return Spaceship::ConnectAPI::Build.get(build_id: build.id, includes: Spaceship::ConnectAPI::Build::ESSENTIAL_INCLUDES)
+    when :failed
+      raise "TestFlight build #{version} (#{build_number}) processing state is #{state}"
+    end
+    if Time.now >= deadline
+      raise "Timed out after 40 minutes waiting for TestFlight build #{version} (#{build_number}) to become VALID. Last state: #{state || "not uploaded yet"}"
+    end
+    sleep(30)
+  end
+end
+
+def ensure_export_compliance(app, version, build_number, build, deadline:)
+  return build unless build.uses_non_exempt_encryption.nil?
+
+  UI.message("Setting usesNonExemptEncryption to false")
+  Spaceship::ConnectAPI.patch_builds(build_id: build.id, attributes: { usesNonExemptEncryption: false })
+  wait_for_valid_testflight_build(app, version, build_number, deadline: deadline)
+end
+
+def set_beta_whats_new(build, changelog)
+  localizations = build.get_beta_build_localizations
+  if localizations.empty?
+    Spaceship::ConnectAPI.post_beta_build_localizations(
+      build_id: build.id,
+      attributes: { locale: "en-US", whatsNew: changelog }
+    )
+  else
+    localizations.each do |localization|
+      Spaceship::ConnectAPI.patch_beta_build_localizations(
+        localization_id: localization.id,
+        attributes: { whatsNew: changelog }
+      )
+    end
+  end
+  UI.message("Set TestFlight whatsNew")
+end
+
+def fill_blank_test_information(app, feedback_email)
+  description = "Wakito is an alarm app. This build is for the external TestFlight groups."
+  localizations = app.get_beta_app_localizations
+  if localizations.empty?
+    attributes = { locale: "en-US", description: description }
+    attributes[:feedbackEmail] = feedback_email unless feedback_email.empty?
+    Spaceship::ConnectAPI.post_beta_app_localizations(app_id: app.id, attributes: attributes)
+    return
+  end
+  localizations.each do |localization|
+    attributes = {}
+    attributes[:description] = description if localization.description.to_s.strip.empty?
+    attributes[:feedbackEmail] = feedback_email if !feedback_email.empty? && localization.feedback_email.to_s.strip.empty?
+    next if attributes.empty?
+
+    Spaceship::ConnectAPI.patch_beta_app_localizations(localization_id: localization.id, attributes: attributes)
+  end
+rescue StandardError => error
+  UI.important("Could not fill blank Test Information: #{error.message}")
+end
+
+def enable_external_notifications(build)
+  detail = build.build_beta_detail
+  return if detail.nil? || detail.id.to_s.empty?
+
+  Spaceship::ConnectAPI.patch_build_beta_details(
+    build_beta_details_id: detail.id,
+    attributes: { autoNotifyEnabled: true }
+  )
+rescue StandardError => error
+  UI.important("Could not turn on external tester notifications: #{error.message}")
+end
+
+def submit_beta_review_or_warn(app, build)
+  detail = fetch_beta_review_detail(app)
+  missing = missing_testflight_review_fields(detail, app.get_beta_app_localizations)
+  if missing.any?
+    warn_missing_test_information(missing)
+    return
+  end
+  build.post_beta_app_review_submission
+  UI.success("Submitted the build for Beta App Review")
+rescue StandardError => error
+  named = review_fields_named_in_error(error.message)
+  if testflight_review_submission_rejected?(error.message) || named.any?
+    warn_missing_test_information(named.empty? ? ["see the App Store Connect error: #{error.message}"] : named)
+  else
+    raise
+  end
+end
+
+def fetch_beta_review_detail(app)
+  response = Spaceship::ConnectAPI.get_beta_app_review_detail(filter: { app: app.id })
+  pages = response.respond_to?(:all_pages) ? response.all_pages : [response]
+  pages.flat_map { |page| page.respond_to?(:to_models) ? page.to_models : [] }.first
+rescue StandardError => error
+  UI.important("Could not read Beta App Review contact info: #{error.message}")
+  nil
+end
+
+def warn_missing_test_information(fields)
+  list = fields.join(", ")
+  warning = "WARNING: Beta App Review was not submitted. Missing Test Information: #{list}. The build was still added to the external groups."
+  UI.important(warning)
   puts "::warning::#{warning}"
 end
