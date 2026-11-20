@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "currency": "EUR",
+  "disclosure": {
+    "en": "Half of the subscription goes to a cause. The app does not collect donations.",
+    "pl": "Połowa subskrypcji idzie na cel. Aplikacja nie zbiera darowizn."
+  },
+  "campaign": {
+    "id": "sample-roof",
+    "title": { "en": "A roof again", "pl": "Znowu dach" },
+    "who": { "en": "A family after the storm", "pl": "Rodzina po burzy" },
+    "why": { "en": "The house was damaged.", "pl": "Dom został uszkodzony." },
+    "photoURL": "https://example.com/cover.jpg",
+    "goalAmount": 1000,
+    "raisedAmount": 400,
+    "date": "2026-11-01",
+    "linkURL": "https://example.com/story",
+    "description": {
+      "en": "The first part of the story.\n\nThe second part, after a blank line.",
+      "pl": "Pierwsza część historii.\n\nDruga część, po pustej linii."
+    },
+    "photos": [
+      {
+        "url": "https://example.com/before.jpg",
+        "caption": { "en": "Before", "pl": "Przed" }
+      },
+      { "url": "https://example.com/after.jpg" },
+      { "url": "http://example.com/not-secure.jpg", "caption": { "en": "Skipped", "pl": "Pominięte" } }
+    ],
+    "updates": [
+      {
+        "date": "2026-11-20",
+        "title": { "en": "Handed over", "pl": "Przekazane" },
+        "text": {
+          "en": "The amount raised was handed over.",
+          "pl": "Zebrana kwota została przekazana."
+        },
+        "photos": [
+          {
+            "url": "https://example.com/receipt.jpg",
+            "caption": { "en": "Receipt", "pl": "Potwierdzenie" }
+          }
+        ]
+      },
+      {
+        "date": "2026-11-02",
+        "text": { "en": "Work started.", "pl": "Prace ruszyły." }
+      }
+    ],
+    "thanks": [
+      {
+        "from": "Anna",
+        "date": "2026-11-18",
+        "text": { "en": "Thank you for the roof.", "pl": "Dziękujemy za dach." },
+        "photoURL": "https://example.com/anna.jpg",
+        "videoURL": "https://example.com/anna.mp4"
+      },
+      {
+        "text": { "en": "A short note.", "pl": "Krótka wiadomość." }
+      }
+    ]
+  },
+  "history": []
+}

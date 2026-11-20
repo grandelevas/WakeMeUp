@@ -4,6 +4,7 @@ struct AchievementsView: View {
     @Environment(\.appAccent) private var appAccent
     @State private var document: AchievementsDocument?
     @State private var firstUse = Date()
+    @State private var readingCampaign = false
 
     var body: some View {
         NavigationStack {
@@ -16,6 +17,9 @@ struct AchievementsView: View {
                     personalCard
                     if let campaign = document?.campaign {
                         campaignCard(campaign)
+                        CampaignPhotoStrip(photos: campaign.gallery, title: "achievements.photos")
+                        CampaignUpdatesSection(updates: campaign.visibleUpdates)
+                        CampaignThanksSection(notes: campaign.visibleThanks)
                     }
                     totalsCard
                     historySection
@@ -24,6 +28,11 @@ struct AchievementsView: View {
                 .padding(16)
             }
             .navigationTitle("tab.achievements")
+            .navigationDestination(isPresented: $readingCampaign) {
+                if let campaign = document?.campaign {
+                    CampaignDetailView(campaign: campaign)
+                }
+            }
             .task { await reload() }
         }
         .accessibilityIdentifier("achievements-screen")
@@ -98,15 +107,12 @@ struct AchievementsView: View {
             Text(campaign.why.resolved(languageCode: languageCode))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            if let photo = URL(string: campaign.photoURL), photo.scheme == "https" {
-                AsyncImage(url: photo) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
-                    Color.secondary.opacity(0.15)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 160)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+            if let photo = SecureLink.url(from: campaign.photoURL) {
+                CachedRemoteImage(url: photo)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 160)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
             ProgressView(value: campaign.progress)
                 .tint(appAccent)
@@ -115,8 +121,15 @@ struct AchievementsView: View {
             Text(campaign.date)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if let link = URL(string: campaign.linkURL), link.scheme == "https" {
+            if let link = SecureLink.url(from: campaign.linkURL) {
                 Link("achievements.more", destination: link)
+            }
+            if campaign.hasStory {
+                Button("achievements.readMore") {
+                    readingCampaign = true
+                }
+                .font(.subheadline.weight(.semibold))
+                .accessibilityIdentifier("achievements-read-more")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -156,7 +169,7 @@ struct AchievementsView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     ForEach(gift.proof) { item in
-                        if let url = URL(string: item.url), url.scheme == "https" {
+                        if let url = SecureLink.url(from: item.url) {
                             Link(item.title.resolved(languageCode: languageCode), destination: url)
                         }
                     }

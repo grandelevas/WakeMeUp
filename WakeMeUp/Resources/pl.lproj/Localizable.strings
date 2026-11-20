@@ -193,6 +193,12 @@
 "achievements.support" = "Twoje wsparcie pomaga";
 "achievements.campaign" = "Aktualna zbiórka";
 "achievements.more" = "Więcej";
+"achievements.readMore" = "Czytaj więcej";
+"achievements.photos" = "Zdjęcia";
+"achievements.updates" = "Efekty zbiórki";
+"achievements.thanks" = "Podziękowania";
+"achievements.watch" = "Obejrzyj";
+"achievements.close" = "Zamknij";
 "achievements.total" = "Razem przekazaliśmy %@";
 "achievements.people" = "Wspartych osób: %d";
 "achievements.history" = "Historia";

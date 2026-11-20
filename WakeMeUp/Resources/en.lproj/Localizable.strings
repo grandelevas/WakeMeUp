@@ -193,6 +193,12 @@
 "achievements.support" = "Your support helps";
 "achievements.campaign" = "Current campaign";
 "achievements.more" = "Read more";
+"achievements.readMore" = "Read more";
+"achievements.photos" = "Photos";
+"achievements.updates" = "Campaign results";
+"achievements.thanks" = "Thank-yous";
+"achievements.watch" = "Watch";
+"achievements.close" = "Close";
 "achievements.total" = "Together we have donated %@";
 "achievements.people" = "People helped: %d";
 "achievements.history" = "History";

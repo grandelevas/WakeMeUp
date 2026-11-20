@@ -13,6 +13,11 @@ If that file is missing or the schema version is not 1, the app keeps the last g
 - `disclosure`, and every `title`, `who`, `why`, `recipient`, `method`, and `description`, has `en` and `pl`.
 - `campaign` is the current card. `goalAmount` and `raisedAmount` are numbers. Use `0` until you record a real amount. Do not invent one.
 - `photoURL` and `linkURL` are `https` links or empty strings. The link is a normal “read more” link, not a payment button.
+- These `campaign` fields are optional. Leave one out, or use an empty list, and that part of the screen stays hidden. Older app builds ignore them and still read the rest of the file. `schemaVersion` stays `1`.
+  - `description` is `{ "en", "pl" }`. A blank line (`\n\n`) starts a new paragraph.
+  - `photos` is a list of `{ "url", "caption": { "en", "pl" } }`. `caption` may be omitted. `url` must be `https`.
+  - `updates` is the newest result first: `{ "date": "YYYY-MM-DD", "title": { "en", "pl" }, "text": { "en", "pl" }, "photos": [ ... ] }`. `title` and `photos` may be omitted.
+  - `thanks` is a list of `{ "from", "date": "YYYY-MM-DD", "text": { "en", "pl" }, "photoURL", "videoURL" }`. Only `text` is required. `photoURL` and `videoURL` must be `https` when present.
 - `history` is past gifts. `amount` is what was actually given. `proof` is a list of `{ "id", "title": { "en", "pl" }, "url" }`.
 - The app adds the history amounts for “Together we have donated” and counts different English recipient names for “People helped”.
 - `userCount` is an optional whole number. The app first reads `stats/community.json` in this repository (updated by the Community count workflow). If that file is missing, it uses `userCount` from this JSON. `userCountDate` is an optional `YYYY-MM-DD`. Leave the field out, or set it to `0`, and the line stays hidden. The app never invents a number. There is no analytics SDK and no tracking.
