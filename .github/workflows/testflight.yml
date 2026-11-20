@@ -55,7 +55,7 @@ jobs:
     name: Sign and upload
     needs: preflight
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -104,6 +104,9 @@ jobs:
           if [ "${ACTION}" = "bootstrap-signing" ]; then
             bundle exec fastlane ios bootstrap_signing
           else
+            # Uploads the build, then distributes it to the external group
+            # Testerzy and submits Beta App Review. Distribution failures are
+            # warnings; the upload itself still succeeds.
             bundle exec fastlane ios beta
           fi
 

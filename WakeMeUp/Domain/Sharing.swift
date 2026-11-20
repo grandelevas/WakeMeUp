@@ -22,6 +22,7 @@ struct ShareGrant: Codable, Equatable, Hashable, Identifiable {
     var cloudKitRootRecordName: String?
     var cloudKitZoneName: String?
     var cloudKitOwnerName: String?
+    var cloudKitShareRecordName: String? = nil
 
     func allows(sender: UUID, recipient: UUID) -> Bool {
         state == .active && grantee?.id == sender && owner.id == recipient
@@ -113,6 +114,20 @@ struct PermissionCenter: Codable, Equatable {
     /// Drops invites that never received an iCloud share link.
     mutating func removeUnsharedInvites() {
         grants.removeAll { $0.state == .pending && $0.cloudKitRootRecordName == nil }
+    }
+}
+
+enum InviteLinkPolicy {
+    /// A pending invite can be opened by anyone who has the link. After the first
+    /// person accepts, or after the owner revokes it, the link stops accepting new people.
+    static func allowsAnyoneWithLink(grantState: GrantState) -> Bool {
+        grantState == .pending
+    }
+
+    static func url(from inviteCode: String) -> URL? {
+        let trimmed = inviteCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed), url.scheme?.lowercased() == "https" else { return nil }
+        return url
     }
 }
 

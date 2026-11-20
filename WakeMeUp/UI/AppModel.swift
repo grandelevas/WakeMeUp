@@ -10,12 +10,6 @@ enum AppTab: Hashable {
     case achievements
 }
 
-struct PreparedShare: Identifiable {
-    let id = UUID()
-    let share: CKShare
-    let containerID: String
-}
-
 @MainActor
 enum AppRuntime {
     static var model: AppModel?
@@ -34,7 +28,7 @@ final class AppModel {
     var scheduleFailure: String?
     var lastError: String?
     var shareURL: URL?
-    var preparedShare: PreparedShare?
+    var shareMessage = ""
     var pastedInvite = ""
     var friendDraftName = ""
     var remoteLabel = ""
@@ -274,16 +268,28 @@ final class AppModel {
             cloudKitOwnerName: nil
         )
         do {
-            let (shared, share) = try await cloudKit.createShare(for: draft)
+            let (shared, _) = try await cloudKit.createShare(for: draft)
             update {
                 $0.permissions.removeUnsharedInvites()
                 $0.permissions.replace(shared)
             }
-            preparedShare = PreparedShare(share: share, containerID: AppConfig.cloudKitContainerID)
+            presentInvite(shared.inviteCode)
         } catch {
             update { $0.permissions.removeUnsharedInvites() }
             lastError = CloudKitErrorText.message(for: error)
         }
+    }
+
+    func copyInviteLink(grantID: UUID) {
+        guard let grant = snapshot.permissions.grant(id: grantID),
+              let url = InviteLinkPolicy.url(from: grant.inviteCode) else { return }
+        UIPasteboard.general.string = url.absoluteString
+    }
+
+    func presentInvite(_ inviteCode: String) {
+        guard let url = InviteLinkPolicy.url(from: inviteCode) else { return }
+        shareMessage = String(localized: "sharing.inviteMessage")
+        shareURL = url
     }
 
     func acceptCloudShare(_ metadata: CKShare.Metadata) async {

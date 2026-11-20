@@ -81,16 +81,20 @@ final class CloudKitSharingClient {
         let root = CKRecord(recordType: "WMRoot", recordID: rootID)
         write(grant, commands: [], to: root)
         let share = CKShare(rootRecord: root)
-        share.publicPermission = .none
+        // One share per person. The link stays open until that person accepts.
+        share.publicPermission = .readWrite
         share[CKShare.SystemFieldKey.title] = "Wakito" as NSString
         let (saveResults, _) = try await database.modifyRecords(saving: [root, share], deleting: [], savePolicy: .allKeys)
         var savedShare: CKShare?
+        var savedRoot: CKRecord?
         var failures: [Error] = []
         for result in saveResults.values {
             switch result {
             case let .success(record):
                 if let saved = record as? CKShare {
                     savedShare = saved
+                } else {
+                    savedRoot = record
                 }
             case let .failure(error):
                 failures.append(error)
@@ -107,6 +111,10 @@ final class CloudKitSharingClient {
         grant.cloudKitRootRecordName = rootName
         grant.cloudKitZoneName = zoneID.zoneName
         grant.cloudKitOwnerName = zoneID.ownerName
+        grant.cloudKitShareRecordName = savedShare.recordID.recordName
+        if let savedRoot {
+            try? await save(grant, commands: [], database: database, record: savedRoot)
+        }
         try? await subscribe(zoneID: zoneID)
         return (grant, savedShare)
     }
@@ -148,6 +156,10 @@ final class CloudKitSharingClient {
         updated.cloudKitZoneName = grant.cloudKitZoneName
         updated.cloudKitOwnerName = grant.cloudKitOwnerName
         updated.inviteCode = grant.inviteCode
+        updated.cloudKitShareRecordName = updated.cloudKitShareRecordName ?? grant.cloudKitShareRecordName
+        if asOwner, !InviteLinkPolicy.allowsAnyoneWithLink(grantState: updated.state) {
+            await closePublicLink(on: root, grant: updated, database: database)
+        }
         return (updated, readCommands(from: root))
     }
 
@@ -168,6 +180,27 @@ final class CloudKitSharingClient {
         revoked.state = .revoked
         let root = try await container.privateCloudDatabase.record(for: try recordID(for: grant))
         try await save(revoked, commands: readCommands(from: root), database: container.privateCloudDatabase, record: root)
+        await closePublicLink(on: root, grant: revoked, database: container.privateCloudDatabase)
+    }
+
+    /// Stops new people from joining. People who already accepted keep their access.
+    private func closePublicLink(on root: CKRecord, grant: ShareGrant, database: CKDatabase) async {
+        let shareID: CKRecord.ID
+        if let reference = root.share {
+            shareID = reference.recordID
+        } else if let name = grant.cloudKitShareRecordName {
+            shareID = CKRecord.ID(recordName: name, zoneID: root.recordID.zoneID)
+        } else {
+            return
+        }
+        do {
+            guard let share = try await database.record(for: shareID) as? CKShare else { return }
+            guard share.publicPermission != .none else { return }
+            share.publicPermission = .none
+            _ = try await database.save(share)
+        } catch {
+            // The grant state is already saved. The next refresh tries again while it is active.
+        }
     }
 
     private func subscribe(zoneID: CKRecordZone.ID) async throws {
@@ -196,6 +229,7 @@ final class CloudKitSharingClient {
             stored.cloudKitZoneName = grant.cloudKitZoneName
             stored.cloudKitOwnerName = grant.cloudKitOwnerName
             stored.inviteCode = grant.inviteCode
+            stored.cloudKitShareRecordName = stored.cloudKitShareRecordName ?? grant.cloudKitShareRecordName
             let commands = change(readCommands(from: root))
             do {
                 try await save(stored, commands: commands, database: database, record: root)
