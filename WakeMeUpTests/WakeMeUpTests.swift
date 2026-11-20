@@ -810,3 +810,13 @@ final class ReleaseNotesTests: XCTestCase {
         XCTAssertTrue(ReleaseNotesPrompt.shouldShow(currentBuild: "23", defaults: defaults))
     }
 }
+
+final class SoundPreviewPolicyTests: XCTestCase {
+    func testPreviewStaysWithinTenSeconds() {
+        XCTAssertEqual(SoundPreviewPolicy.length(fileDuration: 12, requested: nil), 10)
+        XCTAssertEqual(SoundPreviewPolicy.length(fileDuration: 4, requested: nil), 4)
+        XCTAssertEqual(SoundPreviewPolicy.length(fileDuration: 40, requested: 20), 10)
+        XCTAssertEqual(SoundPreviewPolicy.length(fileDuration: 40, requested: 3), 3)
+        XCTAssertEqual(SoundPreviewPolicy.length(fileDuration: 8, requested: 0), 0)
+    }
+}

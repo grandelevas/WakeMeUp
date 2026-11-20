@@ -100,6 +100,15 @@ enum LaunchConfiguration {
 }
 
 enum SoundFiles {
+    static func previewURL(for soundID: String, customSounds: [CustomSound]) -> URL? {
+        if let custom = customSounds.first(where: { $0.id == soundID }) {
+            guard let directory = try? librarySoundsDirectory() else { return nil }
+            let url = directory.appendingPathComponent(custom.filename)
+            return FileManager.default.fileExists(atPath: url.path) ? url : nil
+        }
+        return bundledURL(id: soundID)
+    }
+
     static func bundledURL(id: String) -> URL? {
         if let url = Bundle.main.url(forResource: id, withExtension: "wav") {
             return url
