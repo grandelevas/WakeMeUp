@@ -111,6 +111,9 @@
 "sharing.inviteCode" = "Kod zaproszenia";
 "sharing.enterCode" = "Wklej link zaproszenia";
 "sharing.accept" = "Akceptuj";
+"sharing.accepting" = "Pobieranie zaproszenia…";
+"sharing.timedOut" = "Zaproszenie trwało zbyt długo. Spróbuj ponownie.";
+"sharing.badLink" = "To nie jest link zaproszenia Wakito.";
 "sharing.revoke" = "Cofnij dostęp";
 "sharing.revoke.title" = "Cofnąć dostęp?";
 "sharing.revoke.message" = "Ta osoba nie będzie już mogła ustawiać alarmów na tym iPhonie.";

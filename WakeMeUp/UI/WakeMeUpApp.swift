@@ -36,11 +36,18 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         return true
     }
 
+    func application(
+        _ application: UIApplication,
+        configurationForConnecting connectingSceneSession: UISceneSession,
+        options: UIScene.ConnectionOptions
+    ) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = ShareSceneDelegate.self
+        return configuration
+    }
+
     func application(_ application: UIApplication, userDidAcceptCloudKitShareWith metadata: CKShare.Metadata) {
-        Task {
-            guard let model = await MainActor.run(body: { AppRuntime.model }) else { return }
-            await model.acceptCloudShare(metadata)
-        }
+        ShareAcceptance.enqueue(metadata)
     }
 
     func application(
@@ -67,6 +74,51 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         [.banner, .list, .sound]
+    }
+}
+
+/// SwiftUI's scene does not call `UIApplicationDelegate.userDidAcceptCloudKitShareWith`.
+/// The system "Retrieving" screen waits until this scene method runs.
+final class ShareSceneDelegate: UIResponder, UIWindowSceneDelegate {
+    func scene(
+        _ scene: UIScene,
+        willConnectTo session: UISceneSession,
+        options connectionOptions: UIScene.ConnectionOptions
+    ) {
+        if let metadata = connectionOptions.cloudKitShareMetadata {
+            ShareAcceptance.enqueue(metadata)
+        }
+        for context in connectionOptions.urlContexts {
+            ShareAcceptance.enqueue(url: context.url)
+        }
+    }
+
+    func windowScene(
+        _ windowScene: UIWindowScene,
+        userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata
+    ) {
+        ShareAcceptance.enqueue(cloudKitShareMetadata)
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        for context in URLContexts {
+            ShareAcceptance.enqueue(url: context.url)
+        }
+    }
+}
+
+enum ShareAcceptance {
+    static func enqueue(_ metadata: CKShare.Metadata) {
+        Task { @MainActor in
+            await AppRuntime.acceptWhenReady(metadata)
+        }
+    }
+
+    static func enqueue(url: URL) {
+        guard InviteLinkPolicy.isCloudShare(url) else { return }
+        Task { @MainActor in
+            await AppRuntime.acceptURLWhenReady(url)
+        }
     }
 }
 

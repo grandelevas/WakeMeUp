@@ -51,11 +51,11 @@ struct SharingView: View {
     }
 
     private var incoming: [ShareGrant] {
-        model.grants.filter { $0.owner.id == model.profile.id && $0.state != .revoked }
+        ShareRoster.canSetAlarmsHere(profileID: model.profile.id, grants: model.grants)
     }
 
     private var outgoing: [ShareGrant] {
-        model.grants.filter { $0.grantee?.id == model.profile.id && $0.state == .active }
+        ShareRoster.phonesICanSet(profileID: model.profile.id, grants: model.grants)
     }
 
     private var previewSection: some View {
@@ -96,16 +96,14 @@ struct SharingView: View {
             Button("sharing.invite") {
                 Task { await model.createCloudInvite() }
             }
-            TextField("sharing.enterCode", text: Binding(
-                get: { model.pastedInvite },
-                set: { model.pastedInvite = $0 }
-            ))
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            Button("sharing.accept") {
-                Task { await model.acceptPastedInvite() }
+            if let status = model.shareStatus {
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text(status)
+                        .font(.subheadline)
+                }
+                .accessibilityIdentifier("sharing-status")
             }
-            .disabled(model.pastedInvite.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
     }
 
@@ -149,7 +147,8 @@ struct SharingView: View {
 
     private func otherName(in grant: ShareGrant) -> String {
         if grant.owner.id == model.profile.id {
-            return grant.grantee?.displayName ?? String(localized: "sharing.pending")
+            let name = grant.grantee?.displayName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return name.isEmpty ? String(localized: "sharing.pending") : name
         }
         return grant.owner.displayName
     }

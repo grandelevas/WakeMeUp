@@ -131,9 +131,16 @@ final class CloudKitSharingClient {
     }
 
     private func accept(metadata: CKShare.Metadata, grantee: Participant, inviteURL: URL?) async throws -> ShareGrant {
-        _ = try await container.accept([metadata])
         guard let rootID = metadata.hierarchicalRootRecordID else {
             throw RemoteBackendError.missingRoot
+        }
+        do {
+            _ = try await container.accept([metadata])
+        } catch {
+            // Opening the same link twice still has to record who joined.
+            guard (try? await container.sharedCloudDatabase.record(for: rootID)) != nil else {
+                throw error
+            }
         }
         let root = try await container.sharedCloudDatabase.record(for: rootID)
         guard var grant = readGrant(from: root) else { throw RemoteBackendError.missingRoot }
