@@ -6,16 +6,16 @@ final class GroupReorderUITests: XCTestCase {
         app.launchArguments = ["-WakeMeUpDemo", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
 
-        let more = app.buttons["alarms.more"]
-        XCTAssertTrue(more.waitForExistence(timeout: 15))
-        more.tap()
+        let weekdaysBefore = app.descendants(matching: .any)["group-row-BBBBBBBB-0000-0000-0000-000000000001"]
+        XCTAssertTrue(weekdaysBefore.waitForExistence(timeout: 15))
+        XCTAssertFalse(
+            reorderHandle(near: weekdaysBefore, in: app).waitForExistence(timeout: 1),
+            "Reorder handles should stay hidden until Edit"
+        )
 
-        let reorder = app.buttons["groups.reorder"]
-        if reorder.waitForExistence(timeout: 3) {
-            reorder.tap()
-        } else {
-            app.buttons["Reorder groups"].tap()
-        }
+        let edit = app.buttons["alarms.edit"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 5))
+        edit.tap()
 
         let weekdays = app.descendants(matching: .any)["group-row-BBBBBBBB-0000-0000-0000-000000000001"]
         let weekend = app.descendants(matching: .any)["group-row-BBBBBBBB-0000-0000-0000-000000000002"]

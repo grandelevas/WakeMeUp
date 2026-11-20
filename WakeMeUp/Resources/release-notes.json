@@ -1,5 +1,17 @@
 {
-  "entries": [
+    "entries": [
+    {
+      "version": "1.0.0",
+      "date": "2026-11-20",
+      "changes": {
+        "en": [
+          "Group order changes only after Edit. The alarm list no longer drags groups on a long press."
+        ],
+        "pl": [
+          "Kolejność grup zmienisz dopiero po Edytuj. Lista alarmów nie przesuwa grup po przytrzymaniu."
+        ]
+      }
+    },
     {
       "version": "1.0.0",
       "date": "2026-11-20",
