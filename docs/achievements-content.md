@@ -15,6 +15,7 @@ If that file is missing or the schema version is not 1, the app keeps the last g
 - `photoURL` and `linkURL` are `https` links or empty strings. The link is a normal “read more” link, not a payment button.
 - These `campaign` fields are optional. Leave one out, or use an empty list, and that part of the screen stays hidden. Older app builds ignore them and still read the rest of the file. `schemaVersion` stays `1`.
   - `description` is `{ "en", "pl" }`. A blank line (`\n\n`) starts a new paragraph.
+  - `goalNote` is an optional `{ "en", "pl" }` line under the raised and goal amounts. Leave it out and that line stays hidden.
   - `photos` is a list of `{ "url", "caption": { "en", "pl" } }`. `caption` may be omitted. `url` must be `https`.
   - `updates` is the newest result first: `{ "date": "YYYY-MM-DD", "title": { "en", "pl" }, "text": { "en", "pl" }, "photos": [ ... ] }`. `title` and `photos` may be omitted.
   - `thanks` is a list of `{ "from", "date": "YYYY-MM-DD", "text": { "en", "pl" }, "photoURL", "videoURL" }`. Only `text` is required. `photoURL` and `videoURL` must be `https` when present.

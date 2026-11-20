@@ -358,6 +358,7 @@ final class LocalAchievementTests: XCTestCase {
         XCTAssertEqual(document.campaign?.progress, 0)
         XCTAssertNil(document.visibleUserCount)
         XCTAssertNil(document.campaign?.description)
+        XCTAssertNil(document.campaign?.goalNote)
         XCTAssertNil(document.campaign?.photos)
         XCTAssertNil(document.campaign?.updates)
         XCTAssertNil(document.campaign?.thanks)
@@ -370,6 +371,7 @@ final class LocalAchievementTests: XCTestCase {
         XCTAssertEqual(document.campaign?.id, "placeholder")
         XCTAssertEqual(document.campaign?.raisedAmount, 0)
         XCTAssertNil(document.campaign?.description)
+        XCTAssertNil(document.campaign?.goalNote)
         XCTAssertNil(document.campaign?.photos)
         XCTAssertNil(document.campaign?.updates)
         XCTAssertNil(document.campaign?.thanks)
@@ -403,6 +405,33 @@ final class LocalAchievementTests: XCTestCase {
         XCTAssertNil(campaign.visibleThanks[1].photo)
         XCTAssertEqual(campaign.progress, 0.4, accuracy: 0.001)
         XCTAssertTrue(campaign.hasStory)
+    }
+
+    func testGoalNoteDecodesWhenPresentAndStaysNilWhenAbsent() throws {
+        let without = """
+        {"schemaVersion":1,"currency":"EUR","disclosure":{"en":"e","pl":"p"},"campaign":{"id":"x","title":{"en":"t","pl":"t"},"who":{"en":"w","pl":"w"},"why":{"en":"y","pl":"y"},"photoURL":"","goalAmount":100000,"raisedAmount":0,"date":"2026-11-20","linkURL":""},"history":[]}
+        """
+        let absent = try XCTUnwrap(AchievementsDocument.decode(Data(without.utf8)).campaign)
+        XCTAssertNil(absent.goalNote)
+        XCTAssertNil(absent.visibleGoalNote)
+        XCTAssertEqual(absent.goalAmount, 100_000)
+
+        let withNote = """
+        {"schemaVersion":1,"currency":"EUR","disclosure":{"en":"e","pl":"p"},"campaign":{"id":"x","title":{"en":"t","pl":"t"},"who":{"en":"w","pl":"w"},"why":{"en":"y","pl":"y"},"photoURL":"","goalAmount":100000,"raisedAmount":0,"date":"2026-11-20","linkURL":"","goalNote":{"pl":"Cel: 100 000 € – czyli 50 000 użytkowników Wakito.","en":"Goal: €100,000 – that's 50,000 Wakito users."}},"history":[]}
+        """
+        let note = try XCTUnwrap(AchievementsDocument.decode(Data(withNote.utf8)).campaign?.goalNote)
+        XCTAssertEqual(note.pl, "Cel: 100 000 € – czyli 50 000 użytkowników Wakito.")
+        XCTAssertEqual(note.en, "Goal: €100,000 – that's 50,000 Wakito users.")
+    }
+
+    func testEuroAmountsUseTheLocaleThousandsSeparator() {
+        let polish = Locale(identifier: "pl_PL")
+        let raised = AchievementMoney.format(0, currencyCode: "EUR", locale: polish)
+        let goal = AchievementMoney.format(100_000, currencyCode: "EUR", locale: polish)
+        let label = "\(raised) / \(goal)"
+            .replacingOccurrences(of: "\u{00A0}", with: " ")
+            .replacingOccurrences(of: "\u{202F}", with: " ")
+        XCTAssertEqual(label, "0 € / 100 000 €")
     }
 
     func testBlankStoryAndEmptyListsStayHidden() throws {
