@@ -1413,7 +1413,7 @@ final class MutualInviteTests: XCTestCase {
         XCTAssertFalse(MutualInvite.shouldCreateReturnShare(accepted: accepted, profileID: friend.id, existing: [accepted, back]))
 
         accepted.returnInviteURL = back.inviteCode
-        let url = MutualInvite.returnURLToAccept(in: [accepted, back], profileID: owner.id)
+        let url = MutualInvite.returnURLToAccept(in: [accepted], profileID: owner.id)
         XCTAssertEqual(url?.absoluteString, back.inviteCode)
         back.grantee = owner
         back.state = .active

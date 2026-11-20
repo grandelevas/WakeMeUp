@@ -198,7 +198,7 @@ enum PersonName {
             return inviterLabel(inviteeName: grant.inviteeName, theirName: grant.grantee?.displayName, generic: generic)
         }
         if let mine = grants.first(where: { owned in
-            guard owned.owner.id == profileID else { return false }
+            guard owned.owner.id == profileID, owned.reciprocal != true else { return false }
             if owned.grantee?.id == grant.owner.id { return true }
             if let url = owned.returnInviteURL, url == grant.inviteCode { return true }
             return false
