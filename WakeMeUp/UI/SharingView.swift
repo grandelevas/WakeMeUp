@@ -2,8 +2,13 @@ import SwiftUI
 
 struct SharingView: View {
     @Environment(AppModel.self) private var model
-    @State private var name = ""
     @State private var remoteTime = Date()
+    @State private var inviting = false
+    @State private var inviteeDraft = ""
+    @State private var editingOwnName = false
+    @State private var ownNameDraft = ""
+    @State private var renamingGrantID: UUID?
+    @State private var renameDraft = ""
 
     var body: some View {
         NavigationStack {
@@ -13,10 +18,7 @@ struct SharingView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-                Section("sharing.yourName") {
-                    TextField("sharing.yourName", text: $name)
-                        .onSubmit { model.rename(name) }
-                }
+                ownNameSection
                 if model.showsSimulatedPreview {
                     previewSection
                 } else {
@@ -43,11 +45,124 @@ struct SharingView: View {
                     }
                 }
             }
-            .onAppear {
-                if name.isEmpty { name = model.profile.displayName }
-            }
+            .sheet(isPresented: $inviting) { inviteSheet }
+            .sheet(isPresented: $editingOwnName, onDismiss: {
+                Task { await model.commitOwnName() }
+            }) { ownNameSheet }
+            .sheet(isPresented: renamePresented) { renameSheet }
         }
         .accessibilityIdentifier("sharing-screen")
+    }
+
+    private var renamePresented: Binding<Bool> {
+        Binding(
+            get: { renamingGrantID != nil },
+            set: { if !$0 { renamingGrantID = nil } }
+        )
+    }
+
+    private var ownNameSection: some View {
+        Section("sharing.yourName") {
+            if model.ownName.isEmpty {
+                Button("sharing.addOwnName") {
+                    ownNameDraft = ""
+                    editingOwnName = true
+                }
+                .accessibilityIdentifier("sharing-own-name")
+            } else {
+                HStack {
+                    Text(model.ownName)
+                        .accessibilityIdentifier("sharing-own-name")
+                    Spacer()
+                    Button("sharing.edit") {
+                        ownNameDraft = model.ownName
+                        editingOwnName = true
+                    }
+                }
+            }
+            Text("sharing.ownName.help")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            if model.needsOwnName {
+                Text("sharing.needOwnName")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private var ownNameSheet: some View {
+        NavigationStack {
+            Form {
+                TextField("sharing.yourName", text: $ownNameDraft)
+                    .textInputAutocapitalization(.words)
+                    .onChange(of: ownNameDraft) { _, newValue in
+                        model.rename(newValue)
+                    }
+            }
+            .navigationTitle("sharing.yourName")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("sharing.done") { editingOwnName = false }
+                }
+            }
+        }
+    }
+
+    private var inviteSheet: some View {
+        NavigationStack {
+            Form {
+                TextField("sharing.inviteeName", text: $inviteeDraft)
+                    .textInputAutocapitalization(.words)
+            }
+            .navigationTitle("sharing.whoTitle")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("sharing.cancel") { inviting = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("sharing.continue") {
+                        let typed = inviteeDraft
+                        Task {
+                            if await model.createCloudInvite(inviteeName: typed) {
+                                inviteeDraft = ""
+                                inviting = false
+                            } else if model.needsOwnName {
+                                inviting = false
+                            }
+                        }
+                    }
+                    .disabled(PersonName.nonempty(inviteeDraft) == nil)
+                }
+            }
+        }
+    }
+
+    private var renameSheet: some View {
+        NavigationStack {
+            Form {
+                TextField("sharing.inviteeName", text: $renameDraft)
+                    .textInputAutocapitalization(.words)
+            }
+            .navigationTitle("sharing.rename")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("sharing.cancel") { renamingGrantID = nil }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("sharing.done") {
+                        guard let grantID = renamingGrantID else { return }
+                        let typed = renameDraft
+                        renamingGrantID = nil
+                        Task { await model.renamePerson(grantID: grantID, to: typed) }
+                    }
+                    .disabled(PersonName.nonempty(renameDraft) == nil)
+                }
+            }
+        }
     }
 
     private var incoming: [ShareGrant] {
@@ -94,7 +209,8 @@ struct SharingView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Button("sharing.invite") {
-                Task { await model.createCloudInvite() }
+                inviteeDraft = ""
+                inviting = true
             }
             if let status = model.shareStatus {
                 HStack(spacing: 12) {
@@ -128,6 +244,12 @@ struct SharingView: View {
                         }
                         .font(.footnote)
                     }
+                    Button("sharing.rename") {
+                        let label = otherName(in: grant)
+                        renameDraft = label == String(localized: "sharing.someone") ? "" : label
+                        renamingGrantID = grant.id
+                    }
+                    .font(.footnote)
                     if grant.grantee?.id == model.profile.id && model.usesCloudKit {
                         Button("sharing.schedule") {
                             Task { await model.sendToPhone(grantID: grant.id, immediately: false) }
@@ -146,11 +268,12 @@ struct SharingView: View {
     }
 
     private func otherName(in grant: ShareGrant) -> String {
-        if grant.owner.id == model.profile.id {
-            let name = grant.grantee?.displayName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return name.isEmpty ? String(localized: "sharing.pending") : name
-        }
-        return grant.owner.displayName
+        PersonName.listLabel(
+            for: grant,
+            profileID: model.profile.id,
+            grants: model.grants,
+            generic: String(localized: "sharing.someone")
+        )
     }
 
     private func stateName(_ state: GrantState) -> String {

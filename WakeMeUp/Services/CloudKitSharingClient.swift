@@ -14,16 +14,37 @@ enum CloudKitErrorText {
         guard let cloudError = error as? CKError else {
             return error.localizedDescription
         }
-        var lines = ["CKError \(cloudError.code.rawValue): \(cloudError.localizedDescription)"]
+        var lines: [String] = []
+        func append(_ line: String) {
+            guard !lines.contains(line) else { return }
+            lines.append(line)
+        }
+        append("CKError \(cloudError.code.rawValue): \(cloudError.localizedDescription)")
         if let partial = cloudError.partialErrorsByItemID {
             for (identifier, itemError) in partial {
-                lines.append("\(identifier): \(detail(for: itemError))")
+                append("\(identifier): \(detail(for: itemError))")
             }
         }
         if let underlying = cloudError.userInfo[NSUnderlyingErrorKey] as? Error, !(underlying is CKError) {
-            lines.append(underlying.localizedDescription)
+            append(underlying.localizedDescription)
         }
         return lines.joined(separator: "\n")
+    }
+}
+
+enum CloudKitZoneFailure {
+    static func isZoneNotFound(_ error: Error) -> Bool {
+        guard let cloudError = error as? CKError else { return false }
+        if cloudError.code == .zoneNotFound { return true }
+        guard cloudError.code == .partialFailure, let partial = cloudError.partialErrorsByItemID else { return false }
+        return partial.values.contains { isZoneNotFound($0) }
+    }
+
+    static func isZoneAlreadyExists(_ error: Error) -> Bool {
+        guard let cloudError = error as? CKError else { return false }
+        if cloudError.code == .serverRecordChanged { return true }
+        guard cloudError.code == .partialFailure, let partial = cloudError.partialErrorsByItemID else { return false }
+        return partial.values.contains { isZoneAlreadyExists($0) }
     }
 }
 
@@ -66,16 +87,46 @@ final class CloudKitSharingClient {
         guard status == .available else { throw RemoteBackendError.notSignedIn }
     }
 
+    func currentUserName() async -> String? {
+        do {
+            try await requireAccount()
+            let userID = try await container.userRecordID()
+            let participant = try await container.shareParticipant(forUserRecordID: userID)
+            return PersonName.formatted(participant.userIdentity.nameComponents)
+        } catch {
+            return nil
+        }
+    }
+
+    func ensureSilentSubscription() async {
+        do {
+            try await requireAccount()
+            let zoneID = try await ensurePrivateZone()
+            try await subscribe(zoneID: zoneID)
+        } catch {
+            // The next invite creates the zone and replaces the subscription.
+        }
+    }
+
     func createShare(for grant: ShareGrant) async throws -> (ShareGrant, CKShare) {
         try await requireAccount()
         var grant = grant
         let database = container.privateCloudDatabase
-        let zoneID = CKRecordZone.ID(zoneName: "WakeMeUp", ownerName: CKCurrentUserDefaultName)
         do {
-            _ = try await database.save(CKRecordZone(zoneID: zoneID))
-        } catch let error as CKError where error.code == .serverRecordChanged {
-            // The custom zone already exists. Shares cannot live in _defaultZone.
+            let zoneID = try await ensurePrivateZone()
+            return try await saveNewShare(&grant, zoneID: zoneID, database: database)
+        } catch {
+            guard CloudKitZoneFailure.isZoneNotFound(error) else { throw error }
+            let zoneID = try await ensurePrivateZone()
+            return try await saveNewShare(&grant, zoneID: zoneID, database: database)
         }
+    }
+
+    private func saveNewShare(
+        _ grant: inout ShareGrant,
+        zoneID: CKRecordZone.ID,
+        database: CKDatabase
+    ) async throws -> (ShareGrant, CKShare) {
         let rootName = "grant-\(grant.id.uuidString)"
         let rootID = CKRecord.ID(recordName: rootName, zoneID: zoneID)
         let root = CKRecord(recordType: "WMRoot", recordID: rootID)
@@ -107,15 +158,16 @@ final class CloudKitSharingClient {
         guard let savedShare, let url = savedShare.url else {
             throw RemoteBackendError.shareURLMissing
         }
+        let savedZone = savedRoot?.recordID.zoneID ?? savedShare.recordID.zoneID
         grant.inviteCode = url.absoluteString
-        grant.cloudKitRootRecordName = rootName
-        grant.cloudKitZoneName = zoneID.zoneName
-        grant.cloudKitOwnerName = zoneID.ownerName
+        grant.cloudKitRootRecordName = savedRoot?.recordID.recordName ?? rootName
+        grant.cloudKitZoneName = savedZone.zoneName
+        grant.cloudKitOwnerName = savedZone.ownerName
         grant.cloudKitShareRecordName = savedShare.recordID.recordName
         if let savedRoot {
             try? await save(grant, commands: [], database: database, record: savedRoot)
         }
-        try? await subscribe(zoneID: zoneID)
+        try? await subscribe(zoneID: savedZone)
         return (grant, savedShare)
     }
 
@@ -157,17 +209,46 @@ final class CloudKitSharingClient {
     func refresh(_ grant: ShareGrant, asOwner: Bool) async throws -> (ShareGrant, [RemoteAlarmCommand]) {
         try await requireAccount()
         let database = asOwner ? container.privateCloudDatabase : container.sharedCloudDatabase
-        let root = try await database.record(for: try recordID(for: grant))
+        let root = try await fetchRecord(try recordID(for: grant), in: database)
         guard var updated = readGrant(from: root) else { throw RemoteBackendError.missingRoot }
-        updated.cloudKitRootRecordName = grant.cloudKitRootRecordName
-        updated.cloudKitZoneName = grant.cloudKitZoneName
-        updated.cloudKitOwnerName = grant.cloudKitOwnerName
+        let zoneID = root.recordID.zoneID
+        updated.cloudKitRootRecordName = root.recordID.recordName
+        updated.cloudKitZoneName = zoneID.zoneName
+        updated.cloudKitOwnerName = zoneID.ownerName
         updated.inviteCode = grant.inviteCode
         updated.cloudKitShareRecordName = updated.cloudKitShareRecordName ?? grant.cloudKitShareRecordName
         if asOwner, !InviteLinkPolicy.allowsAnyoneWithLink(grantState: updated.state) {
             await closePublicLink(on: root, grant: updated, database: database)
         }
         return (updated, readCommands(from: root))
+    }
+
+    func publishReturnInvite(_ url: URL, on grant: ShareGrant) async throws {
+        try await requireAccount()
+        try await mutate(grant: grant, database: container.sharedCloudDatabase, alter: { stored in
+            stored.returnInviteURL = url.absoluteString
+        }, change: { $0 })
+    }
+
+    func updateInviteeName(_ name: String, on grant: ShareGrant) async throws {
+        guard PersonName.nonempty(name) != nil else { return }
+        try await requireAccount()
+        try await mutate(grant: grant, database: container.privateCloudDatabase, alter: { stored in
+            stored.inviteeName = name
+        }, change: { $0 })
+    }
+
+    func updateOwnName(_ name: String, on grant: ShareGrant, asOwner: Bool) async throws {
+        guard PersonName.nonempty(name) != nil else { return }
+        try await requireAccount()
+        let database = asOwner ? container.privateCloudDatabase : container.sharedCloudDatabase
+        try await mutate(grant: grant, database: database, alter: { stored in
+            if asOwner {
+                stored.owner.displayName = name
+            } else if stored.grantee != nil {
+                stored.grantee?.displayName = name
+            }
+        }, change: { $0 })
     }
 
     func append(command: RemoteAlarmCommand, grant: ShareGrant, asOwner: Bool) async throws {
@@ -185,7 +266,7 @@ final class CloudKitSharingClient {
         try await requireAccount()
         var revoked = grant
         revoked.state = .revoked
-        let root = try await container.privateCloudDatabase.record(for: try recordID(for: grant))
+        let root = try await fetchRecord(try recordID(for: grant), in: container.privateCloudDatabase)
         try await save(revoked, commands: readCommands(from: root), database: container.privateCloudDatabase, record: root)
         await closePublicLink(on: root, grant: revoked, database: container.privateCloudDatabase)
     }
@@ -201,7 +282,7 @@ final class CloudKitSharingClient {
             return
         }
         do {
-            guard let share = try await database.record(for: shareID) as? CKShare else { return }
+            guard let share = try await fetchRecord(shareID, in: database) as? CKShare else { return }
             guard share.publicPermission != .none else { return }
             share.publicPermission = .none
             _ = try await database.save(share)
@@ -210,12 +291,11 @@ final class CloudKitSharingClient {
         }
     }
 
+    /// Silent subscription. A visible alert here fires for every zone write, including an invite being accepted.
     private func subscribe(zoneID: CKRecordZone.ID) async throws {
         let subscription = CKRecordZoneSubscription(zoneID: zoneID, subscriptionID: "wakemeup-zone")
         let info = CKSubscription.NotificationInfo()
         info.shouldSendContentAvailable = true
-        info.alertLocalizationKey = "sharing.push.generic"
-        info.soundName = "default"
         subscription.notificationInfo = info
         try? await container.privateCloudDatabase.deleteSubscription(withID: subscription.subscriptionID)
         _ = try await container.privateCloudDatabase.save(subscription)
@@ -224,19 +304,20 @@ final class CloudKitSharingClient {
     private func mutate(
         grant: ShareGrant,
         database: CKDatabase,
+        alter: (inout ShareGrant) -> Void = { _ in },
         change: ([RemoteAlarmCommand]) -> [RemoteAlarmCommand]
     ) async throws {
         var attempt = 0
         while attempt < 3 {
             attempt += 1
-            let root = try await database.record(for: try recordID(for: grant))
-            guard let current = readGrant(from: root) else { throw RemoteBackendError.missingRoot }
-            var stored = current
-            stored.cloudKitRootRecordName = grant.cloudKitRootRecordName
-            stored.cloudKitZoneName = grant.cloudKitZoneName
-            stored.cloudKitOwnerName = grant.cloudKitOwnerName
+            let root = try await fetchRecord(try recordID(for: grant), in: database)
+            guard var stored = readGrant(from: root) else { throw RemoteBackendError.missingRoot }
+            stored.cloudKitRootRecordName = root.recordID.recordName
+            stored.cloudKitZoneName = root.recordID.zoneID.zoneName
+            stored.cloudKitOwnerName = root.recordID.zoneID.ownerName
             stored.inviteCode = grant.inviteCode
             stored.cloudKitShareRecordName = stored.cloudKitShareRecordName ?? grant.cloudKitShareRecordName
+            alter(&stored)
             let commands = change(readCommands(from: root))
             do {
                 try await save(stored, commands: commands, database: database, record: root)
@@ -247,6 +328,57 @@ final class CloudKitSharingClient {
         }
     }
 
+    private func ensurePrivateZone() async throws -> CKRecordZone.ID {
+        let requested = CKRecordZone.ID(zoneName: "WakeMeUp", ownerName: CKCurrentUserDefaultName)
+        let operation = CKModifyRecordZonesOperation(
+            recordZonesToSave: [CKRecordZone(zoneID: requested)],
+            recordZoneIDsToDelete: nil
+        )
+        operation.qualityOfService = .userInitiated
+        let box = ZoneSaveBox()
+        return try await withCheckedThrowingContinuation { continuation in
+            operation.perRecordZoneSaveBlock = { zoneID, result in
+                switch result {
+                case .success:
+                    box.setSaved(zoneID)
+                case let .failure(error):
+                    if CloudKitZoneFailure.isZoneAlreadyExists(error) {
+                        box.setSaved(zoneID)
+                    } else {
+                        box.setFailure(error)
+                    }
+                }
+            }
+            operation.modifyRecordZonesResultBlock = { result in
+                if let failure = box.failure {
+                    continuation.resume(throwing: failure)
+                    return
+                }
+                switch result {
+                case .success:
+                    continuation.resume(returning: box.saved ?? requested)
+                case let .failure(error):
+                    if CloudKitZoneFailure.isZoneAlreadyExists(error) {
+                        continuation.resume(returning: box.saved ?? requested)
+                    } else {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+            container.privateCloudDatabase.add(operation)
+        }
+    }
+
+    private func fetchRecord(_ id: CKRecord.ID, in database: CKDatabase) async throws -> CKRecord {
+        do {
+            return try await database.record(for: id)
+        } catch {
+            guard database.databaseScope == .private, CloudKitZoneFailure.isZoneNotFound(error) else { throw error }
+            let zoneID = try await ensurePrivateZone()
+            return try await database.record(for: CKRecord.ID(recordName: id.recordName, zoneID: zoneID))
+        }
+    }
+
     private func save(
         _ grant: ShareGrant,
         commands: [RemoteAlarmCommand],
@@ -254,7 +386,13 @@ final class CloudKitSharingClient {
         record: CKRecord
     ) async throws {
         write(grant, commands: commands, to: record)
-        _ = try await database.save(record)
+        do {
+            _ = try await database.save(record)
+        } catch {
+            guard database.databaseScope == .private, CloudKitZoneFailure.isZoneNotFound(error) else { throw error }
+            _ = try await ensurePrivateZone()
+            _ = try await database.save(record)
+        }
     }
 
     private func recordID(for grant: ShareGrant) throws -> CKRecord.ID {
@@ -296,5 +434,35 @@ final class CloudKitSharingClient {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode(type, from: Data(text.utf8))
+    }
+}
+
+private final class ZoneSaveBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var savedID: CKRecordZone.ID?
+    private var failureError: Error?
+
+    var saved: CKRecordZone.ID? {
+        lock.lock()
+        defer { lock.unlock() }
+        return savedID
+    }
+
+    var failure: Error? {
+        lock.lock()
+        defer { lock.unlock() }
+        return failureError
+    }
+
+    func setSaved(_ id: CKRecordZone.ID) {
+        lock.lock()
+        savedID = id
+        lock.unlock()
+    }
+
+    func setFailure(_ error: Error) {
+        lock.lock()
+        failureError = error
+        lock.unlock()
     }
 }

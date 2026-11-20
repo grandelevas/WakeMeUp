@@ -59,6 +59,7 @@ final class AppModel {
     var shareURL: URL?
     var shareMessage = ""
     var shareStatus: String?
+    var needsOwnName = false
     var friendDraftName = ""
     var remoteLabel = ""
     var remoteHour = 7
@@ -68,7 +69,21 @@ final class AppModel {
     private let store: LibraryStore
     private let coordinator: AlarmCoordinator
     private let cloudKit: CloudKitSharingClient?
+    private let ownNames = OwnNameStore(
+        local: UserDefaultsStringStore(defaults: .standard),
+        cloud: UbiquitousStringStore(store: .default)
+    )
     private var started = false
+    private var refreshing = false
+    private var acceptingReturn = false
+    private var heldShare: CKShare.Metadata?
+    private var heldURL: URL?
+
+    var ownName: String {
+        let stored = ownNames.load()
+        if let name = PersonName.nonempty(stored) { return name }
+        return PersonName.nonempty(snapshot.profile.displayName) ?? ""
+    }
 
     var library: AlarmLibrary { snapshot.library }
     var usesCloudKit: Bool { cloudKit != nil }
@@ -107,6 +122,9 @@ final class AppModel {
             cloudKit = CloudKitSharingClient(containerID: AppConfig.cloudKitContainerID)
         } else {
             cloudKit = nil
+        }
+        if !screenshot {
+            restoreOwnName()
         }
         AppRuntime.model = self
         Task {
@@ -149,6 +167,7 @@ final class AppModel {
             await UIApplication.shared.open(handoff.songURL)
         }
         Task { await refreshRemote() }
+        Task { await cloudKit?.ensureSilentSubscription() }
         await coordinator.observeAlerting { [weak self] id in
             self?.ringingAlarmID = id
         }
@@ -237,9 +256,30 @@ final class AppModel {
     }
 
     func rename(_ name: String) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        update { $0.profile.displayName = trimmed }
+        ownNames.save(name)
+        let stored = ownNames.load()
+        guard let saved = PersonName.nonempty(stored) else { return }
+        guard saved != snapshot.profile.displayName else {
+            needsOwnName = false
+            return
+        }
+        update { snapshot in
+            snapshot.profile.displayName = saved
+            for index in snapshot.permissions.grants.indices {
+                snapshot.permissions.grants[index] = GrantRefreshMerge.applyingOwnName(
+                    saved,
+                    to: snapshot.permissions.grants[index],
+                    profileID: snapshot.profile.id
+                )
+            }
+        }
+        needsOwnName = false
+    }
+
+    func commitOwnName() async {
+        await pushOwnName()
+        await continueHeldAcceptIfNeeded()
+        await acceptReturnInvitesIfNeeded()
     }
 
     func importSound(source: URL, window: TrimWindow, name: String) async -> String? {
@@ -312,17 +352,24 @@ final class AppModel {
         }
     }
 
-    func createCloudInvite() async {
+    @discardableResult
+    func createCloudInvite(inviteeName: String) async -> Bool {
         guard let cloudKit else {
             lastError = RemoteBackendError.notConfigured.errorDescription
-            return
+            return false
         }
-        let owner = snapshot.profile
-        let draft = ShareGrant(
+        guard let label = PersonName.nonempty(inviteeName) else { return false }
+        guard let me = await identityForSharing() else {
+            needsOwnName = true
+            selectedTab = .sharing
+            return false
+        }
+        needsOwnName = false
+        var draft = ShareGrant(
             id: UUID(),
             inviteCode: "",
             secret: UUID().uuidString,
-            owner: owner,
+            owner: Participant(id: me.id, displayName: me.displayName),
             grantee: nil,
             state: .pending,
             createdAt: .now,
@@ -330,6 +377,7 @@ final class AppModel {
             cloudKitZoneName: nil,
             cloudKitOwnerName: nil
         )
+        draft.inviteeName = label
         do {
             let (shared, _) = try await cloudKit.createShare(for: draft)
             update {
@@ -337,9 +385,11 @@ final class AppModel {
                 $0.permissions.replace(shared)
             }
             presentInvite(shared.inviteCode)
+            return true
         } catch {
             update { $0.permissions.removeUnsharedInvites() }
             lastError = CloudKitErrorText.message(for: error)
+            return false
         }
     }
 
@@ -361,10 +411,17 @@ final class AppModel {
     }
 
     func acceptCloudShare(_ metadata: CKShare.Metadata) async {
+        guard let me = await identityForSharing() else {
+            heldShare = metadata
+            needsOwnName = true
+            selectedTab = .sharing
+            return
+        }
+        needsOwnName = false
         await acceptInvite {
             guard let cloudKit else { throw RemoteBackendError.notConfigured }
             return try await AsyncDeadline.run(seconds: 30) {
-                try await cloudKit.accept(metadata: metadata, grantee: self.namedProfile)
+                try await cloudKit.accept(metadata: metadata, grantee: me)
             }
         }
     }
@@ -374,20 +431,19 @@ final class AppModel {
             lastError = String(localized: "sharing.badLink")
             return
         }
+        guard let me = await identityForSharing() else {
+            heldURL = url
+            needsOwnName = true
+            selectedTab = .sharing
+            return
+        }
+        needsOwnName = false
         await acceptInvite {
             guard let cloudKit else { throw RemoteBackendError.notConfigured }
             return try await AsyncDeadline.run(seconds: 30) {
-                try await cloudKit.accept(url: url, grantee: self.namedProfile)
+                try await cloudKit.accept(url: url, grantee: me)
             }
         }
-    }
-
-    private var namedProfile: Participant {
-        var person = snapshot.profile
-        if person.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            person.displayName = String(localized: "sharing.someone")
-        }
-        return person
     }
 
     private func acceptInvite(_ work: () async throws -> ShareGrant) async {
@@ -397,6 +453,11 @@ final class AppModel {
         do {
             let grant = try await work()
             update { $0.permissions.replace(grant) }
+            do {
+                try await createReturnShareIfNeeded(for: grant)
+            } catch {
+                lastError = CloudKitErrorText.message(for: error)
+            }
             await refreshRemote()
         } catch is AsyncDeadlineError {
             lastError = String(localized: "sharing.timedOut")
@@ -408,7 +469,10 @@ final class AppModel {
     }
 
     func refreshRemote() async {
-        guard let cloudKit else { return }
+        guard let cloudKit, !refreshing else { return }
+        refreshing = true
+        defer { refreshing = false }
+        await publishMissingReturnLinks()
         let grants = snapshot.permissions.grants.filter { $0.cloudKitRootRecordName != nil && $0.state != .revoked }
         var refreshFailure: String?
         for grant in grants {
@@ -421,15 +485,18 @@ final class AppModel {
                 refreshFailure = CloudKitErrorText.message(for: error)
                 continue
             }
-            let updated = updatedGrant
+            var updated = GrantRefreshMerge.merging(updatedGrant, with: grant)
+            updated = GrantRefreshMerge.applyingOwnName(ownNames.load(), to: updated, profileID: snapshot.profile.id)
             var library = snapshot.library
             var applied = snapshot.appliedCommandIDs
             var notices: [String] = []
+            if asOwner, let joined = ShareChangeNotice.joinedName(previous: grant, updated: updated) {
+                notices.append(String(format: String(localized: "sharing.push.joined"), joined))
+            }
             for command in commands where !applied.contains(command.id) {
                 if updated.state == .active {
                     if (command.action == .upsert || command.action == .triggerNow), let alarm = command.alarm {
-                        let sender = updated.grantee?.displayName ?? ""
-                        notices.append(RemoteAlarmNotice.text(sender: sender, schedule: alarm.schedule))
+                        notices.append(RemoteAlarmNotice.text(sender: PersonName.senderName(grant: updated), schedule: alarm.schedule))
                     }
                     try? RemoteCommandApplier.apply(command: command, grant: updated, library: &library)
                 }
@@ -448,6 +515,28 @@ final class AppModel {
             lastError = refreshFailure
         }
         await reschedule(requestAccess: false)
+        await acceptReturnInvitesIfNeeded()
+    }
+
+    func renamePerson(grantID: UUID, to name: String) async {
+        guard let label = PersonName.nonempty(name) else { return }
+        guard let grant = snapshot.permissions.grant(id: grantID) else { return }
+        let targetID: UUID
+        if grant.owner.id == snapshot.profile.id {
+            targetID = grant.id
+        } else if let mine = snapshot.permissions.grants.first(where: {
+            $0.owner.id == snapshot.profile.id && ($0.grantee?.id == grant.owner.id || $0.returnInviteURL == grant.inviteCode)
+        }) {
+            targetID = mine.id
+        } else {
+            return
+        }
+        guard var target = snapshot.permissions.grant(id: targetID) else { return }
+        target.inviteeName = label
+        update { $0.permissions.replace(target) }
+        if let cloudKit, target.cloudKitRootRecordName != nil, target.owner.id == snapshot.profile.id {
+            try? await cloudKit.updateInviteeName(label, on: target)
+        }
     }
 
     func revoke(grantID: UUID) async {
@@ -636,6 +725,120 @@ final class AppModel {
             scheduleFailure = String(format: String(localized: "settings.systemAlarm.failed"), failure)
         } else {
             scheduleFailure = nil
+        }
+    }
+
+    private func restoreOwnName() {
+        if ownNames.load().isEmpty, let legacy = PersonName.nonempty(snapshot.profile.displayName) {
+            ownNames.save(legacy)
+        }
+        guard let stored = PersonName.nonempty(ownNames.load()), stored != snapshot.profile.displayName else { return }
+        snapshot.profile.displayName = stored
+        if !suppressPermissionBanner {
+            store.save(snapshot)
+        }
+    }
+
+    /// Twoje imię when it is saved, otherwise the iCloud name. Nil when both are empty.
+    private func identityForSharing() async -> Participant? {
+        if let entered = PersonName.nonempty(ownNames.load()) {
+            return Participant(id: snapshot.profile.id, displayName: entered)
+        }
+        let cloud = await cloudKit?.currentUserName()
+        guard let name = PersonName.ownName(entered: nil, cloud: cloud) else { return nil }
+        return Participant(id: snapshot.profile.id, displayName: name)
+    }
+
+    private func continueHeldAcceptIfNeeded() async {
+        guard await identityForSharing() != nil else { return }
+        if let metadata = heldShare {
+            heldShare = nil
+            await acceptCloudShare(metadata)
+        } else if let url = heldURL {
+            heldURL = nil
+            await acceptShareLink(url)
+        }
+    }
+
+    private func createReturnShareIfNeeded(for grant: ShareGrant) async throws {
+        guard let cloudKit else { return }
+        let existing = snapshot.permissions.grants
+        guard MutualInvite.shouldCreateReturnShare(accepted: grant, profileID: snapshot.profile.id, existing: existing) else {
+            return
+        }
+        guard let me = await identityForSharing() else { return }
+        shareStatus = String(localized: "sharing.linking")
+        var draft = ShareGrant(
+            id: UUID(),
+            inviteCode: "",
+            secret: UUID().uuidString,
+            owner: Participant(id: me.id, displayName: me.displayName),
+            grantee: nil,
+            state: .pending,
+            createdAt: .now,
+            cloudKitRootRecordName: nil,
+            cloudKitZoneName: nil,
+            cloudKitOwnerName: nil
+        )
+        draft.inviteeName = PersonName.nonempty(grant.owner.displayName)
+        draft.reciprocal = true
+        draft.reciprocalForGrantID = grant.id
+        let (shared, _) = try await cloudKit.createShare(for: draft)
+        update { $0.permissions.replace(shared) }
+        guard let url = InviteLinkPolicy.url(from: shared.inviteCode) else { return }
+        try await cloudKit.publishReturnInvite(url, on: grant)
+        var published = grant
+        published.returnInviteURL = url.absoluteString
+        update { $0.permissions.replace(published) }
+    }
+
+    private func publishMissingReturnLinks() async {
+        guard let cloudKit else { return }
+        let me = snapshot.profile.id
+        for back in snapshot.permissions.grants where back.reciprocal == true && back.owner.id == me && back.state != .revoked {
+            guard let url = InviteLinkPolicy.url(from: back.inviteCode),
+                  let originalID = back.reciprocalForGrantID,
+                  var original = snapshot.permissions.grant(id: originalID),
+                  InviteLinkPolicy.url(from: original.returnInviteURL ?? "") == nil else { continue }
+            do {
+                try await cloudKit.publishReturnInvite(url, on: original)
+                original.returnInviteURL = url.absoluteString
+                update { $0.permissions.replace(original) }
+            } catch {
+                lastError = CloudKitErrorText.message(for: error)
+            }
+        }
+    }
+
+    private func acceptReturnInvitesIfNeeded() async {
+        guard !acceptingReturn, let cloudKit else { return }
+        guard let url = MutualInvite.returnURLToAccept(in: snapshot.permissions.grants, profileID: snapshot.profile.id) else {
+            return
+        }
+        guard let me = await identityForSharing() else { return }
+        acceptingReturn = true
+        defer { acceptingReturn = false }
+        let previousStatus = shareStatus
+        shareStatus = String(localized: "sharing.linking")
+        defer { shareStatus = previousStatus }
+        do {
+            let grant = try await AsyncDeadline.run(seconds: 30) {
+                try await cloudKit.accept(url: url, grantee: me)
+            }
+            update { $0.permissions.replace(grant) }
+        } catch is AsyncDeadlineError {
+            lastError = String(localized: "sharing.timedOut")
+        } catch {
+            lastError = CloudKitErrorText.message(for: error)
+        }
+    }
+
+    private func pushOwnName() async {
+        guard let cloudKit, let name = PersonName.nonempty(ownNames.load()) else { return }
+        for grant in snapshot.permissions.grants where grant.cloudKitRootRecordName != nil && grant.state != .revoked {
+            let asOwner = grant.owner.id == snapshot.profile.id
+            guard asOwner || grant.grantee?.id == snapshot.profile.id else { continue }
+            try? await cloudKit.updateOwnName(name, on: grant, asOwner: asOwner)
         }
     }
 
