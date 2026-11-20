@@ -162,6 +162,33 @@ final class AlarmLibraryTests: XCTestCase {
         XCTAssertTrue(library.alarms[0].isEnabled)
     }
 
+    func testRenamingAGroupKeepsItsAlarms() {
+        var library = AlarmLibrary()
+        let group = library.addGroup(name: "Work", symbol: "folder")
+        library.upsert(alarm(hour: 7, group: group.id, enabled: true))
+        library.updateGroup(id: group.id, name: "  Office ", symbol: "briefcase")
+        XCTAssertEqual(library.group(group.id)?.name, "Office")
+        XCTAssertEqual(library.group(group.id)?.symbol, "briefcase")
+        XCTAssertEqual(library.alarms[0].groupID, group.id)
+        XCTAssertTrue(library.alarms[0].isEnabled)
+    }
+
+    func testMovingAnAlarmIntoADisabledGroupTurnsItOffUntilTheGroupReturns() {
+        var library = AlarmLibrary()
+        let group = library.addGroup(name: "Work")
+        let item = alarm(hour: 7, group: nil, enabled: true)
+        library.upsert(item)
+        library.setGroupEnabled(false, groupID: group.id)
+        library.moveAlarm(item.id, to: group.id)
+        XCTAssertEqual(library.alarms[0].groupID, group.id)
+        XCTAssertFalse(library.alarms[0].isEnabled)
+        XCTAssertEqual(library.alarms[0].resumeWhenGroupEnables, true)
+        library.moveAlarm(item.id, to: nil)
+        XCTAssertNil(library.alarms[0].groupID)
+        XCTAssertTrue(library.alarms[0].isEnabled)
+        XCTAssertNil(library.alarms[0].resumeWhenGroupEnables)
+    }
+
     func testIndividualToggleWhileGroupIsOffOnlyUpdatesTheMemory() {
         var library = AlarmLibrary()
         let group = library.addGroup(name: "Work")

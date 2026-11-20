@@ -148,6 +148,31 @@ struct AlarmLibrary: Codable, Equatable {
         }
     }
 
+    mutating func updateGroup(id: UUID, name: String, symbol: String) {
+        guard let index = groups.firstIndex(where: { $0.id == id }) else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            groups[index].name = trimmed
+        }
+        groups[index].symbol = symbol
+    }
+
+    /// Moves an alarm into a group, or out of every group when `groupID` is nil.
+    /// A disabled group keeps the alarm off and remembers whether it should return.
+    mutating func moveAlarm(_ alarmID: UUID, to groupID: UUID?) {
+        guard let index = alarms.firstIndex(where: { $0.id == alarmID }) else { return }
+        if alarms[index].groupID == groupID { return }
+        if let current = alarms[index].groupID, group(current)?.isEnabled == false {
+            alarms[index].isEnabled = alarms[index].resumeWhenGroupEnables ?? false
+            alarms[index].resumeWhenGroupEnables = nil
+        }
+        alarms[index].groupID = groupID
+        if let groupID, group(groupID)?.isEnabled == false {
+            alarms[index].resumeWhenGroupEnables = alarms[index].isEnabled
+            alarms[index].isEnabled = false
+        }
+    }
+
     @discardableResult
     mutating func addGroup(name: String, symbol: String = "folder") -> AlarmGroup {
         let group = AlarmGroup(id: UUID(), name: name, isEnabled: true, symbol: symbol)

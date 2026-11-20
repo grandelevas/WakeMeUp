@@ -166,6 +166,17 @@ final class AppModel {
         update { _ = $0.library.addGroup(name: trimmed, symbol: symbol) }
     }
 
+    func updateGroup(id: UUID, name: String, symbol: String) {
+        update { $0.library.updateGroup(id: id, name: name, symbol: symbol) }
+    }
+
+    func moveAlarm(_ alarmID: UUID, to groupID: UUID?) {
+        let before = snapshot.library.alarm(alarmID)
+        update { $0.library.moveAlarm(alarmID, to: groupID) }
+        guard snapshot.library.alarm(alarmID) != before else { return }
+        Task { await reschedule(requestAccess: true) }
+    }
+
     func deleteGroup(id: UUID) {
         update { $0.library.deleteGroup(id: id) }
         Task { await reschedule(requestAccess: false) }

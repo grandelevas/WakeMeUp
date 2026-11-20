@@ -67,6 +67,12 @@
 "groups.delete" = "Usuń grupę";
 "groups.symbol" = "Symbol";
 "groups.create" = "Utwórz";
+"groups.edit" = "Edytuj grupę";
+"groups.enabled" = "Włączona";
+"groups.alarms" = "Alarmy";
+"groups.alarms.empty" = "W tej grupie nie ma jeszcze alarmów.";
+"groups.addAlarm" = "Dodaj alarm";
+"groups.addAlarm.none" = "Wszystkie alarmy są już w tej grupie.";
 "groups.delete.confirm" = "Usunąć tę grupę? Jej alarmy zostaną na telefonie, poza grupą.";
 
 "sharing.title" = "Współpraca";
