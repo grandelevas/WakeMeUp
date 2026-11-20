@@ -8,6 +8,8 @@
 "alarms.empty.group" = "No alarms in this group";
 "alarms.edit" = "Edit";
 "alarms.done" = "Done";
+"alarms.select" = "Select";
+"alarms.changeSound" = "Change sound";
 "alarms.add" = "Add Alarm";
 "alarms.next" = "Next alarm";
 "alarms.otherGroup" = "Other";
@@ -68,6 +70,7 @@
 "groups.symbol" = "Symbol";
 "groups.create" = "Create";
 "groups.edit" = "Edit Group";
+"groups.changeSound" = "Change sound for the whole group";
 "groups.enabled" = "On";
 "groups.alarms" = "Alarms";
 "groups.alarms.empty" = "No alarms in this group yet.";

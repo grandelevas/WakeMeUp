@@ -8,6 +8,8 @@
 "alarms.empty.group" = "W tej grupie nie ma alarmów";
 "alarms.edit" = "Edytuj";
 "alarms.done" = "Gotowe";
+"alarms.select" = "Zaznacz";
+"alarms.changeSound" = "Zmień dzwonek";
 "alarms.add" = "Dodaj alarm";
 "alarms.next" = "Następny alarm";
 "alarms.otherGroup" = "Inne";
@@ -68,6 +70,7 @@
 "groups.symbol" = "Symbol";
 "groups.create" = "Utwórz";
 "groups.edit" = "Edytuj grupę";
+"groups.changeSound" = "Zmień dzwonek dla całej grupy";
 "groups.enabled" = "Włączona";
 "groups.alarms" = "Alarmy";
 "groups.alarms.empty" = "W tej grupie nie ma jeszcze alarmów.";

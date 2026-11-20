@@ -162,6 +162,41 @@ final class AlarmLibraryTests: XCTestCase {
         XCTAssertTrue(library.alarms[0].isEnabled)
     }
 
+    func testOneSoundAppliesToChosenAlarmsOnly() {
+        var library = AlarmLibrary()
+        let first = alarm(hour: 6, group: nil, enabled: true)
+        let second = alarm(hour: 7, group: nil, enabled: true)
+        let third = alarm(hour: 8, group: nil, enabled: true)
+        library.upsert(first)
+        library.upsert(second)
+        library.upsert(third)
+        library.setSound("bell", alarmIDs: [first.id, second.id])
+        XCTAssertEqual(library.alarm(first.id)?.soundID, "bell")
+        XCTAssertEqual(library.alarm(second.id)?.soundID, "bell")
+        XCTAssertEqual(library.alarm(third.id)?.soundID, "classic")
+    }
+
+    func testGroupOrderSurvivesRelaunchAndAMove() throws {
+        let first = UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000001")!
+        let second = UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000002")!
+        let saved = """
+        {"alarms":[],"groups":[
+          {"id":"\(first.uuidString)","name":"Weekdays","isEnabled":true,"symbol":"folder"},
+          {"id":"\(second.uuidString)","name":"Weekend","isEnabled":true,"symbol":"sun.max"}
+        ]}
+        """
+        var library = try JSONDecoder().decode(AlarmLibrary.self, from: Data(saved.utf8))
+        library.normalizeGroupOrder()
+        XCTAssertEqual(library.groups.map(\.name), ["Weekdays", "Weekend"])
+        XCTAssertEqual(library.groups.map(\.sortIndex), [0, 1])
+        library.moveGroup(second, before: first)
+        XCTAssertEqual(library.groups.map(\.name), ["Weekend", "Weekdays"])
+        let data = try JSONEncoder().encode(library)
+        var loaded = try JSONDecoder().decode(AlarmLibrary.self, from: data)
+        loaded.normalizeGroupOrder()
+        XCTAssertEqual(loaded.groups.map(\.name), ["Weekend", "Weekdays"])
+    }
+
     func testCollapsedGroupsStayCollapsed() {
         let name = "wakito.tests.group-expansion"
         let defaults = UserDefaults(suiteName: name)!

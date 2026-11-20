@@ -86,6 +86,38 @@ struct AlarmGroup: Codable, Equatable, Hashable, Identifiable {
     var name: String
     var isEnabled: Bool
     var symbol: String
+    /// Position in the alarms list. Older saved groups omit this and keep their existing order.
+    var sortIndex: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, isEnabled, symbol, sortIndex
+    }
+
+    init(id: UUID, name: String, isEnabled: Bool, symbol: String, sortIndex: Int = 0) {
+        self.id = id
+        self.name = name
+        self.isEnabled = isEnabled
+        self.symbol = symbol
+        self.sortIndex = sortIndex
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
+        symbol = try container.decode(String.self, forKey: .symbol)
+        sortIndex = try container.decodeIfPresent(Int.self, forKey: .sortIndex) ?? -1
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(isEnabled, forKey: .isEnabled)
+        try container.encode(symbol, forKey: .symbol)
+        try container.encode(sortIndex, forKey: .sortIndex)
+    }
 }
 
 struct AlarmLibrary: Codable, Equatable {
@@ -148,6 +180,13 @@ struct AlarmLibrary: Codable, Equatable {
         }
     }
 
+    mutating func setSound(_ soundID: String, alarmIDs: some Sequence<UUID>) {
+        let ids = Set(alarmIDs)
+        for index in alarms.indices where ids.contains(alarms[index].id) {
+            alarms[index].soundID = soundID
+        }
+    }
+
     mutating func updateGroup(id: UUID, name: String, symbol: String) {
         guard let index = groups.firstIndex(where: { $0.id == id }) else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -173,9 +212,37 @@ struct AlarmLibrary: Codable, Equatable {
         }
     }
 
+    /// Gives groups saved before ordering a stable index, then sorts by that index.
+    mutating func normalizeGroupOrder() {
+        var next = (groups.map(\.sortIndex).filter { $0 >= 0 }.max() ?? -1) + 1
+        for index in groups.indices where groups[index].sortIndex < 0 {
+            groups[index].sortIndex = next
+            next += 1
+        }
+        groups.sort { lhs, rhs in
+            if lhs.sortIndex != rhs.sortIndex { return lhs.sortIndex < rhs.sortIndex }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    /// Places `sourceID` where `targetID` currently sits. The target shifts down.
+    mutating func moveGroup(_ sourceID: UUID, before targetID: UUID) {
+        normalizeGroupOrder()
+        guard sourceID != targetID,
+              let from = groups.firstIndex(where: { $0.id == sourceID }),
+              var to = groups.firstIndex(where: { $0.id == targetID }) else { return }
+        let item = groups.remove(at: from)
+        if from < to { to -= 1 }
+        groups.insert(item, at: to)
+        for index in groups.indices {
+            groups[index].sortIndex = index
+        }
+    }
+
     @discardableResult
     mutating func addGroup(name: String, symbol: String = "folder") -> AlarmGroup {
-        let group = AlarmGroup(id: UUID(), name: name, isEnabled: true, symbol: symbol)
+        let next = (groups.map(\.sortIndex).filter { $0 >= 0 }.max() ?? -1) + 1
+        let group = AlarmGroup(id: UUID(), name: name, isEnabled: true, symbol: symbol, sortIndex: next)
         groups.append(group)
         return group
     }
