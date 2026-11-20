@@ -17,8 +17,8 @@
 "alarms.add" = "Dodaj alarm";
 "alarms.next" = "Następny alarm";
 "alarms.otherGroup" = "Inne";
-"alarms.fromOthers" = "Dla mnie od innych";
-"alarms.toOthers" = "Ode mnie dla innych";
+"alarms.fromOthers" = "Od znajomych";
+"alarms.toOthers" = "Dla znajomych";
 "alarms.fromSender" = "od %@";
 "alarms.forRecipient" = "dla %@";
 "alarms.groups" = "Grupy";
