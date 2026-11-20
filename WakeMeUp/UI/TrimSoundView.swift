@@ -38,7 +38,7 @@ struct TrimSoundView: View {
                     }
                     Text(format(max(0, end - start)))
                         .font(.title2.monospacedDigit())
-                    Button("sound.preview") { preview() }
+                    Button("sound.preview") { playTrimPreview() }
                     Button("sound.use") { useSelection() }
                         .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 } else {
@@ -75,7 +75,7 @@ struct TrimSoundView: View {
         }
     }
 
-    private func preview() {
+    private func playTrimPreview() {
         if preview.isPlaying("trim") {
             preview.stop()
             return
