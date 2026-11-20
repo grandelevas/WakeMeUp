@@ -92,6 +92,19 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: WakeMeUp
+  WakeMeUpUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "26.1"
+    sources:
+      - path: WakeMeUpUITests
+    dependencies:
+      - target: WakeMeUp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.grandelevas.wakemeup.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: WakeMeUp
 schemes:
   WakeMeUp:
     build:
@@ -99,11 +112,13 @@ schemes:
         WakeMeUp: all
         WakeMeUpWidget: all
         WakeMeUpTests: [test]
+        WakeMeUpUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
         - WakeMeUpTests
+        - WakeMeUpUITests
     archive:
       config: Release
