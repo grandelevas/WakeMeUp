@@ -162,6 +162,18 @@ final class AlarmLibraryTests: XCTestCase {
         XCTAssertTrue(library.alarms[0].isEnabled)
     }
 
+    func testCollapsedGroupsStayCollapsed() {
+        let name = "wakito.tests.group-expansion"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        let id = UUID()
+        XCTAssertTrue(GroupExpansionStore.isExpanded(id, defaults: defaults))
+        GroupExpansionStore.setExpanded(false, id: id, defaults: defaults)
+        XCTAssertFalse(GroupExpansionStore.isExpanded(id, defaults: defaults))
+        GroupExpansionStore.setExpanded(true, id: id, defaults: defaults)
+        XCTAssertTrue(GroupExpansionStore.isExpanded(id, defaults: defaults))
+    }
+
     func testRenamingAGroupKeepsItsAlarms() {
         var library = AlarmLibrary()
         let group = library.addGroup(name: "Work", symbol: "folder")

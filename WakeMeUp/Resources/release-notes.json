@@ -7,12 +7,14 @@
         "en": [
           "Send an invite with Messages, WhatsApp, Mail, or Copy.",
           "Copy the link again while an invite is still waiting.",
-          "Open a group to rename it, change its icon, turn it on or off, and choose its alarms."
+          "Open a group to rename it, change its icon, turn it on or off, and choose its alarms.",
+          "Tap a group on the Alarms screen to show or hide its alarms."
         ],
         "pl": [
           "Wyślij zaproszenie przez Wiadomości, WhatsApp, pocztę albo Kopiuj.",
           "Skopiuj link ponownie, gdy zaproszenie jeszcze czeka.",
-          "Otwórz grupę, żeby zmienić nazwę, ikonę, włączenie i jej alarmy."
+          "Otwórz grupę, żeby zmienić nazwę, ikonę, włączenie i jej alarmy.",
+          "Stuknij grupę na liście alarmów, żeby pokazać albo schować jej alarmy."
         ]
       }
     },
