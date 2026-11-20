@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct AlarmEditorView: View {
     @Environment(AppModel.self) private var model
@@ -7,7 +6,6 @@ struct AlarmEditorView: View {
     @State private var draft: AlarmDraft
     @State private var time: Date
     @State private var importing = false
-    @State private var trimFile: ImportedAudio?
     @State private var preview = SoundPreviewPlayer()
 
     init(draft: AlarmDraft) {
@@ -109,21 +107,9 @@ struct AlarmEditorView: View {
                     .disabled(!draft.songIsValid)
                 }
             }
-            .fileImporter(isPresented: $importing, allowedContentTypes: [.audio, .mp3, .wav, .aiff]) { result in
-                if case let .success(url) = result {
-                    trimFile = ImportedAudio(url: url)
-                }
-            }
-            .sheet(item: $trimFile) { file in
-                TrimSoundView(source: file.url) { window, name in
-                    Task {
-                        if let id = await model.importSound(source: file.url, window: window, name: name) {
-                            draft.soundID = id
-                            playPreview(of: id)
-                        }
-                    }
-                }
-                .readableWidth()
+            .soundFileImporter(isPresented: $importing) { id in
+                draft.soundID = id
+                playPreview(of: id)
             }
             .onDisappear { preview.stop() }
         }
@@ -157,11 +143,6 @@ struct AlarmEditorView: View {
         components.minute = minute
         return Calendar.current.date(from: components) ?? .now
     }
-}
-
-struct ImportedAudio: Identifiable {
-    let id = UUID()
-    let url: URL
 }
 
 struct DayPicker: View {

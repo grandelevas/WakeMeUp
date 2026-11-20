@@ -71,6 +71,8 @@
 "sound.mine" = "My sounds";
 "sound.empty" = "No custom sounds yet";
 "sound.importTitle" = "Import a sound";
+"sound.importing" = "Loading sound…";
+"sound.unreadable" = "Could not read the audio file.";
 
 "song.play" = "Play my song";
 "song.stop" = "Stop";

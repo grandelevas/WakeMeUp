@@ -26,11 +26,42 @@ enum AlarmLoudness {
 }
 
 enum AudioTrimmer {
-    static func duration(of url: URL) throws -> TimeInterval {
-        let file = try AVAudioFile(forReading: url)
-        let rate = file.processingFormat.sampleRate
-        guard rate > 0 else { throw AudioTrimError.unreadable }
-        return Double(file.length) / rate
+    static let durationTimeout: TimeInterval = 15
+
+    /// Reads duration off the caller's actor. Zero, NaN, and a hung file provider all fail.
+    static func duration(of url: URL) async throws -> TimeInterval {
+        try await withThrowingTaskGroup(of: TimeInterval.self) { group in
+            group.addTask {
+                try await loadDuration(of: url)
+            }
+            group.addTask {
+                try await Task.sleep(for: .seconds(durationTimeout))
+                throw AudioTrimError.unreadable
+            }
+            do {
+                guard let seconds = try await group.next() else { throw AudioTrimError.unreadable }
+                group.cancelAll()
+                guard seconds.isFinite, seconds > 0 else { throw AudioTrimError.unreadable }
+                return seconds
+            } catch is CancellationError {
+                group.cancelAll()
+                throw CancellationError()
+            } catch let error as AudioTrimError {
+                group.cancelAll()
+                throw error
+            } catch {
+                group.cancelAll()
+                throw AudioTrimError.unreadable
+            }
+        }
+    }
+
+    private static func loadDuration(of url: URL) async throws -> TimeInterval {
+        let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
+        let time = try await asset.load(.duration)
+        let seconds = time.seconds
+        guard seconds.isFinite, seconds > 0 else { throw AudioTrimError.unreadable }
+        return seconds
     }
 
     static func trim(source: URL, window: TrimWindow, destination: URL) async throws {

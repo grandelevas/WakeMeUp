@@ -22,7 +22,7 @@ struct TrimSoundView: View {
         NavigationStack {
             Form {
                 if failed {
-                    Text("error.generic")
+                    Text("sound.unreadable")
                 } else if duration > 0 {
                     Text("sound.trim.help")
                         .font(.footnote)
@@ -64,12 +64,16 @@ struct TrimSoundView: View {
     }
 
     private func load() async {
-        let accessing = source.startAccessingSecurityScopedResource()
-        defer { if accessing { source.stopAccessingSecurityScopedResource() } }
         do {
             let seconds = try await AudioTrimmer.duration(of: source)
+            guard seconds.isFinite, seconds > 0 else {
+                failed = true
+                return
+            }
             duration = seconds
             end = min(seconds, TrimWindow.maximumDuration)
+        } catch is CancellationError {
+            return
         } catch {
             failed = true
         }
@@ -86,8 +90,7 @@ struct TrimSoundView: View {
             id: "trim",
             url: source,
             start: window.start,
-            length: window.duration,
-            securityScoped: true
+            length: window.duration
         )
     }
 
