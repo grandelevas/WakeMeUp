@@ -91,7 +91,7 @@ final class CloudKitSharingClient {
         do {
             try await requireAccount()
             let userID = try await container.userRecordID()
-            let participant = try await container.shareParticipant(withUserRecordID: userID)
+            let participant = try await container.shareParticipant(forUserRecordID: userID)
             return PersonName.formatted(participant.userIdentity?.nameComponents)
         } catch {
             return nil
