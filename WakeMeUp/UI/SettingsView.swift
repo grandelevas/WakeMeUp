@@ -13,6 +13,9 @@ struct SettingsView: View {
                     .font(.title3.weight(.semibold))
                 Text(version)
                     .foregroundStyle(.secondary)
+                NavigationLink("settings.history") {
+                    ReleaseNotesView()
+                }
             }
             appearanceSection
             Section("settings.alarmAccess") {

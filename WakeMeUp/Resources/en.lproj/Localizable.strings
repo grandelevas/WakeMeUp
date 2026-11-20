@@ -129,7 +129,9 @@
 "settings.appearance.icon.minimal" = "Light";
 "settings.appearance.icon.color" = "Color";
 "settings.appearance.icon.unavailable" = "The icon can be changed on an iPhone. The Simulator keeps the default icon.";
-"settings.tagline" = "Remind me of";
+"settings.tagline" = "Wakito";
+"settings.history" = "Update history";
+"settings.whatsNew" = "What's New";
 "settings.alarmAccess" = "Alarm access";
 "settings.alarmAccess.authorized" = "Allowed";
 "settings.alarmAccess.denied" = "Denied";
@@ -164,6 +166,8 @@
 "demo.friend" = "Ola";
 
 "achievements.disclosure" = "Mateusz gives 50% of subscription proceeds to causes he chooses. The app does not collect donations.";
+"achievements.userCount" = "%@ of us already";
+"achievements.userCountDate" = "As of %@";
 "achievements.together" = "Our shared success";
 "achievements.support" = "Your support helps";
 "achievements.campaign" = "Current campaign";

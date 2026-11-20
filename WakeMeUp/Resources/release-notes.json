@@ -1,0 +1,106 @@
+{
+  "entries": [
+    {
+      "version": "1.0.0",
+      "date": "2026-11-20",
+      "changes": {
+        "en": [
+          "Send an invite with Messages, WhatsApp, Mail, or Copy.",
+          "Copy the link again while an invite is still waiting."
+        ],
+        "pl": [
+          "Wyślij zaproszenie przez Wiadomości, WhatsApp, pocztę albo Kopiuj.",
+          "Skopiuj link ponownie, gdy zaproszenie jeszcze czeka."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-19",
+      "changes": {
+        "en": [
+          "The Achievements tab shows the current goal and what has already been given.",
+          "Badges mark how long you have been with Wakito."
+        ],
+        "pl": [
+          "Zakładka Achievements pokazuje cel i to, co już zostało przekazane.",
+          "Odznaki pokazują, jak długo jesteś z Wakito."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-19",
+      "changes": {
+        "en": [
+          "An iCloud invite now gives you a link you can send."
+        ],
+        "pl": [
+          "Zaproszenie iCloud tworzy link, który możesz wysłać."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-19",
+      "changes": {
+        "en": [
+          "A friend can set an alarm on your iPhone after you accept an iCloud invite."
+        ],
+        "pl": [
+          "Znajomy może ustawić Ci budzik, gdy zaakceptujesz zaproszenie iCloud."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-19",
+      "changes": {
+        "en": [
+          "Open Settings from the gear on the Alarms screen."
+        ],
+        "pl": [
+          "Ustawienia otworzysz kołem zębatym na liście alarmów."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-19",
+      "changes": {
+        "en": [
+          "Choose a light theme, a dark theme, or match the system.",
+          "Pick an accent color and an app icon."
+        ],
+        "pl": [
+          "Wybierz jasny motyw, ciemny albo taki jak w systemie.",
+          "Ustaw kolor akcentu i ikonę aplikacji."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-19",
+      "changes": {
+        "en": [
+          "Alarms ring full screen and out loud, including when the iPhone is locked."
+        ],
+        "pl": [
+          "Budzik dzwoni na całym ekranie i głośno, także gdy iPhone jest zablokowany."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-19",
+      "changes": {
+        "en": [
+          "Set repeat days in one tap: every day, weekdays, or the weekend."
+        ],
+        "pl": [
+          "Jednym stuknięciem ustawisz powtarzanie: codziennie, dni robocze albo weekend."
+        ]
+      }
+    }
+  ]
+}

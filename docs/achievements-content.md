@@ -15,6 +15,7 @@ If that file is missing or the schema version is not 1, the app keeps the last g
 - `photoURL` and `linkURL` are `https` links or empty strings. The link is a normal “read more” link, not a payment button.
 - `history` is past gifts. `amount` is what was actually given. `proof` is a list of `{ "id", "title": { "en", "pl" }, "url" }`.
 - The app adds the history amounts for “Together we have donated” and counts different English recipient names for “People helped”.
+- `userCount` is an optional whole number: how many people use Wakito, copied by hand from App Store Connect analytics. `userCountDate` is an optional `YYYY-MM-DD` for when that number was checked. Leave both out, or set `userCount` to `0`, until there is a real number. The app hides the line in those cases and never invents one. There is no analytics SDK and no tracking.
 - No other record types. The app does not query extra indexes.
 
 ## Example
@@ -55,3 +56,12 @@ The same file is bundled at `WakeMeUp/Resources/achievements.json`.
 4. The raw file is `https://raw.githubusercontent.com/grandelevas/wakito-content/main/achievements.json`. That is already the app’s `AchievementsContentURL`.
 5. To change the text later, edit `achievements.json` in the GitHub app and commit. The next time Wakito is opened it downloads the new file. No app update is required.
 6. Keep `raisedAmount` and every history `amount` at a number you can point to. Leave them at `0` until then.
+7. To show how many people use Wakito, add `"userCount": 1234` and, if you want, `"userCountDate": "2026-11-20"`. Copy the number from App Store Connect analytics. Do not guess. If you omit `userCount` or set it to `0`, the line stays hidden.
+
+## Liczba osób (z iPhone’a)
+
+1. W App Store Connect sprawdź analitykę Wakito i zapisz prawdziwą liczbę użytkowników. Nie zgaduj.
+2. W aplikacji GitHub otwórz publiczne repozytorium `grandelevas/wakito-content`, plik `achievements.json` na gałęzi `main`.
+3. Dopisz w głównym obiekcie, obok `schemaVersion`, na przykład `"userCount": 1234` i `"userCountDate": "2026-11-20"`. `schemaVersion` zostaje `1`.
+4. Zatwierdź zmianę. Przy następnym otwarciu Wakito pokaże „Jest nas już 1 234”.
+5. Gdy pola nie ma albo `userCount` wynosi `0`, wiersz się nie pokazuje. Aplikacja nie wymyśla liczby, nie ma własnego serwera i nie śledzi użytkowników.

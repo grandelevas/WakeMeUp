@@ -2,7 +2,7 @@
 
 An iPhone alarm app in the spirit of Clock → Alarms, plus groups, your own sounds, a one-tap link to a song, and alarms that another person can set after you let them.
 
-The working names are **Remind me of** and **Przypomnij mi o**. The home-screen name is Wakito. The Xcode target and bundle id stay WakeMeUp and `com.grandelevas.wakemeup`. The interface is SwiftUI, in English and Polish.
+The name on the iPhone is Wakito. The Xcode target and bundle id stay WakeMeUp and `com.grandelevas.wakemeup`. The interface is SwiftUI, in English and Polish.
 
 There is no Mac in the loop. GitHub Actions `macos-26` builds the app, runs the tests, and takes Simulator screenshots. A second workflow signs a Release build and uploads it to TestFlight once the Apple secrets below exist. That workflow is expected to fail until then.
 
@@ -188,6 +188,10 @@ Apple only allows a few distribution certificates per team. Do not run bootstrap
 - Custom alert sounds should stay at or under 30 seconds. Import enforces that. The bundled tones are about 12 seconds, 22.05 kHz, 16-bit mono WAV.
 - Force-quitting Wakito does not delete AlarmKit alarms that are already scheduled. It does stop the silent push that delivers a new remote alarm.
 - Polish and English follow the iPhone language. Day letters follow the calendar's first weekday, so a Polish phone starts the week on Monday.
+
+## Update history
+
+Settings shows **Update history** / **Historia aktualizacji** under the version. The list is `WakeMeUp/Resources/release-notes.json`, newest entry first. Each entry has `version`, an optional `build` (omit it when the TestFlight build number is unknown), `date` as `YYYY-MM-DD`, and `changes` with `en` and `pl` bullet lists written for people using the app. Add a new object at the top of `entries` when a build ships. The first launch after the installed build number changes shows the newest entry once. The first install only remembers the build and stays quiet.
 
 ## Project layout
 

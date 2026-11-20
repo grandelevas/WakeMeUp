@@ -261,6 +261,25 @@ final class LocalAchievementTests: XCTestCase {
         XCTAssertEqual(document.totalDonated, 0)
         XCTAssertEqual(document.peopleHelped, 0)
         XCTAssertEqual(document.campaign?.progress, 0)
+        XCTAssertNil(document.visibleUserCount)
+    }
+
+    func testMissingOrZeroUserCountStaysHidden() throws {
+        let zero = """
+        {"schemaVersion":1,"currency":"EUR","disclosure":{"en":"e","pl":"p"},"userCount":0,"userCountDate":"2026-11-20","history":[]}
+        """
+        let document = try AchievementsDocument.decode(Data(zero.utf8))
+        XCTAssertEqual(document.userCount, 0)
+        XCTAssertNil(document.visibleUserCount)
+    }
+
+    func testPositiveUserCountIsShown() throws {
+        let json = """
+        {"schemaVersion":1,"currency":"EUR","disclosure":{"en":"e","pl":"p"},"userCount":1234,"userCountDate":"2026-11-20","history":[]}
+        """
+        let document = try AchievementsDocument.decode(Data(json.utf8))
+        XCTAssertEqual(document.visibleUserCount, 1234)
+        XCTAssertEqual(document.userCountDate, "2026-11-20")
     }
 }
 
@@ -754,5 +773,40 @@ final class InviteLinkPolicyTests: XCTestCase {
         )
         XCTAssertNil(InviteLinkPolicy.url(from: "OLA-DEMO"))
         XCTAssertNil(InviteLinkPolicy.url(from: "http://example.com/share"))
+    }
+}
+
+final class ReleaseNotesTests: XCTestCase {
+    func testNewestEntryComesFirstAndBuildIsOptional() throws {
+        let json = """
+        {"entries":[
+          {"version":"1.0.0","date":"2026-11-19","changes":{"en":["Older"],"pl":["Starsze"]}},
+          {"version":"1.0.0","build":22,"date":"2026-11-20","changes":{"en":["Newer"],"pl":["Nowsze"]}}
+        ]}
+        """.data(using: .utf8)!
+        let notes = try ReleaseNotesDocument.decode(json).newestFirst
+        XCTAssertEqual(notes.map(\.heading), ["1.0.0 (22)", "1.0.0"])
+        XCTAssertEqual(notes[0].bullets(for: "pl"), ["Nowsze"])
+        XCTAssertEqual(notes[1].bullets(for: "fr"), ["Older"])
+    }
+
+    func testBundledHistoryStartsWithTheLatestChange() {
+        let notes = ReleaseNotesDocument.bundled().newestFirst
+        XCTAssertGreaterThanOrEqual(notes.count, 7)
+        XCTAssertEqual(notes.first?.date, notes.map(\.date).max())
+        let english = notes.flatMap { $0.bullets(for: "en") }.joined(separator: " ")
+        XCTAssertTrue(english.contains("full screen"))
+        XCTAssertTrue(english.contains("Achievements"))
+        XCTAssertFalse(english.localizedCaseInsensitiveContains("Przypomnij"))
+    }
+
+    func testWhatsNewAppearsOnlyAfterTheBuildChanges() {
+        let name = "wakito.tests.release-notes"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        XCTAssertFalse(ReleaseNotesPrompt.shouldShow(currentBuild: "22", defaults: defaults))
+        ReleaseNotesPrompt.markSeen(currentBuild: "22", defaults: defaults)
+        XCTAssertFalse(ReleaseNotesPrompt.shouldShow(currentBuild: "22", defaults: defaults))
+        XCTAssertTrue(ReleaseNotesPrompt.shouldShow(currentBuild: "23", defaults: defaults))
     }
 }

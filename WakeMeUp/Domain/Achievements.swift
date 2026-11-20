@@ -52,6 +52,14 @@ struct AchievementsDocument: Codable, Equatable {
     var disclosure: LocalizedCopy
     var campaign: AchievementCampaign?
     var history: [AchievementGift]
+    var userCount: Int?
+    var userCountDate: String?
+
+    /// A missing or non-positive count is hidden. The app never invents one.
+    var visibleUserCount: Int? {
+        guard let userCount, userCount > 0 else { return nil }
+        return userCount
+    }
 
     static let supportedSchemaVersion = 1
 
