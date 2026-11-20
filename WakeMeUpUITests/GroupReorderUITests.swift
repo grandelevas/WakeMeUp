@@ -3,7 +3,7 @@ import XCTest
 final class GroupReorderUITests: XCTestCase {
     func testEditModeDragMovesTheSecondGroupAboveTheFirst() {
         let app = XCUIApplication()
-        app.launchArguments = ["-WakeMeUpDemo"]
+        app.launchArguments = ["-WakeMeUpDemo", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
 
         let more = app.buttons["alarms.more"]
@@ -22,28 +22,42 @@ final class GroupReorderUITests: XCTestCase {
         XCTAssertTrue(weekdays.waitForExistence(timeout: 5))
         XCTAssertTrue(weekend.waitForExistence(timeout: 5))
 
-        let systemHandle = app.buttons["Reorder Weekend"]
-        if systemHandle.waitForExistence(timeout: 2) {
-            systemHandle.press(forDuration: 0.6, thenDragTo: weekdays, withVelocity: .slow, thenHoldForDuration: 0.5)
-        } else {
-            let handle = weekend.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5))
-            let destination = weekdays.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05))
-            handle.press(forDuration: 0.8, thenDragTo: destination)
+        let handle = reorderHandle(near: weekend, in: app)
+        if handle.waitForExistence(timeout: 3) {
+            drag(handle, to: weekdays.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.15)))
         }
-        if firstGroupIdentifier(in: app) != "group-row-BBBBBBBB-0000-0000-0000-000000000002" {
-            let handle = weekend.coordinate(withNormalizedOffset: CGVector(dx: 0.96, dy: 0.5))
-            let above = weekdays.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: -0.4))
-            handle.press(forDuration: 1.0, thenDragTo: above)
+        let starts: [CGFloat] = [0.92, 1.08, 0.98]
+        let ends: [CGFloat] = [0.2, -0.25, 0.0]
+        for (startX, endY) in zip(starts, ends) where !weekendIsAbove(weekend, weekdays) {
+            let start = weekend.coordinate(withNormalizedOffset: CGVector(dx: startX, dy: 0.5))
+            let end = weekdays.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endY))
+            start.press(forDuration: 0.7, thenDragTo: end)
         }
 
-        XCTAssertEqual(firstGroupIdentifier(in: app), "group-row-BBBBBBBB-0000-0000-0000-000000000002")
+        XCTAssertTrue(
+            weekendIsAbove(weekend, weekdays),
+            "Weekend \(weekend.frame) should sit above weekdays \(weekdays.frame). Buttons: \(buttonLabels(in: app))"
+        )
     }
 
-    private func firstGroupIdentifier(in app: XCUIApplication) -> String? {
-        app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH 'group-row-'"))
-            .allElementsBoundByIndex
-            .map(\.identifier)
-            .first
+    private func reorderHandle(near row: XCUIElement, in app: XCUIApplication) -> XCUIElement {
+        let matches = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'reorder'"))
+        let nearest = matches.allElementsBoundByIndex.min { lhs, rhs in
+            abs(lhs.frame.midY - row.frame.midY) < abs(rhs.frame.midY - row.frame.midY)
+        }
+        return nearest ?? matches.firstMatch
+    }
+
+    private func drag(_ handle: XCUIElement, to destination: XCUICoordinate) {
+        let start = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.6, thenDragTo: destination)
+    }
+
+    private func weekendIsAbove(_ weekend: XCUIElement, _ weekdays: XCUIElement) -> Bool {
+        weekend.exists && weekdays.exists && weekend.frame.minY + 8 < weekdays.frame.minY
+    }
+
+    private func buttonLabels(in app: XCUIApplication) -> [String] {
+        app.buttons.allElementsBoundByIndex.prefix(25).map(\.label)
     }
 }
