@@ -137,6 +137,15 @@
 "sharing.phonesICanWake" = "Phones I can set";
 "sharing.ringNow" = "Ring now";
 "sharing.schedule" = "Schedule";
+"sharing.voice.title" = "Voice message";
+"sharing.voice.help" = "Record up to 20 seconds. It rings as their alarm. You can send without a recording.";
+"sharing.voice.record" = "Record";
+"sharing.voice.stop" = "Stop";
+"sharing.voice.preview" = "Preview";
+"sharing.voice.rerecord" = "Record again";
+"sharing.voice.send" = "Send alarm";
+"sound.voice" = "Voice message";
+"sound.voice.play" = "Play voice message";
 "sharing.simulatedFriend" = "Simulated friend";
 "sharing.addFriend" = "Add a simulated friend";
 "sharing.friendName" = "Friend’s name";

@@ -418,6 +418,7 @@ struct AlarmListView: View {
 
 struct AlarmRow: View {
     @Environment(\.appAccent) private var appAccent
+    @State private var preview = SoundPreviewPlayer()
     let alarm: Alarm
     let enabled: Bool
     var showsToggle: Bool = true
@@ -443,6 +444,20 @@ struct AlarmRow: View {
                         .font(.caption)
                         .foregroundStyle(appAccent)
                 }
+            }
+            if alarm.soundID.hasPrefix("voice-"),
+               let url = SoundFiles.previewURL(for: alarm.soundID, customSounds: model.customSounds) {
+                Button {
+                    if preview.isPlaying(alarm.soundID) {
+                        preview.stop()
+                    } else {
+                        preview.play(id: alarm.soundID, url: url, cap: VoiceClipPolicy.maxSeconds)
+                    }
+                } label: {
+                    Image(systemName: preview.isPlaying(alarm.soundID) ? "stop.circle" : "play.circle")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("sound.voice.play")
             }
             Spacer(minLength: 8)
             if showsToggle {
@@ -501,6 +516,8 @@ struct AlarmRow: View {
 
 private struct SentAlarmRow: View {
     @Environment(\.appAccent) private var appAccent
+    @Environment(AppModel.self) private var model
+    @State private var preview = SoundPreviewPlayer()
     let sent: SentAlarm
 
     var body: some View {
@@ -527,6 +544,20 @@ private struct SentAlarmRow: View {
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("sent-status-\(sent.commandID.uuidString)")
                 }
+            }
+            if sent.alarm.soundID.hasPrefix("voice-"),
+               let url = SoundFiles.previewURL(for: sent.alarm.soundID, customSounds: model.customSounds) {
+                Button {
+                    if preview.isPlaying(sent.alarm.soundID) {
+                        preview.stop()
+                    } else {
+                        preview.play(id: sent.alarm.soundID, url: url, cap: VoiceClipPolicy.maxSeconds)
+                    }
+                } label: {
+                    Image(systemName: preview.isPlaying(sent.alarm.soundID) ? "stop.circle" : "play.circle")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("sound.voice.play")
             }
             Spacer(minLength: 8)
         }

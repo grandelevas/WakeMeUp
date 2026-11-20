@@ -9,6 +9,7 @@ struct SharingView: View {
     @State private var ownNameDraft = ""
     @State private var renamingGrantID: UUID?
     @State private var renameDraft = ""
+    @State private var voiceGrantID: UUID?
 
     var body: some View {
         NavigationStack {
@@ -50,8 +51,23 @@ struct SharingView: View {
                 Task { await model.commitOwnName() }
             }) { ownNameSheet }
             .sheet(isPresented: renamePresented) { renameSheet }
+            .sheet(isPresented: voicePresented) {
+                if let voiceGrantID {
+                    VoiceMessageSheet { url in
+                        guard let id = voiceGrantID else { return }
+                        self.voiceGrantID = nil
+                        Task { await model.sendToPhone(grantID: id, immediately: false, voiceFile: url) }
+                    } onCancel: {
+                        self.voiceGrantID = nil
+                    }
+                }
+            }
         }
         .accessibilityIdentifier("sharing-screen")
+    }
+
+    private var voicePresented: Binding<Bool> {
+        Binding(get: { voiceGrantID != nil }, set: { if !$0 { voiceGrantID = nil } })
     }
 
     private var renamePresented: Binding<Bool> {
@@ -252,7 +268,7 @@ struct SharingView: View {
                     .font(.footnote)
                     if grant.grantee?.id == model.profile.id && model.usesCloudKit {
                         Button("sharing.schedule") {
-                            Task { await model.sendToPhone(grantID: grant.id, immediately: false) }
+                            voiceGrantID = grant.id
                         }
                         Button("sharing.ringNow") {
                             Task { await model.sendToPhone(grantID: grant.id, immediately: true) }
@@ -282,5 +298,63 @@ struct SharingView: View {
         case .active: String(localized: "sharing.active")
         case .revoked: String(localized: "sharing.revoked")
         }
+    }
+}
+
+private struct VoiceMessageSheet: View {
+    var onSend: (URL?) -> Void
+    var onCancel: () -> Void
+    @State private var recorder = VoiceClipRecorder()
+    @State private var preview = SoundPreviewPlayer()
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("sharing.voice.help")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    if recorder.isRecording {
+                        Button("sharing.voice.stop") { recorder.stop() }
+                    } else if recorder.fileURL == nil {
+                        Button("sharing.voice.record") {
+                            do { try recorder.record() } catch {
+                                recorder.discard()
+                            }
+                        }
+                    } else {
+                        Button("sharing.voice.preview") {
+                            if let url = recorder.fileURL {
+                                preview.play(id: "voice-draft", url: url, cap: VoiceClipPolicy.maxSeconds)
+                            }
+                        }
+                        Button("sharing.voice.rerecord") {
+                            preview.stop()
+                            recorder.discard()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("sharing.voice.title")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("sharing.cancel") {
+                        preview.stop()
+                        recorder.discard()
+                        onCancel()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("sharing.voice.send") {
+                        preview.stop()
+                        recorder.stop()
+                        onSend(recorder.fileURL)
+                    }
+                    .disabled(recorder.isRecording)
+                }
+            }
+        }
+        .onDisappear { recorder.stop() }
     }
 }

@@ -7,10 +7,10 @@ enum SoundPreviewPolicy {
     static let volume: Float = 0.8
 
     /// How long a preview should run. A requested trim range wins over the file length, and both are capped.
-    static func length(fileDuration: TimeInterval, requested: TimeInterval?) -> TimeInterval {
+    static func length(fileDuration: TimeInterval, requested: TimeInterval?, cap: TimeInterval = maximumDuration) -> TimeInterval {
         let span = requested ?? fileDuration
         guard span.isFinite, span > 0 else { return 0 }
-        return min(maximumDuration, span)
+        return min(cap, span)
     }
 }
 
@@ -30,7 +30,8 @@ final class SoundPreviewPlayer {
         url: URL,
         start: TimeInterval = 0,
         length: TimeInterval? = nil,
-        securityScoped: Bool = false
+        securityScoped: Bool = false,
+        cap: TimeInterval = SoundPreviewPolicy.maximumDuration
     ) {
         stop()
         let accessing = securityScoped && url.startAccessingSecurityScopedResource()
@@ -40,7 +41,7 @@ final class SoundPreviewPlayer {
             try session.setActive(true)
             let player = try AVAudioPlayer(contentsOf: url)
             let available = max(0, player.duration - max(0, start))
-            let playLength = SoundPreviewPolicy.length(fileDuration: available, requested: length)
+            let playLength = SoundPreviewPolicy.length(fileDuration: available, requested: length, cap: cap)
             guard playLength > 0 else {
                 if accessing { url.stopAccessingSecurityScopedResource() }
                 return
