@@ -42,6 +42,20 @@ enum AchievementsContentStore {
         return document
     }
 
+    static func communityCount(urlString: String, session: URLSession = .shared) async -> CommunityCountSnapshot? {
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed), url.scheme == "https" else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 20
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        guard let (data, response) = try? await session.data(for: request),
+              let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(CommunityCountSnapshot.self, from: data)
+    }
+
     private static func cacheURL() -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory())

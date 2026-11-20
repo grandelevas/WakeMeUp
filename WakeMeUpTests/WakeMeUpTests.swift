@@ -281,6 +281,20 @@ final class LocalAchievementTests: XCTestCase {
         XCTAssertEqual(document.visibleUserCount, 1234)
         XCTAssertEqual(document.userCountDate, "2026-11-20")
     }
+
+    func testCommunityFileOverridesTheAchievementsCount() throws {
+        let json = """
+        {"schemaVersion":1,"currency":"EUR","disclosure":{"en":"e","pl":"p"},"userCount":9,"userCountDate":"2026-11-01","history":[]}
+        """
+        let document = try AchievementsDocument.decode(Data(json.utf8))
+        let hidden = document.applying(community: CommunityCountSnapshot(userCount: 0, userCountDate: "2026-11-20"))
+        XCTAssertNil(hidden.visibleUserCount)
+        let shown = document.applying(community: CommunityCountSnapshot(userCount: 1234, userCountDate: "2026-11-20"))
+        XCTAssertEqual(shown.visibleUserCount, 1234)
+        XCTAssertEqual(shown.userCountDate, "2026-11-20")
+        let unchanged = document.applying(community: CommunityCountSnapshot(userCount: nil, userCountDate: nil))
+        XCTAssertEqual(unchanged.visibleUserCount, 9)
+    }
 }
 
 final class RemoteAlarmNoticeTests: XCTestCase {

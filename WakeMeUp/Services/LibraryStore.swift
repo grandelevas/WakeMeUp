@@ -36,6 +36,16 @@ final class LibraryStore {
 }
 
 enum AppConfig {
+    static var communityCountURL: String {
+        guard let url = Bundle.main.url(forResource: "WakeMeUpConfig", withExtension: "plist"),
+              let data = try? Data(contentsOf: url),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+              let address = plist["CommunityCountURL"] as? String else {
+            return ""
+        }
+        return address.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     static var achievementsContentURL: String {
         guard let url = Bundle.main.url(forResource: "WakeMeUpConfig", withExtension: "plist"),
               let data = try? Data(contentsOf: url),

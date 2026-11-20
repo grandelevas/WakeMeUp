@@ -15,7 +15,7 @@ If that file is missing or the schema version is not 1, the app keeps the last g
 - `photoURL` and `linkURL` are `https` links or empty strings. The link is a normal “read more” link, not a payment button.
 - `history` is past gifts. `amount` is what was actually given. `proof` is a list of `{ "id", "title": { "en", "pl" }, "url" }`.
 - The app adds the history amounts for “Together we have donated” and counts different English recipient names for “People helped”.
-- `userCount` is an optional whole number: how many people use Wakito, copied by hand from App Store Connect analytics. `userCountDate` is an optional `YYYY-MM-DD` for when that number was checked. Leave both out, or set `userCount` to `0`, until there is a real number. The app hides the line in those cases and never invents one. There is no analytics SDK and no tracking.
+- `userCount` is an optional whole number. The app first reads `stats/community.json` in this repository (updated by the Community count workflow). If that file is missing, it uses `userCount` from this JSON. `userCountDate` is an optional `YYYY-MM-DD`. Leave the field out, or set it to `0`, and the line stays hidden. The app never invents a number. There is no analytics SDK and no tracking.
 - No other record types. The app does not query extra indexes.
 
 ## Example

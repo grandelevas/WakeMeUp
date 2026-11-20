@@ -234,5 +234,9 @@ struct AchievementsView: View {
         if let remote = await AchievementsContentStore.refresh(urlString: AppConfig.achievementsContentURL) {
             document = remote
         }
+        if let current = document,
+           let community = await AchievementsContentStore.communityCount(urlString: AppConfig.communityCountURL) {
+            document = current.applying(community: community)
+        }
     }
 }

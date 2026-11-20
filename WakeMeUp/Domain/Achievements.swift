@@ -71,6 +71,15 @@ struct AchievementsDocument: Codable, Equatable {
         Set(history.map { $0.recipient.en }).count
     }
 
+    func applying(community: CommunityCountSnapshot) -> AchievementsDocument {
+        guard community.userCount != nil else { return self }
+        var copy = self
+        copy.userCount = community.userCount
+        let date = community.userCountDate?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        copy.userCountDate = date.isEmpty ? nil : date
+        return copy
+    }
+
     static func decode(_ data: Data) throws -> AchievementsDocument {
         let decoder = JSONDecoder()
         let document = try decoder.decode(AchievementsDocument.self, from: data)
@@ -79,6 +88,11 @@ struct AchievementsDocument: Codable, Equatable {
         }
         return document
     }
+}
+
+struct CommunityCountSnapshot: Decodable, Equatable {
+    var userCount: Int?
+    var userCountDate: String?
 }
 
 enum AchievementsContentError: Error, Equatable {
