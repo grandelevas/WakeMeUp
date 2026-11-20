@@ -60,7 +60,6 @@ struct SoundPickerSheet: View {
     @State private var soundID = SoundCatalog.defaultID
     @State private var preview = SoundPreviewPlayer()
     @State private var importing = false
-    @State private var trimFile: ImportedAudio?
 
     var body: some View {
         NavigationStack {
@@ -86,21 +85,10 @@ struct SoundPickerSheet: View {
                     }
                 }
             }
-            .fileImporter(isPresented: $importing, allowedContentTypes: [.audio, .mp3, .wav, .aiff]) { result in
-                if case let .success(url) = result {
-                    trimFile = ImportedAudio(url: url)
-                }
-            }
-            .sheet(item: $trimFile) { file in
-                TrimSoundView(source: file.url) { window, name in
-                    Task {
-                        if let id = await model.importSound(source: file.url, window: window, name: name) {
-                            soundID = id
-                            if let url = SoundFiles.previewURL(for: id, customSounds: model.customSounds) {
-                                preview.play(id: id, url: url)
-                            }
-                        }
-                    }
+            .soundFileImporter(isPresented: $importing) { id in
+                soundID = id
+                if let url = SoundFiles.previewURL(for: id, customSounds: model.customSounds) {
+                    preview.play(id: id, url: url)
                 }
             }
             .onDisappear { preview.stop() }

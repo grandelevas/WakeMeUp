@@ -67,6 +67,8 @@
 "sound.mine" = "Moje dźwięki";
 "sound.empty" = "Nie ma jeszcze własnych dźwięków";
 "sound.importTitle" = "Importuj dźwięk";
+"sound.importing" = "Wczytywanie dźwięku…";
+"sound.unreadable" = "Nie udało się odczytać pliku dźwiękowego.";
 
 "song.play" = "Zagraj moją piosenkę";
 "song.stop" = "Zatrzymaj";

@@ -208,8 +208,6 @@ final class AppModel {
     }
 
     func importSound(source: URL, window: TrimWindow, name: String) async -> String? {
-        let accessing = source.startAccessingSecurityScopedResource()
-        defer { if accessing { source.stopAccessingSecurityScopedResource() } }
         do {
             let directory = try SoundFiles.librarySoundsDirectory()
             let id = UUID().uuidString
@@ -219,7 +217,7 @@ final class AppModel {
             update { $0.customSounds.append(sound) }
             return id
         } catch {
-            lastError = error.localizedDescription
+            lastError = String(localized: "sound.unreadable")
             return nil
         }
     }

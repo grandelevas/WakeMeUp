@@ -885,14 +885,42 @@ final class AudioTrimmerTests: XCTestCase {
         let source = directory.appendingPathComponent("tone.wav")
         let destination = directory.appendingPathComponent("clip.caf")
         try WAVFixture.write(to: source, seconds: 2)
-        let before = try AudioTrimmer.duration(of: source)
+        let before = try await AudioTrimmer.duration(of: source)
         XCTAssertEqual(before, 2, accuracy: 0.05)
         try await AudioTrimmer.trim(source: source, window: TrimWindow(start: 0.5, end: 1.5), destination: destination)
-        let after = try AudioTrimmer.duration(of: destination)
+        let after = try await AudioTrimmer.duration(of: destination)
         XCTAssertEqual(after, 1, accuracy: 0.08)
         let peak = try Self.peak(of: destination)
         XCTAssertGreaterThan(peak, 0.45)
         XCTAssertLessThan(peak, 0.95)
+    }
+
+    func testM4ATrimWritesAPlayableCAF() async throws {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let source = directory.appendingPathComponent("tone.m4a")
+        let destination = directory.appendingPathComponent("clip.caf")
+        try M4AFixture.write(to: source, seconds: 1.2)
+        let before = try await AudioTrimmer.duration(of: source)
+        XCTAssertEqual(before, 1.2, accuracy: 0.2)
+        try await AudioTrimmer.trim(source: source, window: TrimWindow(start: 0.2, end: 0.9), destination: destination)
+        XCTAssertEqual(destination.pathExtension, "caf")
+        let after = try await AudioTrimmer.duration(of: destination)
+        XCTAssertEqual(after, 0.7, accuracy: 0.2)
+        let file = try AVAudioFile(forReading: destination)
+        XCTAssertGreaterThan(file.length, 0)
+        XCTAssertEqual(file.fileFormat.commonFormat, .pcmFormatInt16)
+    }
+
+    func testUnreadableAudioHasNoDuration() async {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(UUID().uuidString).m4a")
+        try? Data("not audio".utf8).write(to: url)
+        do {
+            _ = try await AudioTrimmer.duration(of: url)
+            XCTFail("A text file should not have a duration")
+        } catch {
+            XCTAssertEqual(error as? AudioTrimError, .unreadable)
+        }
     }
 
     func testSpikyAudioStopsAtThePeakCeiling() {
@@ -936,6 +964,34 @@ final class AudioTrimmerTests: XCTestCase {
             peak = max(peak, abs(channels[0][frame]))
         }
         return peak
+    }
+}
+
+enum M4AFixture {
+    static func write(to url: URL, seconds: Double, sampleRate: Double = 44_100) throws {
+        let settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: sampleRate,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderBitRateKey: 64_000,
+        ]
+        let file = try AVAudioFile(forWriting: url, settings: settings)
+        let format = file.processingFormat
+        let frames = AVAudioFrameCount(sampleRate * seconds)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames) else {
+            throw AudioTrimError.exportFailed
+        }
+        buffer.frameLength = frames
+        if let samples = buffer.floatChannelData?[0] {
+            for index in 0..<Int(frames) {
+                samples[index] = sin(2 * Float.pi * 440 * Float(index) / Float(sampleRate)) * 0.4
+            }
+        } else if let samples = buffer.int16ChannelData?[0] {
+            for index in 0..<Int(frames) {
+                samples[index] = Int16(sin(2 * Float.pi * 440 * Float(index) / Float(sampleRate)) * 8_000)
+            }
+        }
+        try file.write(from: buffer)
     }
 }
 
