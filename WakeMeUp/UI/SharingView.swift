@@ -54,7 +54,7 @@ struct SharingView: View {
             .sheet(isPresented: voicePresented) {
                 if let voiceGrantID {
                     VoiceMessageSheet { url in
-                        guard let id = voiceGrantID else { return }
+                        let id = voiceGrantID
                         self.voiceGrantID = nil
                         Task { await model.sendToPhone(grantID: id, immediately: false, voiceFile: url) }
                     } onCancel: {
