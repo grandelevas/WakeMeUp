@@ -117,6 +117,7 @@ struct AlarmListView: View {
         }
     }
 
+    @ViewBuilder
     private func groupSection(_ group: AlarmGroup) -> some View {
         let alarms = model.library.alarms(in: group.id)
         Section {
