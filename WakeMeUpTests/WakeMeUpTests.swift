@@ -1201,3 +1201,269 @@ final class SoundPreviewPolicyTests: XCTestCase {
         XCTAssertEqual(SoundPreviewPolicy.length(fileDuration: 8, requested: 0), 0)
     }
 }
+
+private final class MemoryStringStore: StringKeyValueStore {
+    var values: [String: String] = [:]
+
+    func string(forKey key: String) -> String? {
+        values[key]
+    }
+
+    func setString(_ value: String, forKey key: String) {
+        values[key] = value
+    }
+}
+
+final class OwnNamePersistenceTests: XCTestCase {
+    private var suite: String!
+    private var defaults: UserDefaults!
+
+    override func setUp() {
+        super.setUp()
+        suite = "wakito.tests.own-name.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suite)
+        defaults.removePersistentDomain(forName: suite)
+    }
+
+    override func tearDown() {
+        defaults.removePersistentDomain(forName: suite)
+        super.tearDown()
+    }
+
+    func testNameSurvivesANewStoreAndAnEmptyWrite() {
+        let cloud = MemoryStringStore()
+        let store = OwnNameStore(local: UserDefaultsStringStore(defaults: defaults), cloud: cloud)
+        store.save("Mateusz")
+        store.save("")
+        store.save("   ")
+        XCTAssertEqual(store.load(), "Mateusz")
+        XCTAssertEqual(defaults.string(forKey: OwnNameStore.key), "Mateusz")
+
+        let reopened = OwnNameStore(local: UserDefaultsStringStore(defaults: defaults), cloud: MemoryStringStore())
+        XCTAssertEqual(reopened.load(), "Mateusz")
+    }
+
+    func testEmptyCloudValueDoesNotClearTheSavedName() {
+        let defaultsStore = UserDefaultsStringStore(defaults: defaults)
+        let cloud = MemoryStringStore()
+        cloud.setString("Ola", forKey: OwnNameStore.key)
+        let store = OwnNameStore(local: defaultsStore, cloud: cloud)
+        XCTAssertEqual(store.load(), "Ola")
+        XCTAssertEqual(defaults.string(forKey: OwnNameStore.key), "Ola")
+
+        cloud.setString("", forKey: OwnNameStore.key)
+        XCTAssertEqual(store.load(), "Ola")
+        XCTAssertEqual(defaults.string(forKey: OwnNameStore.key), "Ola")
+    }
+
+    func testSavedNameWinsOverADifferentCloudName() {
+        defaults.set("Mateusz", forKey: OwnNameStore.key)
+        let cloud = MemoryStringStore()
+        cloud.setString("Someone", forKey: OwnNameStore.key)
+        let store = OwnNameStore(local: UserDefaultsStringStore(defaults: defaults), cloud: cloud)
+        XCTAssertEqual(store.load(), "Mateusz")
+        XCTAssertEqual(cloud.string(forKey: OwnNameStore.key), "Someone")
+    }
+
+    func testEmptyFetchedNameDoesNotClearTheStoredLabel() {
+        let owner = Participant(id: UUID(), displayName: "Mateusz")
+        var local = ShareGrant(
+            id: UUID(),
+            inviteCode: "https://www.icloud.com/share/abc",
+            secret: "s",
+            owner: owner,
+            grantee: Participant(id: UUID(), displayName: "Aleksandra"),
+            state: .active,
+            createdAt: .now,
+            cloudKitRootRecordName: "grant",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: "__defaultOwner__"
+        )
+        local.inviteeName = "Ola"
+        var fetched = local
+        fetched.inviteeName = " "
+        fetched.owner.displayName = ""
+        fetched.grantee?.displayName = ""
+        let merged = GrantRefreshMerge.merging(fetched, with: local)
+        XCTAssertEqual(merged.inviteeName, "Ola")
+        let kept = GrantRefreshMerge.applyingOwnName("", to: merged, profileID: owner.id)
+        XCTAssertEqual(kept.owner.displayName, "")
+        let restored = GrantRefreshMerge.applyingOwnName("Mateusz", to: kept, profileID: owner.id)
+        XCTAssertEqual(restored.owner.displayName, "Mateusz")
+        XCTAssertEqual(restored.grantee?.displayName, "")
+    }
+}
+
+final class MutualInviteTests: XCTestCase {
+    func testInviterKeepsTheTypedNameWhilePendingAndAfterBothDirections() {
+        let owner = Participant(id: UUID(), displayName: "Mateusz")
+        let friend = Participant(id: UUID(), displayName: "Aleksandra")
+        var outgoing = ShareGrant(
+            id: UUID(),
+            inviteCode: "https://www.icloud.com/share/out",
+            secret: "s",
+            owner: owner,
+            grantee: nil,
+            state: .pending,
+            createdAt: .now,
+            cloudKitRootRecordName: "grant-a",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: "_owner"
+        )
+        outgoing.inviteeName = "Ola"
+        XCTAssertEqual(
+            PersonName.listLabel(for: outgoing, profileID: owner.id, grants: [outgoing], generic: "Someone"),
+            "Ola"
+        )
+
+        outgoing.grantee = friend
+        outgoing.state = .active
+        var returning = ShareGrant(
+            id: UUID(),
+            inviteCode: "https://www.icloud.com/share/back",
+            secret: "s2",
+            owner: friend,
+            grantee: owner,
+            state: .active,
+            createdAt: .now,
+            cloudKitRootRecordName: "grant-b",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: "_friend"
+        )
+        returning.reciprocal = true
+        returning.reciprocalForGrantID = outgoing.id
+        returning.inviteeName = "Old label"
+        outgoing.returnInviteURL = returning.inviteCode
+        let grants = [outgoing, returning]
+
+        XCTAssertEqual(ShareRoster.canSetAlarmsHere(profileID: owner.id, grants: grants).count, 1)
+        XCTAssertEqual(ShareRoster.phonesICanSet(profileID: owner.id, grants: grants).count, 1)
+        XCTAssertEqual(ShareRoster.canSetAlarmsHere(profileID: friend.id, grants: grants).count, 1)
+        XCTAssertEqual(ShareRoster.phonesICanSet(profileID: friend.id, grants: grants).count, 1)
+        XCTAssertEqual(
+            PersonName.listLabel(for: returning, profileID: owner.id, grants: grants, generic: "Someone"),
+            "Ola"
+        )
+        XCTAssertEqual(
+            PersonName.listLabel(for: outgoing, profileID: friend.id, grants: grants, generic: "Someone"),
+            "Mateusz"
+        )
+        XCTAssertEqual(
+            PersonName.listLabel(for: returning, profileID: friend.id, grants: grants, generic: "Someone"),
+            "Mateusz"
+        )
+    }
+
+    func testOwnNameBeatsICloudAndTheTypedInviteeNameStaysTheSenderFallback() {
+        XCTAssertEqual(PersonName.ownName(entered: "Mateusz", cloud: "iCloud Mateusz"), "Mateusz")
+        XCTAssertEqual(PersonName.ownName(entered: " ", cloud: "iCloud Mateusz"), "iCloud Mateusz")
+        XCTAssertNil(PersonName.ownName(entered: "", cloud: nil))
+
+        let grant = ShareGrant(
+            id: UUID(),
+            inviteCode: "https://www.icloud.com/share/out",
+            secret: "s",
+            owner: Participant(id: UUID(), displayName: "Mateusz"),
+            grantee: Participant(id: UUID(), displayName: "Aleksandra"),
+            state: .active,
+            createdAt: .now,
+            cloudKitRootRecordName: "grant",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: "_owner",
+            inviteeName: "Ola"
+        )
+        XCTAssertEqual(PersonName.senderName(grant: grant), "Aleksandra")
+        var unnamed = grant
+        unnamed.grantee?.displayName = " "
+        XCTAssertEqual(PersonName.senderName(grant: unnamed), "Ola")
+    }
+
+    func testOneAcceptanceCreatesTheReturnShareAndTheInviterAcceptsItOnce() {
+        let owner = Participant(id: UUID(), displayName: "A")
+        let friend = Participant(id: UUID(), displayName: "B")
+        var accepted = ShareGrant(
+            id: UUID(),
+            inviteCode: "https://www.icloud.com/share/out",
+            secret: "s",
+            owner: owner,
+            grantee: friend,
+            state: .active,
+            createdAt: .now,
+            cloudKitRootRecordName: "grant-a",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: "_a"
+        )
+        XCTAssertTrue(MutualInvite.shouldCreateReturnShare(accepted: accepted, profileID: friend.id, existing: [accepted]))
+        XCTAssertFalse(MutualInvite.shouldCreateReturnShare(accepted: accepted, profileID: owner.id, existing: [accepted]))
+
+        var back = ShareGrant(
+            id: UUID(),
+            inviteCode: "https://www.icloud.com/share/back",
+            secret: "s2",
+            owner: friend,
+            grantee: nil,
+            state: .pending,
+            createdAt: .now,
+            cloudKitRootRecordName: "grant-b",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: "_b"
+        )
+        back.reciprocal = true
+        back.reciprocalForGrantID = accepted.id
+        XCTAssertFalse(MutualInvite.shouldCreateReturnShare(accepted: accepted, profileID: friend.id, existing: [accepted, back]))
+
+        accepted.returnInviteURL = back.inviteCode
+        let url = MutualInvite.returnURLToAccept(in: [accepted, back], profileID: owner.id)
+        XCTAssertEqual(url?.absoluteString, back.inviteCode)
+        back.grantee = owner
+        back.state = .active
+        XCTAssertNil(MutualInvite.returnURLToAccept(in: [accepted, back], profileID: owner.id))
+        XCTAssertFalse(MutualInvite.shouldCreateReturnShare(accepted: back, profileID: owner.id, existing: [accepted, back]))
+    }
+
+    func testJoiningDoesNotLookLikeAnAlarm() {
+        let owner = Participant(id: UUID(), displayName: "A")
+        var pending = ShareGrant(
+            id: UUID(),
+            inviteCode: "https://www.icloud.com/share/out",
+            secret: "s",
+            owner: owner,
+            grantee: nil,
+            state: .pending,
+            createdAt: .now,
+            cloudKitRootRecordName: "grant",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: "_a",
+            inviteeName: "Ola"
+        )
+        var active = pending
+        active.state = .active
+        active.grantee = Participant(id: UUID(), displayName: "Aleksandra")
+        XCTAssertEqual(ShareChangeNotice.joinedName(previous: pending, updated: active), "Ola")
+        XCTAssertNil(ShareChangeNotice.joinedName(previous: active, updated: active))
+    }
+
+    func testOldGrantJSONDecodesWithoutTheNewFields() throws {
+        let json = """
+        {"id":"11111111-1111-1111-1111-111111111111","inviteCode":"https://www.icloud.com/share/abc","secret":"s","owner":{"id":"22222222-2222-2222-2222-222222222222","displayName":"A"},"state":"pending","createdAt":"2026-11-20T12:00:00Z"}
+        """.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let grant = try decoder.decode(ShareGrant.self, from: json)
+        XCTAssertEqual(grant.owner.displayName, "A")
+        XCTAssertNil(grant.inviteeName)
+        XCTAssertNil(grant.returnInviteURL)
+        XCTAssertNil(grant.reciprocal)
+        XCTAssertNil(grant.reciprocalForGrantID)
+    }
+
+    func testZoneNotFoundIsRecognizedAndAnExistingZoneIsNot() {
+        XCTAssertTrue(CloudKitZoneFailure.isZoneNotFound(CKError(.zoneNotFound)))
+        XCTAssertFalse(CloudKitZoneFailure.isZoneNotFound(CKError(.serverRecordChanged)))
+        XCTAssertTrue(CloudKitZoneFailure.isZoneAlreadyExists(CKError(.serverRecordChanged)))
+        let partial = CKError(.partialFailure, userInfo: [
+            CKPartialErrorsByItemIDKey: ["grant": CKError(.zoneNotFound)]
+        ])
+        XCTAssertTrue(CloudKitZoneFailure.isZoneNotFound(partial))
+    }
+}

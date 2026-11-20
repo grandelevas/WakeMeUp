@@ -23,6 +23,14 @@ struct ShareGrant: Codable, Equatable, Hashable, Identifiable {
     var cloudKitZoneName: String?
     var cloudKitOwnerName: String?
     var cloudKitShareRecordName: String? = nil
+    /// Name the inviter typed for the other person. This stays the inviter's label.
+    var inviteeName: String? = nil
+    /// Share URL the invitee publishes so the inviter can wake them too.
+    var returnInviteURL: String? = nil
+    /// True on the share created automatically after accepting someone else's invite.
+    var reciprocal: Bool? = nil
+    /// The accepted grant this reciprocal share answers.
+    var reciprocalForGrantID: UUID? = nil
 
     func allows(sender: UUID, recipient: UUID) -> Bool {
         state == .active && grantee?.id == sender && owner.id == recipient
@@ -157,6 +165,109 @@ enum ShareRoster {
     /// Phones this person can set, because they accepted that phone's invite.
     static func phonesICanSet(profileID: UUID, grants: [ShareGrant]) -> [ShareGrant] {
         grants.filter { $0.grantee?.id == profileID && $0.state == .active }
+    }
+}
+
+enum PersonName {
+    static func nonempty(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    static func formatted(_ components: PersonNameComponents?) -> String? {
+        guard let components else { return nil }
+        return nonempty(PersonNameComponentsFormatter().string(from: components))
+    }
+
+    /// Name typed in Twoje imię, or the iCloud name when that field is empty.
+    static func ownName(entered: String?, cloud: String?) -> String? {
+        nonempty(entered) ?? nonempty(cloud)
+    }
+
+    /// Inviter-side label. The name typed while inviting wins over the name they chose.
+    static func inviterLabel(inviteeName: String?, theirName: String?, generic: String) -> String {
+        nonempty(inviteeName) ?? nonempty(theirName) ?? generic
+    }
+
+    static func listLabel(for grant: ShareGrant, profileID: UUID, grants: [ShareGrant], generic: String) -> String {
+        if grant.owner.id == profileID {
+            if grant.reciprocal == true {
+                // The other person did not get a name typed on this share. Prefer the name they chose.
+                return inviterLabel(inviteeName: grant.grantee?.displayName, theirName: grant.inviteeName, generic: generic)
+            }
+            return inviterLabel(inviteeName: grant.inviteeName, theirName: grant.grantee?.displayName, generic: generic)
+        }
+        if let mine = grants.first(where: { owned in
+            guard owned.owner.id == profileID else { return false }
+            if owned.grantee?.id == grant.owner.id { return true }
+            if let url = owned.returnInviteURL, url == grant.inviteCode { return true }
+            return false
+        }), let label = nonempty(mine.inviteeName) {
+            return label
+        }
+        return nonempty(grant.owner.displayName) ?? generic
+    }
+
+    /// Sender name on the phone that rings: their own name, then the inviter's label.
+    static func senderName(grant: ShareGrant) -> String {
+        nonempty(grant.grantee?.displayName) ?? nonempty(grant.inviteeName) ?? ""
+    }
+}
+
+enum MutualInvite {
+    static func shouldCreateReturnShare(accepted: ShareGrant, profileID: UUID, existing: [ShareGrant]) -> Bool {
+        guard accepted.grantee?.id == profileID, accepted.reciprocal != true else { return false }
+        if let url = accepted.returnInviteURL, InviteLinkPolicy.url(from: url) != nil { return false }
+        if existing.contains(where: { $0.reciprocalForGrantID == accepted.id }) { return false }
+        return true
+    }
+
+    static func returnURLToAccept(in grants: [ShareGrant], profileID: UUID) -> URL? {
+        for grant in grants where grant.owner.id == profileID && grant.reciprocal != true && grant.state != .revoked {
+            guard let raw = grant.returnInviteURL,
+                  let url = InviteLinkPolicy.url(from: raw),
+                  InviteLinkPolicy.isCloudShare(url) else { continue }
+            if grants.contains(where: { $0.inviteCode == url.absoluteString }) { continue }
+            return url
+        }
+        return nil
+    }
+}
+
+enum ShareChangeNotice {
+    /// The invite just became active. The name is the inviter's label, then the joiner's own name.
+    static func joinedName(previous: ShareGrant, updated: ShareGrant) -> String? {
+        guard previous.state != .active, updated.state == .active else { return nil }
+        return PersonName.nonempty(updated.inviteeName) ?? PersonName.nonempty(updated.grantee?.displayName)
+    }
+}
+
+enum GrantRefreshMerge {
+    /// Keeps local labels when a CloudKit fetch omits them. An empty fetched name does not clear them.
+    static func merging(_ updated: ShareGrant, with local: ShareGrant) -> ShareGrant {
+        var merged = updated
+        merged.inviteCode = local.inviteCode
+        if merged.cloudKitRootRecordName == nil { merged.cloudKitRootRecordName = local.cloudKitRootRecordName }
+        if merged.cloudKitZoneName == nil { merged.cloudKitZoneName = local.cloudKitZoneName }
+        if merged.cloudKitOwnerName == nil { merged.cloudKitOwnerName = local.cloudKitOwnerName }
+        merged.cloudKitShareRecordName = merged.cloudKitShareRecordName ?? local.cloudKitShareRecordName
+        if PersonName.nonempty(merged.inviteeName) == nil { merged.inviteeName = local.inviteeName }
+        if InviteLinkPolicy.url(from: merged.returnInviteURL ?? "") == nil,
+           InviteLinkPolicy.url(from: local.returnInviteURL ?? "") != nil {
+            merged.returnInviteURL = local.returnInviteURL
+        }
+        if merged.reciprocal == nil { merged.reciprocal = local.reciprocal }
+        if merged.reciprocalForGrantID == nil { merged.reciprocalForGrantID = local.reciprocalForGrantID }
+        return merged
+    }
+
+    /// Applies the saved own name. An empty value leaves the grant unchanged.
+    static func applyingOwnName(_ name: String?, to grant: ShareGrant, profileID: UUID) -> ShareGrant {
+        guard let name = PersonName.nonempty(name) else { return grant }
+        var copy = grant
+        if copy.owner.id == profileID { copy.owner.displayName = name }
+        if copy.grantee?.id == profileID { copy.grantee?.displayName = name }
+        return copy
     }
 }
 
