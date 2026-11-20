@@ -118,6 +118,11 @@ struct AchievementsView: View {
                 .tint(appAccent)
             Text(progressLabel(campaign))
                 .font(.subheadline.weight(.semibold))
+            if let note = campaign.visibleGoalNote?.resolved(languageCode: languageCode) {
+                Text(note)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
             Text(campaign.date)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -233,10 +238,7 @@ struct AchievementsView: View {
     }
 
     private func money(_ amount: Decimal) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = document?.currency ?? "EUR"
-        return formatter.string(from: amount as NSDecimalNumber) ?? "\(amount) \(document?.currency ?? "EUR")"
+        AchievementMoney.format(amount, currencyCode: document?.currency ?? "EUR")
     }
 
     private func reload() async {

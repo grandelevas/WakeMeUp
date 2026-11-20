@@ -86,6 +86,8 @@ struct AchievementCampaign: Codable, Equatable, Identifiable {
     var linkURL: String
     /// Optional since schema 1. Missing means the older file, and the extra UI stays hidden.
     var description: LocalizedCopy?
+    /// Optional line under the raised and goal amounts, such as what the goal stands for.
+    var goalNote: LocalizedCopy?
     var photos: [CampaignPhoto]?
     var updates: [CampaignUpdate]?
     var thanks: [CampaignThanks]?
@@ -115,6 +117,34 @@ struct AchievementCampaign: Codable, Equatable, Identifiable {
 
     var hasStory: Bool {
         story(languageCode: "pl").isEmpty == false || story(languageCode: "en").isEmpty == false
+    }
+
+    var visibleGoalNote: LocalizedCopy? {
+        guard let goalNote, !goalNote.isBlank else { return nil }
+        return goalNote
+    }
+}
+
+enum AchievementMoney {
+    /// Currency text for the reader's locale, with a thousands separator.
+    static func format(_ amount: Decimal, currencyCode: String, locale: Locale = .current) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = locale
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currencyCode
+        formatter.usesGroupingSeparator = true
+        if isWhole(amount) {
+            formatter.minimumFractionDigits = 0
+            formatter.maximumFractionDigits = 0
+        }
+        return formatter.string(from: amount as NSDecimalNumber) ?? "\(amount) \(currencyCode)"
+    }
+
+    private static func isWhole(_ amount: Decimal) -> Bool {
+        var source = amount
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &source, 0, .plain)
+        return rounded == amount
     }
 }
 
