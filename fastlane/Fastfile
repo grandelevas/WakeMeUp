@@ -1,6 +1,7 @@
 default_platform(:ios)
 
 require_relative "signing_paths"
+require_relative "external_beta_groups"
 
 def bundle_id
   ENV.fetch("BUNDLE_ID", "com.grandelevas.wakemeup")
@@ -362,24 +363,23 @@ platform :ios do
 end
 
 # The upload above has already succeeded. This waits for processing, sends the
-# build to the external group Testerzy, and submits it for Beta App Review.
-# A missing group or missing Test Information must not fail the upload.
+# build to every external TestFlight group, and submits it for Beta App Review.
+# No external groups, or missing Test Information, must not fail the upload.
 def distribute_to_external_testers(key, bundle_version)
-  group_name = "Testerzy"
   app = Spaceship::ConnectAPI::App.find(bundle_id)
   raise "App Store Connect has no app for #{bundle_id}" unless app
 
   groups = app.get_beta_groups
-  testerzy = groups.find { |group| group.name == group_name }
-  unless testerzy
-    names = groups.map(&:name)
-    found = names.empty? ? "(none)" : names.join(", ")
-    raise "No TestFlight group named exactly #{group_name}. Groups found: #{found}"
-  end
-  if testerzy.is_internal_group == true || testerzy.is_internal_group.to_s == "true"
-    raise "Group #{group_name} is internal. External distribution needs an external group with that exact name."
+  chosen = external_beta_group_names(groups)
+  found = chosen[:found]
+  names = chosen[:external]
+  found_text = found.empty? ? "(none)" : found.join(", ")
+  UI.message("TestFlight groups found: #{found_text}")
+  if names.empty?
+    raise "No external TestFlight groups (is_internal_group false). Groups found: #{found_text}"
   end
 
+  UI.message("Distributing TestFlight build #{bundle_version} to external groups: #{names.join(", ")}")
   feedback = ENV["TESTFLIGHT_FEEDBACK_EMAIL"].to_s.strip
   upload_to_testflight(
     api_key: key,
@@ -391,20 +391,21 @@ def distribute_to_external_testers(key, bundle_version)
     wait_processing_interval: 30,
     wait_processing_timeout_duration: 2400,
     distribute_external: true,
-    groups: ["Testerzy"],
+    groups: names,
     notify_external_testers: true,
     submit_beta_review: true,
     changelog: "Wakito TestFlight build.",
-    beta_app_description: "Wakito is an alarm app. This build is for people in the Testerzy group.",
+    beta_app_description: "Wakito is an alarm app. This build is for the external TestFlight groups.",
     uses_non_exempt_encryption: false,
     **(feedback.empty? ? {} : { beta_app_feedback_email: feedback })
   )
+  UI.success("Distributed TestFlight build #{bundle_version} to: #{names.join(", ")}")
 rescue StandardError => error
-  warning = "WARNING: The TestFlight upload succeeded, but distribution to the external group Testerzy failed: #{error.message}"
+  warning = "WARNING: The TestFlight upload succeeded, but distribution to external groups failed: #{error.message}"
   UI.important(warning)
   UI.important(<<~MSG)
     Create these once in App Store Connect, then run upload-testflight again:
-    - An external TestFlight group named exactly Testerzy.
+    - At least one external TestFlight group (internal groups are skipped).
     - Test Information: Beta App Description, Feedback Email, and the Beta App Review contact (first name, last name, phone, and email).
     Optional GitHub secret TESTFLIGHT_FEEDBACK_EMAIL fills the feedback email from this lane.
     The uploaded build is already in TestFlight.
