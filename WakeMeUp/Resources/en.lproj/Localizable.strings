@@ -111,6 +111,9 @@
 "sharing.inviteCode" = "Invite code";
 "sharing.enterCode" = "Paste an invite link";
 "sharing.accept" = "Accept";
+"sharing.accepting" = "Retrieving the invite…";
+"sharing.timedOut" = "The invite took too long. Try again.";
+"sharing.badLink" = "This is not a Wakito invite link.";
 "sharing.revoke" = "Revoke";
 "sharing.revoke.title" = "Revoke access?";
 "sharing.revoke.message" = "They will no longer be able to set alarms on this iPhone.";

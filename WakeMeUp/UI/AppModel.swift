@@ -13,6 +13,35 @@ enum AppTab: Hashable {
 @MainActor
 enum AppRuntime {
     static var model: AppModel?
+    private static var pendingShare: CKShare.Metadata?
+
+    private static var pendingURL: URL?
+
+    static func acceptWhenReady(_ metadata: CKShare.Metadata) async {
+        pendingShare = metadata
+        await model?.acceptPendingShare()
+    }
+
+    static func acceptURLWhenReady(_ url: URL) async {
+        guard InviteLinkPolicy.isCloudShare(url) else { return }
+        if let model {
+            await model.acceptShareLink(url)
+        } else {
+            pendingURL = url
+        }
+    }
+
+    static func takePendingShare() -> CKShare.Metadata? {
+        let metadata = pendingShare
+        pendingShare = nil
+        return metadata
+    }
+
+    static func takePendingURL() -> URL? {
+        let url = pendingURL
+        pendingURL = nil
+        return url
+    }
 }
 
 @MainActor
@@ -29,7 +58,7 @@ final class AppModel {
     var lastError: String?
     var shareURL: URL?
     var shareMessage = ""
-    var pastedInvite = ""
+    var shareStatus: String?
     var friendDraftName = ""
     var remoteLabel = ""
     var remoteHour = 7
@@ -80,6 +109,12 @@ final class AppModel {
             cloudKit = nil
         }
         AppRuntime.model = self
+        Task {
+            await acceptPendingShare()
+            if let url = AppRuntime.takePendingURL() {
+                await acceptShareLink(url)
+            }
+        }
         friendDraftName = String(localized: "demo.friend")
         remoteLabel = String(localized: "demo.morning")
         switch LaunchConfiguration.screen {
@@ -320,42 +355,73 @@ final class AppModel {
         shareURL = url
     }
 
+    func acceptPendingShare() async {
+        guard let metadata = AppRuntime.takePendingShare() else { return }
+        await acceptCloudShare(metadata)
+    }
+
     func acceptCloudShare(_ metadata: CKShare.Metadata) async {
-        guard let cloudKit else {
-            lastError = RemoteBackendError.notConfigured.errorDescription
-            return
-        }
-        do {
-            let grant = try await cloudKit.accept(metadata: metadata, grantee: snapshot.profile)
-            update { $0.permissions.replace(grant) }
-            selectedTab = .sharing
-            await refreshRemote()
-        } catch {
-            lastError = error.localizedDescription
+        await acceptInvite {
+            guard let cloudKit else { throw RemoteBackendError.notConfigured }
+            return try await AsyncDeadline.run(seconds: 30) {
+                try await cloudKit.accept(metadata: metadata, grantee: self.namedProfile)
+            }
         }
     }
 
-    func acceptPastedInvite() async {
-        guard let cloudKit else {
-            lastError = RemoteBackendError.notConfigured.errorDescription
+    func acceptShareLink(_ url: URL) async {
+        guard InviteLinkPolicy.isCloudShare(url) else {
+            lastError = String(localized: "sharing.badLink")
             return
         }
-        guard let url = URL(string: pastedInvite.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+        await acceptInvite {
+            guard let cloudKit else { throw RemoteBackendError.notConfigured }
+            return try await AsyncDeadline.run(seconds: 30) {
+                try await cloudKit.accept(url: url, grantee: self.namedProfile)
+            }
+        }
+    }
+
+    private var namedProfile: Participant {
+        var person = snapshot.profile
+        if person.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            person.displayName = String(localized: "sharing.someone")
+        }
+        return person
+    }
+
+    private func acceptInvite(_ work: () async throws -> ShareGrant) async {
+        shareStatus = String(localized: "sharing.accepting")
+        selectedTab = .sharing
+        defer { shareStatus = nil }
         do {
-            let grant = try await cloudKit.accept(url: url, grantee: snapshot.profile)
+            let grant = try await work()
             update { $0.permissions.replace(grant) }
-            pastedInvite = ""
+            await refreshRemote()
+        } catch is AsyncDeadlineError {
+            lastError = String(localized: "sharing.timedOut")
+        } catch is CancellationError {
+            return
         } catch {
-            lastError = error.localizedDescription
+            lastError = CloudKitErrorText.message(for: error)
         }
     }
 
     func refreshRemote() async {
         guard let cloudKit else { return }
         let grants = snapshot.permissions.grants.filter { $0.cloudKitRootRecordName != nil && $0.state != .revoked }
+        var refreshFailure: String?
         for grant in grants {
             let asOwner = grant.owner.id == snapshot.profile.id
-            guard let (updated, commands) = try? await cloudKit.refresh(grant, asOwner: asOwner) else { continue }
+            let updatedGrant: ShareGrant
+            let commands: [RemoteAlarmCommand]
+            do {
+                (updatedGrant, commands) = try await cloudKit.refresh(grant, asOwner: asOwner)
+            } catch {
+                refreshFailure = CloudKitErrorText.message(for: error)
+                continue
+            }
+            let updated = updatedGrant
             var library = snapshot.library
             var applied = snapshot.appliedCommandIDs
             var notices: [String] = []
@@ -377,6 +443,9 @@ final class AppModel {
                 $0.library = library
                 $0.appliedCommandIDs = applied
             }
+        }
+        if let refreshFailure {
+            lastError = refreshFailure
         }
         await reschedule(requestAccess: false)
     }
@@ -489,6 +558,10 @@ final class AppModel {
     }
 
     func handle(url: URL) {
+        if InviteLinkPolicy.isCloudShare(url) {
+            Task { await acceptShareLink(url) }
+            return
+        }
         guard url.scheme?.lowercased() == "wakemeup" else {
             if SongLink.parse(url.absoluteString) != nil {
                 UIApplication.shared.open(url)

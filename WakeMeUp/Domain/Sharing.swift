@@ -129,6 +129,35 @@ enum InviteLinkPolicy {
         guard let url = URL(string: trimmed), url.scheme?.lowercased() == "https" else { return nil }
         return url
     }
+
+    static func isCloudShare(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "https" else { return false }
+        let host = url.host?.lowercased() ?? ""
+        return host == "icloud.com" || host.hasSuffix(".icloud.com")
+    }
+
+    /// Pulls an iCloud share link out of a message that also contains other words.
+    static func cloudShareURL(from text: String) -> URL? {
+        let pieces = text.split { $0.isWhitespace || $0 == "\n" || $0 == "\r" }
+        for piece in pieces {
+            let trimmed = piece.trimmingCharacters(in: CharacterSet(charactersIn: "<>\"'“”"))
+            guard let url = URL(string: String(trimmed)), isCloudShare(url) else { continue }
+            return url
+        }
+        return nil
+    }
+}
+
+enum ShareRoster {
+    /// People who accepted an invite to this phone. They can set alarms here.
+    static func canSetAlarmsHere(profileID: UUID, grants: [ShareGrant]) -> [ShareGrant] {
+        grants.filter { $0.owner.id == profileID && $0.state != .revoked }
+    }
+
+    /// Phones this person can set, because they accepted that phone's invite.
+    static func phonesICanSet(profileID: UUID, grants: [ShareGrant]) -> [ShareGrant] {
+        grants.filter { $0.grantee?.id == profileID && $0.state == .active }
+    }
 }
 
 enum InviteCode {

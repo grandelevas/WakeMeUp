@@ -1102,6 +1102,59 @@ final class InviteLinkPolicyTests: XCTestCase {
         XCTAssertNil(InviteLinkPolicy.url(from: "OLA-DEMO"))
         XCTAssertNil(InviteLinkPolicy.url(from: "http://example.com/share"))
     }
+
+    func testCloudShareLinkIsRecognizedInsideTheInviteMessage() {
+        let link = "https://www.icloud.com/share/abc123"
+        XCTAssertTrue(InviteLinkPolicy.isCloudShare(URL(string: link)!))
+        XCTAssertFalse(InviteLinkPolicy.isCloudShare(URL(string: "https://example.com/share/abc")!))
+        XCTAssertEqual(
+            InviteLinkPolicy.cloudShareURL(from: "Open this link in Wakito. \(link)")?.absoluteString,
+            link
+        )
+        XCTAssertNil(InviteLinkPolicy.cloudShareURL(from: "no link here"))
+    }
+
+    func testAcceptedInviteeIsVisibleToTheOwnerAndCanSetThatPhone() {
+        let owner = Participant(id: UUID(), displayName: "A")
+        let friend = Participant(id: UUID(), displayName: "B")
+        var grant = ShareGrant(
+            id: UUID(),
+            inviteCode: "https://www.icloud.com/share/abc",
+            secret: "s",
+            owner: owner,
+            grantee: nil,
+            state: .pending,
+            createdAt: .now,
+            cloudKitRootRecordName: "grant",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: "__defaultOwner__"
+        )
+        XCTAssertEqual(ShareRoster.canSetAlarmsHere(profileID: owner.id, grants: [grant]).count, 1)
+        XCTAssertTrue(ShareRoster.phonesICanSet(profileID: owner.id, grants: [grant]).isEmpty)
+        grant.grantee = friend
+        grant.state = .active
+        XCTAssertEqual(ShareRoster.canSetAlarmsHere(profileID: owner.id, grants: [grant]).first?.grantee?.displayName, "B")
+        XCTAssertEqual(ShareRoster.phonesICanSet(profileID: friend.id, grants: [grant]).first?.owner.displayName, "A")
+    }
+}
+
+final class AsyncDeadlineTests: XCTestCase {
+    func testAHungCallBecomesATimeout() async {
+        do {
+            _ = try await AsyncDeadline.run(seconds: 0.05) {
+                try await Task.sleep(for: .seconds(5))
+                return "late"
+            }
+            XCTFail("The hung call should time out")
+        } catch {
+            XCTAssertEqual(error as? AsyncDeadlineError, .timedOut)
+        }
+    }
+
+    func testAFastCallReturnsBeforeTheDeadline() async throws {
+        let value = try await AsyncDeadline.run(seconds: 2) { "ready" }
+        XCTAssertEqual(value, "ready")
+    }
 }
 
 final class ReleaseNotesTests: XCTestCase {

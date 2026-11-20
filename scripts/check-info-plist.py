@@ -55,6 +55,9 @@ def main() -> int:
             if plist.get(key) != "Wakito":
                 print(f"{label} {key} must be Wakito, got {plist.get(key)!r}", file=sys.stderr)
                 return 1
+    if app.get("CKSharingSupported") is not True:
+        print("CKSharingSupported must stay true so iCloud share links can open the app", file=sys.stderr)
+        return 1
     if "PRODUCT_BUNDLE_IDENTIFIER: com.grandelevas.wakemeup" not in project:
         print("bundle id must stay com.grandelevas.wakemeup", file=sys.stderr)
         return 1
