@@ -304,8 +304,22 @@ struct SentAlarm: Codable, Equatable, Identifiable {
     var recipientName: String
     var sentAt: Date
     var commandID: UUID
+    var wakeStatus: WakeStatusKind? = nil
+    var wakeStatusAt: Date? = nil
 
     var id: UUID { commandID }
+}
+
+struct WakeTracking: Codable, Equatable, Identifiable {
+    var alarmID: UUID
+    var commandID: UUID
+    var senderID: UUID
+    var firedAt: Date
+    var snoozeCount: Int
+    var dismissedAt: Date?
+    var reported: WakeStatusKind?
+
+    var id: UUID { alarmID }
 }
 
 struct AlarmDraft: Equatable, Identifiable {

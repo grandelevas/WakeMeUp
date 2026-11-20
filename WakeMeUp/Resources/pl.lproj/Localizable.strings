@@ -105,6 +105,10 @@
 "sharing.push.joined" = "Zaproszenie przyjęte: %@. Możecie ustawiać sobie budziki.";
 "sharing.cloudError" = "Nie udało się utworzyć zaproszenia iCloud.";
 "sharing.push.scheduled" = "%@ ustawił Ci budzik na %@.";
+"sharing.wake.up" = "%@ wstał(a) o %@";
+"sharing.wake.asleep" = "%@ jeszcze śpi";
+"sharing.wake.rowUp" = "Wstał(a) o %@";
+"sharing.wake.rowAsleep" = "Jeszcze śpi";
 "sharing.yourName" = "Twoje imię";
 "sharing.ownName.help" = "To imię widzi druga osoba i powiadomienia. Jeśli zostawisz je puste, Wakito użyje imienia z iCloud.";
 "sharing.addOwnName" = "Dodaj swoje imię";

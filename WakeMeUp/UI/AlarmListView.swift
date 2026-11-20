@@ -521,11 +521,34 @@ private struct SentAlarmRow: View {
                 Text(String(format: String(localized: "alarms.forRecipient"), sent.recipientName))
                     .font(.caption)
                     .foregroundStyle(appAccent)
+                if let status = sent.wakeStatus {
+                    Text(wakeStatusText(status, at: sent.wakeStatusAt))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("sent-status-\(sent.commandID.uuidString)")
+                }
             }
             Spacer(minLength: 8)
         }
         .padding(.vertical, 4)
         .accessibilityIdentifier("sent-alarm-\(sent.commandID.uuidString)")
+    }
+
+    private func wakeStatusText(_ status: WakeStatusKind, at date: Date?) -> String {
+        switch status {
+        case .up:
+            let moment = date ?? .now
+            let parts = ClockFormat.parts(
+                hour: Calendar.current.component(.hour, from: moment),
+                minute: Calendar.current.component(.minute, from: moment),
+                locale: .current,
+                timeZone: .current
+            )
+            let time = parts.period.isEmpty ? parts.time : "\(parts.time) \(parts.period)"
+            return String(format: String(localized: "sharing.wake.rowUp"), time)
+        case .asleep:
+            return String(localized: "sharing.wake.rowAsleep")
+        }
     }
 
     private var parts: ClockFormat.Parts {
