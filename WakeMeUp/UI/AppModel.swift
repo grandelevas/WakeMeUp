@@ -160,6 +160,17 @@ final class AppModel {
         Task { await reschedule(requestAccess: true) }
     }
 
+    func setSound(_ soundID: String, for alarmIDs: Set<UUID>) {
+        guard !alarmIDs.isEmpty else { return }
+        update { $0.library.setSound(soundID, alarmIDs: alarmIDs) }
+        Task { await reschedule(requestAccess: true) }
+    }
+
+    func setSound(_ soundID: String, forGroup groupID: UUID) {
+        let ids = Set(snapshot.library.alarms(in: groupID).map(\.id))
+        setSound(soundID, for: ids)
+    }
+
     func moveGroup(_ sourceID: UUID, before targetID: UUID) {
         update { $0.library.moveGroup(sourceID, before: targetID) }
     }

@@ -5,10 +5,12 @@
       "date": "2026-11-20",
       "changes": {
         "en": [
-          "Press and hold a group, then drag it to change the order."
+          "Press and hold a group, then drag it to change the order.",
+          "Select several alarms, or a whole group, and give them the same sound."
         ],
         "pl": [
-          "Przytrzymaj grupę i przeciągnij ją, żeby zmienić kolejność."
+          "Przytrzymaj grupę i przeciągnij ją, żeby zmienić kolejność.",
+          "Zaznacz kilka alarmów albo całą grupę i ustaw im ten sam dzwonek."
         ]
       }
     },

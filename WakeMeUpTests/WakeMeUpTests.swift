@@ -162,6 +162,20 @@ final class AlarmLibraryTests: XCTestCase {
         XCTAssertTrue(library.alarms[0].isEnabled)
     }
 
+    func testOneSoundAppliesToChosenAlarmsOnly() {
+        var library = AlarmLibrary()
+        let first = alarm(hour: 6, group: nil, enabled: true)
+        let second = alarm(hour: 7, group: nil, enabled: true)
+        let third = alarm(hour: 8, group: nil, enabled: true)
+        library.upsert(first)
+        library.upsert(second)
+        library.upsert(third)
+        library.setSound("bell", alarmIDs: [first.id, second.id])
+        XCTAssertEqual(library.alarm(first.id)?.soundID, "bell")
+        XCTAssertEqual(library.alarm(second.id)?.soundID, "bell")
+        XCTAssertEqual(library.alarm(third.id)?.soundID, "classic")
+    }
+
     func testGroupOrderSurvivesRelaunchAndAMove() throws {
         let first = UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000001")!
         let second = UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000002")!

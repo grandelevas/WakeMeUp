@@ -5,6 +5,10 @@ struct AlarmListView: View {
     @Environment(AppModel.self) private var model
     @State private var collapsedGroups: Set<UUID> = GroupExpansionStore.collapsedIDs()
     @State private var editingGroupID: UUID?
+    @State private var selecting = false
+    @State private var selectedAlarmIDs: Set<UUID> = []
+    @State private var changingSelectionSound = false
+    @State private var soundGroupID: UUID?
 
     var body: some View {
         NavigationStack {
@@ -22,7 +26,21 @@ struct AlarmListView: View {
             .navigationTitle("alarms.title")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
+                    Button(selecting ? "alarms.done" : "alarms.select") {
+                        selecting.toggle()
+                        if !selecting { selectedAlarmIDs.removeAll() }
+                    }
+                }
+                ToolbarItem(placement: .topBarLeading) {
                     EditButton()
+                }
+                if selecting {
+                    ToolbarItem(placement: .bottomBar) {
+                        Button("alarms.changeSound") {
+                            changingSelectionSound = true
+                        }
+                        .disabled(selectedAlarmIDs.isEmpty)
+                    }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -56,8 +74,26 @@ struct AlarmListView: View {
             .navigationDestination(item: $editingGroupID) { id in
                 GroupEditorView(groupID: id)
             }
+            .sheet(isPresented: $changingSelectionSound) {
+                SoundPickerSheet { soundID in
+                    model.setSound(soundID, for: selectedAlarmIDs)
+                    selecting = false
+                    selectedAlarmIDs.removeAll()
+                }
+            }
+            .sheet(isPresented: groupSoundPresented) {
+                if let soundGroupID {
+                    SoundPickerSheet(title: "groups.changeSound") { soundID in
+                        model.setSound(soundID, forGroup: soundGroupID)
+                    }
+                }
+            }
         }
         .accessibilityIdentifier("alarm-list")
+    }
+
+    private var groupSoundPresented: Binding<Bool> {
+        Binding(get: { soundGroupID != nil }, set: { if !$0 { soundGroupID = nil } })
     }
 
     private var groupsPresented: Binding<Bool> {
@@ -151,8 +187,16 @@ struct AlarmListView: View {
                     )) {
                         Text(group.name)
                     }
-                .labelsHidden()
-                .accessibilityIdentifier("group-toggle-\(group.id.uuidString)")
+                    .labelsHidden()
+                    .accessibilityIdentifier("group-toggle-\(group.id.uuidString)")
+                }
+            }
+            .contextMenu {
+                Button("groups.changeSound", systemImage: "speaker.wave.2") {
+                    soundGroupID = group.id
+                }
+                Button("groups.edit", systemImage: "info.circle") {
+                    editingGroupID = group.id
                 }
             }
             .dropDestination(for: String.self) { items, _ in
@@ -218,9 +262,23 @@ struct AlarmListView: View {
         } else {
             ForEach(alarms) { alarm in
                 Button {
-                    model.edit(alarm)
+                    if selecting {
+                        if selectedAlarmIDs.contains(alarm.id) {
+                            selectedAlarmIDs.remove(alarm.id)
+                        } else {
+                            selectedAlarmIDs.insert(alarm.id)
+                        }
+                    } else {
+                        model.edit(alarm)
+                    }
                 } label: {
-                    AlarmRow(alarm: alarm, enabled: alarm.isEnabled)
+                    HStack(spacing: 8) {
+                        if selecting {
+                            Image(systemName: selectedAlarmIDs.contains(alarm.id) ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(.secondary)
+                        }
+                        AlarmRow(alarm: alarm, enabled: alarm.isEnabled)
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("alarm-row-\(alarm.id.uuidString)")

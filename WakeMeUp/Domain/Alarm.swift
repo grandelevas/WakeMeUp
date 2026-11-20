@@ -180,6 +180,13 @@ struct AlarmLibrary: Codable, Equatable {
         }
     }
 
+    mutating func setSound(_ soundID: String, alarmIDs: some Sequence<UUID>) {
+        let ids = Set(alarmIDs)
+        for index in alarms.indices where ids.contains(alarms[index].id) {
+            alarms[index].soundID = soundID
+        }
+    }
+
     mutating func updateGroup(id: UUID, name: String, symbol: String) {
         guard let index = groups.firstIndex(where: { $0.id == id }) else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)

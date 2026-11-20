@@ -3,7 +3,6 @@ import UniformTypeIdentifiers
 
 struct AlarmEditorView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.appAccent) private var appAccent
     @Environment(\.dismiss) private var dismiss
     @State private var draft: AlarmDraft
     @State private var time: Date
@@ -40,37 +39,8 @@ struct AlarmEditorView: View {
                     TextField("alarm.defaultLabel", text: $draft.label)
                 }
 
-                Section("alarm.sound") {
-                    ForEach(SoundCatalog.bundled) { sound in
-                        Button {
-                            chooseSound(sound.id)
-                        } label: {
-                            HStack {
-                                Text(LocalizedStringKey(sound.localizationKey))
-                                Spacer()
-                                if draft.soundID == sound.id {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(appAccent)
-                                }
-                            }
-                        }
-                        .foregroundStyle(.primary)
-                    }
-                    ForEach(model.customSounds) { sound in
-                        Button {
-                            chooseSound(sound.id)
-                        } label: {
-                            HStack {
-                                Text(sound.displayName)
-                                Spacer()
-                                if draft.soundID == sound.id {
-                                    Image(systemName: "checkmark").foregroundStyle(appAccent)
-                                }
-                            }
-                        }
-                        .foregroundStyle(.primary)
-                    }
-                    Button("sound.import") { importing = true }
+                SoundChoiceList(soundID: $draft.soundID, preview: preview, showsImport: true) {
+                    importing = true
                 }
 
                 Section {
@@ -158,15 +128,6 @@ struct AlarmEditorView: View {
             .onDisappear { preview.stop() }
         }
         .accessibilityIdentifier("alarm-editor")
-    }
-
-    private func chooseSound(_ id: String) {
-        if draft.soundID == id, preview.isPlaying(id) {
-            preview.stop()
-            return
-        }
-        draft.soundID = id
-        playPreview(of: id)
     }
 
     private func playPreview(of id: String) {

@@ -90,6 +90,7 @@ struct GroupEditorView: View {
     @State private var name = ""
     @State private var symbol = "folder"
     @State private var confirmDelete = false
+    @State private var changingGroupSound = false
 
     var body: some View {
         Form {
@@ -154,6 +155,8 @@ struct GroupEditorView: View {
                     }
                 }
                 Section {
+                    Button("groups.changeSound") { changingGroupSound = true }
+                        .disabled(model.library.alarms(in: groupID).isEmpty)
                     Button("groups.delete", role: .destructive) { confirmDelete = true }
                 }
             }
@@ -168,6 +171,11 @@ struct GroupEditorView: View {
         }
         .onDisappear {
             model.updateGroup(id: groupID, name: name, symbol: symbol)
+        }
+        .sheet(isPresented: $changingGroupSound) {
+            SoundPickerSheet(title: "groups.changeSound") { soundID in
+                model.setSound(soundID, forGroup: groupID)
+            }
         }
         .alert("groups.delete", isPresented: $confirmDelete) {
             Button("groups.delete", role: .destructive) {
