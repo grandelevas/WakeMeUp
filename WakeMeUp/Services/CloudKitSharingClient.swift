@@ -238,6 +238,20 @@ final class CloudKitSharingClient {
         }, change: { $0 })
     }
 
+    func appendWakeReport(_ report: WakeReport, on grant: ShareGrant) async throws {
+        try await requireAccount()
+        try await mutate(grant: grant, database: container.sharedCloudDatabase, alter: { stored in
+            var reports = stored.wakeReports ?? []
+            if let index = reports.firstIndex(where: { $0.commandID == report.commandID }) {
+                if reports[index].status == .up, report.status == .asleep { return }
+                reports[index] = report
+            } else {
+                reports.append(report)
+            }
+            stored.wakeReports = reports
+        }, change: { $0 })
+    }
+
     func updateOwnName(_ name: String, on grant: ShareGrant, asOwner: Bool) async throws {
         guard PersonName.nonempty(name) != nil else { return }
         try await requireAccount()

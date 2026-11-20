@@ -1455,6 +1455,7 @@ final class MutualInviteTests: XCTestCase {
         XCTAssertNil(grant.returnInviteURL)
         XCTAssertNil(grant.reciprocal)
         XCTAssertNil(grant.reciprocalForGrantID)
+        XCTAssertNil(grant.wakeReports)
     }
 
     func testZoneNotFoundIsRecognizedAndAnExistingZoneIsNot() {
@@ -1465,5 +1466,123 @@ final class MutualInviteTests: XCTestCase {
             CKPartialErrorsByItemIDKey: ["grant": CKError(.zoneNotFound)]
         ])
         XCTAssertTrue(CloudKitZoneFailure.isZoneNotFound(partial))
+    }
+}
+
+final class WakeReportTests: XCTestCase {
+    private let fired = Date(timeIntervalSince1970: 1_700_000_000)
+
+    func testDismissalReportsUpImmediately() {
+        let outcome = WakeReportPolicy.outcome(
+            firedAt: fired,
+            now: fired.addingTimeInterval(30),
+            snoozeCount: 0,
+            dismissedAt: fired.addingTimeInterval(30)
+        )
+        XCTAssertEqual(outcome, .up(fired.addingTimeInterval(30)))
+    }
+
+    func testTenMinutesWithoutDismissalReportsStillAsleep() {
+        XCTAssertEqual(
+            WakeReportPolicy.outcome(firedAt: fired, now: fired.addingTimeInterval(9 * 60), snoozeCount: 0, dismissedAt: nil),
+            .pending
+        )
+        XCTAssertEqual(
+            WakeReportPolicy.outcome(firedAt: fired, now: fired.addingTimeInterval(10 * 60), snoozeCount: 0, dismissedAt: nil),
+            .asleep
+        )
+    }
+
+    func testASecondSnoozeReportsStillAsleep() {
+        XCTAssertEqual(
+            WakeReportPolicy.outcome(firedAt: fired, now: fired.addingTimeInterval(60), snoozeCount: 1, dismissedAt: nil),
+            .pending
+        )
+        XCTAssertEqual(
+            WakeReportPolicy.outcome(firedAt: fired, now: fired.addingTimeInterval(120), snoozeCount: 2, dismissedAt: nil),
+            .asleep
+        )
+    }
+
+    func testUpReplacesAsleepAndAsleepDoesNotReplaceUp() {
+        let command = UUID()
+        let sent = [
+            SentAlarm(
+                alarm: Alarm(
+                    id: UUID(),
+                    schedule: .wallClock(hour: 6, minute: 30, repeatDays: []),
+                    label: "",
+                    soundID: "classic",
+                    snoozeEnabled: true,
+                    snoozeMinutes: 9,
+                    isEnabled: true,
+                    groupID: nil,
+                    songLink: nil,
+                    origin: .local,
+                    resumeWhenGroupEnables: nil
+                ),
+                recipientID: UUID(),
+                recipientName: "Ola",
+                sentAt: fired,
+                commandID: command
+            )
+        ]
+        let asleep = WakeReport(
+            id: UUID(),
+            commandID: command,
+            alarmID: sent[0].alarm.id,
+            reporterID: UUID(),
+            reporterName: "Aleksandra",
+            status: .asleep,
+            at: fired
+        )
+        let up = WakeReport(
+            id: UUID(),
+            commandID: command,
+            alarmID: sent[0].alarm.id,
+            reporterID: asleep.reporterID,
+            reporterName: "Aleksandra",
+            status: .up,
+            at: fired.addingTimeInterval(60)
+        )
+        let first = WakeStatusApply.changes(reports: [asleep], sent: sent) { $0.reporterName }
+        XCTAssertEqual(first.map(\.status), [.asleep])
+        XCTAssertTrue(first[0].notice.contains("Aleksandra"))
+        var updated = sent
+        updated[0].wakeStatus = .asleep
+        let second = WakeStatusApply.changes(reports: [up], sent: updated) { _ in "Ola" }
+        XCTAssertEqual(second.map(\.status), [.up])
+        XCTAssertTrue(second[0].notice.contains("Ola"))
+        updated[0].wakeStatus = .up
+        XCTAssertTrue(WakeStatusApply.changes(reports: [asleep], sent: updated) { $0.reporterName }.isEmpty)
+    }
+
+    func testAMissingWakeReportOnTheServerDoesNotClearTheLocalOne() {
+        var local = ShareGrant(
+            id: UUID(),
+            inviteCode: "https://www.icloud.com/share/abc",
+            secret: "s",
+            owner: Participant(id: UUID(), displayName: "A"),
+            grantee: nil,
+            state: .active,
+            createdAt: fired,
+            cloudKitRootRecordName: "grant",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: "_a"
+        )
+        local.wakeReports = [
+            WakeReport(
+                id: UUID(),
+                commandID: UUID(),
+                alarmID: UUID(),
+                reporterID: UUID(),
+                reporterName: "Ola",
+                status: .up,
+                at: fired
+            )
+        ]
+        var fetched = local
+        fetched.wakeReports = nil
+        XCTAssertEqual(GrantRefreshMerge.merging(fetched, with: local).wakeReports?.count, 1)
     }
 }

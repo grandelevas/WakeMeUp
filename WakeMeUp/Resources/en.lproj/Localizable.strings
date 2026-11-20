@@ -105,6 +105,10 @@
 "sharing.push.joined" = "%@ accepted your invite. You can set alarms for each other.";
 "sharing.cloudError" = "Could not create the iCloud invite.";
 "sharing.push.scheduled" = "%@ set an alarm for you at %@.";
+"sharing.wake.up" = "%@ is up (%@)";
+"sharing.wake.asleep" = "%@ is still asleep";
+"sharing.wake.rowUp" = "Up (%@)";
+"sharing.wake.rowAsleep" = "Still asleep";
 "sharing.yourName" = "Your name";
 "sharing.ownName.help" = "This name is shown to the other person and in notifications. If you leave it empty, Wakito uses your iCloud name.";
 "sharing.addOwnName" = "Add your name";

@@ -5,6 +5,20 @@
       "date": "2026-11-20",
       "changes": {
         "en": [
+          "When a friend stops an alarm you set, you are told they are up, with the time. If they snooze twice or leave it for 10 minutes, you are told they are still asleep.",
+          "That status is shown on the alarm under For friends."
+        ],
+        "pl": [
+          "Gdy znajomy wyłączy budzik, który mu ustawisz, dostajesz informację, że wstał, z godziną. Po dwóch drzemkach albo 10 minutach dostajesz informację, że jeszcze śpi.",
+          "Ten status widać przy alarmie w Dla znajomych."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-20",
+      "changes": {
+        "en": [
           "Group order changes only after Edit. The alarm list no longer drags groups on a long press."
         ],
         "pl": [

@@ -78,6 +78,9 @@ final class AppModel {
     private var acceptingReturn = false
     private var heldShare: CKShare.Metadata?
     private var heldURL: URL?
+    private var wakeCheck: Task<Void, Never>?
+    private var publishingWake = false
+    private var wakePublishAgain = false
 
     var ownName: String {
         let stored = ownNames.load()
@@ -168,8 +171,10 @@ final class AppModel {
         }
         Task { await refreshRemote() }
         Task { await cloudKit?.ensureSilentSubscription() }
+        Task { await publishDueWakeReports() }
         await coordinator.observeAlerting { [weak self] id in
             self?.ringingAlarmID = id
+            self?.noteRemoteAlarmFired(id)
         }
     }
 
@@ -502,6 +507,15 @@ final class AppModel {
                 }
                 applied.append(command.id)
             }
+            let wakeChanges = asOwner
+                ? WakeStatusApply.changes(reports: updated.wakeReports ?? [], sent: snapshot.sentAlarms) { report in
+                    if updated.grantee?.id == report.reporterID, let label = PersonName.nonempty(updated.inviteeName) {
+                        return label
+                    }
+                    return report.reporterName
+                }
+                : []
+            notices.append(contentsOf: wakeChanges.map(\.notice))
             if !notices.isEmpty {
                 Task { await postRemoteNotices(notices) }
             }
@@ -509,6 +523,11 @@ final class AppModel {
                 $0.permissions.replace(updated)
                 $0.library = library
                 $0.appliedCommandIDs = applied
+                for change in wakeChanges {
+                    guard let index = $0.sentAlarms.firstIndex(where: { $0.commandID == change.commandID }) else { continue }
+                    $0.sentAlarms[index].wakeStatus = change.status
+                    $0.sentAlarms[index].wakeStatusAt = change.at
+                }
             }
         }
         if let refreshFailure {
@@ -629,18 +648,21 @@ final class AppModel {
 
     func stopRinging() async {
         guard let id = ringingAlarmID else { return }
+        noteRemoteAlarmDismissed(id)
         await coordinator.stop(id: id)
         ringingAlarmID = nil
     }
 
     func snoozeRinging() async {
         guard let alarm = ringingAlarm else { return }
+        noteRemoteAlarmSnoozed(alarm.id)
         await coordinator.snooze(alarm, customSounds: snapshot.customSounds)
         ringingAlarmID = nil
     }
 
     func playSong(of alarm: Alarm) async {
         guard let link = alarm.songLink else { return }
+        noteRemoteAlarmDismissed(alarm.id)
         await coordinator.stop(id: alarm.id)
         ringingAlarmID = nil
         await UIApplication.shared.open(link.url)
@@ -681,16 +703,23 @@ final class AppModel {
             }
         case NotificationAction.snooze:
             if let alarmID, let alarm = snapshot.library.alarm(alarmID) {
+                noteRemoteAlarmSnoozed(alarmID)
                 await coordinator.snooze(alarm, customSounds: snapshot.customSounds)
             }
         case NotificationAction.stop, UNNotificationDismissActionIdentifier:
-            if let alarmID { await coordinator.stop(id: alarmID) }
+            if let alarmID {
+                noteRemoteAlarmDismissed(alarmID)
+                await coordinator.stop(id: alarmID)
+            }
         default:
             if let alarmID { ringingAlarmID = alarmID }
         }
     }
 
     func dismissRinging() {
+        if let id = ringingAlarmID {
+            noteRemoteAlarmDismissed(id)
+        }
         ringingAlarmID = nil
     }
 
@@ -725,6 +754,132 @@ final class AppModel {
             scheduleFailure = String(format: String(localized: "settings.systemAlarm.failed"), failure)
         } else {
             scheduleFailure = nil
+        }
+    }
+
+    func noteRemoteAlarmFired(_ id: UUID, at date: Date = .now) {
+        guard let alarm = snapshot.library.alarm(id),
+              case let .remote(senderID, _, commandID) = alarm.origin else { return }
+        guard !snapshot.wakeTracking.contains(where: { $0.alarmID == id }) else { return }
+        update {
+            $0.wakeTracking.append(WakeTracking(
+                alarmID: id,
+                commandID: commandID,
+                senderID: senderID,
+                firedAt: date,
+                snoozeCount: 0,
+                dismissedAt: nil,
+                reported: nil
+            ))
+        }
+        Task { await publishDueWakeReports() }
+    }
+
+    func noteRemoteAlarmSnoozed(_ id: UUID) {
+        guard snapshot.library.alarm(id)?.origin.isFromSomeoneElse == true else { return }
+        update {
+            guard let index = $0.wakeTracking.firstIndex(where: { $0.alarmID == id }) else { return }
+            $0.wakeTracking[index].snoozeCount += 1
+        }
+        Task { await publishDueWakeReports() }
+    }
+
+    func noteRemoteAlarmDismissed(_ id: UUID, at date: Date = .now) {
+        guard let alarm = snapshot.library.alarm(id),
+              case let .remote(senderID, _, commandID) = alarm.origin else { return }
+        update {
+            if let index = $0.wakeTracking.firstIndex(where: { $0.alarmID == id }) {
+                $0.wakeTracking[index].dismissedAt = date
+            } else {
+                $0.wakeTracking.append(WakeTracking(
+                    alarmID: id,
+                    commandID: commandID,
+                    senderID: senderID,
+                    firedAt: date,
+                    snoozeCount: 0,
+                    dismissedAt: date,
+                    reported: nil
+                ))
+            }
+        }
+        Task { await publishDueWakeReports() }
+    }
+
+    private func publishDueWakeReports(now: Date = .now) async {
+        if publishingWake {
+            wakePublishAgain = true
+            return
+        }
+        publishingWake = true
+        defer {
+            publishingWake = false
+            if wakePublishAgain {
+                wakePublishAgain = false
+                Task { await publishDueWakeReports() }
+            }
+        }
+        for tracking in snapshot.wakeTracking {
+            let outcome = WakeReportPolicy.outcome(
+                firedAt: tracking.firedAt,
+                now: now,
+                snoozeCount: tracking.snoozeCount,
+                dismissedAt: tracking.dismissedAt
+            )
+            switch outcome {
+            case .pending:
+                continue
+            case let .up(at):
+                guard tracking.reported != .up else { continue }
+                await sendWakeReport(tracking, status: .up, at: at)
+            case .asleep:
+                guard tracking.reported == nil else { continue }
+                await sendWakeReport(tracking, status: .asleep, at: now)
+            }
+        }
+        scheduleWakeCheck(now: now)
+    }
+
+    private func sendWakeReport(_ tracking: WakeTracking, status: WakeStatusKind, at date: Date) async {
+        let name = await identityForSharing()?.displayName ?? snapshot.profile.displayName
+        let report = WakeReport(
+            id: UUID(),
+            commandID: tracking.commandID,
+            alarmID: tracking.alarmID,
+            reporterID: snapshot.profile.id,
+            reporterName: name,
+            status: status,
+            at: date
+        )
+        if let cloudKit {
+            guard let grant = snapshot.permissions.grants.first(where: {
+                $0.state == .active && $0.owner.id == tracking.senderID && $0.grantee?.id == snapshot.profile.id && $0.cloudKitRootRecordName != nil
+            }) else { return }
+            do {
+                try await cloudKit.appendWakeReport(report, on: grant)
+            } catch {
+                lastError = CloudKitErrorText.message(for: error)
+                return
+            }
+        }
+        update {
+            guard let index = $0.wakeTracking.firstIndex(where: { $0.alarmID == tracking.alarmID }) else { return }
+            $0.wakeTracking[index].reported = status
+        }
+    }
+
+    private func scheduleWakeCheck(now: Date = .now) {
+        wakeCheck?.cancel()
+        let deadlines = snapshot.wakeTracking.compactMap { tracking -> Date? in
+            guard tracking.reported == nil, tracking.dismissedAt == nil else { return nil }
+            return tracking.firedAt.addingTimeInterval(WakeReportPolicy.asleepDelay)
+        }
+        guard let next = deadlines.min() else { return }
+        let remaining = next.timeIntervalSince(now)
+        let delay = remaining > 0 ? remaining : 60
+        wakeCheck = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            await self?.publishDueWakeReports()
         }
     }
 

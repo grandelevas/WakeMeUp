@@ -31,6 +31,8 @@ struct ShareGrant: Codable, Equatable, Hashable, Identifiable {
     var reciprocal: Bool? = nil
     /// The accepted grant this reciprocal share answers.
     var reciprocalForGrantID: UUID? = nil
+    /// Wake-up reports the invited person wrote back onto this phone's share.
+    var wakeReports: [WakeReport]? = nil
 
     func allows(sender: UUID, recipient: UUID) -> Bool {
         state == .active && grantee?.id == sender && owner.id == recipient
@@ -258,6 +260,7 @@ enum GrantRefreshMerge {
         }
         if merged.reciprocal == nil { merged.reciprocal = local.reciprocal }
         if merged.reciprocalForGrantID == nil { merged.reciprocalForGrantID = local.reciprocalForGrantID }
+        if merged.wakeReports == nil { merged.wakeReports = local.wakeReports }
         return merged
     }
 
@@ -276,6 +279,97 @@ enum InviteCode {
 
     static func make(length: Int = 8, randomByte: () -> UInt8 = { UInt8.random(in: 0...255) }) -> String {
         String((0..<length).map { _ in alphabet[Int(randomByte()) % alphabet.count] })
+    }
+}
+
+enum WakeStatusKind: String, Codable, Equatable {
+    case up
+    case asleep
+}
+
+struct WakeReport: Codable, Equatable, Identifiable {
+    var id: UUID
+    var commandID: UUID
+    var alarmID: UUID
+    var reporterID: UUID
+    var reporterName: String
+    var status: WakeStatusKind
+    var at: Date
+}
+
+enum WakeReportPolicy {
+    static let asleepDelay: TimeInterval = 10 * 60
+    /// A second snooze, without a dismissal, counts as still asleep.
+    static let repeatedSnoozes = 2
+
+    enum Outcome: Equatable {
+        case up(Date)
+        case asleep
+        case pending
+    }
+
+    static func outcome(firedAt: Date, now: Date, snoozeCount: Int, dismissedAt: Date?) -> Outcome {
+        if let dismissedAt { return .up(dismissedAt) }
+        if snoozeCount >= repeatedSnoozes { return .asleep }
+        if now.timeIntervalSince(firedAt) >= asleepDelay { return .asleep }
+        return .pending
+    }
+}
+
+enum WakeStatusNotice {
+    static func text(name: String, status: WakeStatusKind, at: Date, calendar: Calendar = .current) -> String {
+        let who = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let person = who.isEmpty ? String(localized: "sharing.someone") : who
+        switch status {
+        case .up:
+            let parts = ClockFormat.parts(
+                hour: calendar.component(.hour, from: at),
+                minute: calendar.component(.minute, from: at),
+                locale: .current,
+                timeZone: calendar.timeZone
+            )
+            let time = parts.period.isEmpty ? parts.time : "\(parts.time) \(parts.period)"
+            return String(format: String(localized: "sharing.wake.up"), person, time)
+        case .asleep:
+            return String(format: String(localized: "sharing.wake.asleep"), person)
+        }
+    }
+}
+
+enum WakeStatusApply {
+    struct Change: Equatable {
+        var commandID: UUID
+        var status: WakeStatusKind
+        var at: Date
+        var notice: String
+    }
+
+    /// An "up" report replaces "asleep". A later "asleep" does not replace "up".
+    static func changes(
+        reports: [WakeReport],
+        sent: [SentAlarm],
+        name: (WakeReport) -> String,
+        calendar: Calendar = .current
+    ) -> [Change] {
+        let known = Set(sent.map(\.commandID))
+        var current: [UUID: WakeStatusKind] = [:]
+        for alarm in sent {
+            if let status = alarm.wakeStatus { current[alarm.commandID] = status }
+        }
+        var changes: [Change] = []
+        for report in reports where known.contains(report.commandID) {
+            let existing = current[report.commandID]
+            if existing == .up { continue }
+            if existing == report.status { continue }
+            current[report.commandID] = report.status
+            changes.append(Change(
+                commandID: report.commandID,
+                status: report.status,
+                at: report.at,
+                notice: WakeStatusNotice.text(name: name(report), status: report.status, at: report.at, calendar: calendar)
+            ))
+        }
+        return changes
     }
 }
 
