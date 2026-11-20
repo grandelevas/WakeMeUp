@@ -50,6 +50,11 @@ enum AlarmOrigin: Codable, Equatable, Hashable {
         return nil
     }
 
+    var isFromSomeoneElse: Bool {
+        if case .remote = self { return true }
+        return false
+    }
+
     func isOwned(by senderID: UUID) -> Bool {
         if case let .remote(id, _, _) = self { return id == senderID }
         return false
@@ -272,11 +277,35 @@ struct AlarmLibrary: Codable, Equatable {
     func alarms(in groupID: UUID?) -> [Alarm] {
         alarms
             .filter { $0.groupID == groupID }
-            .sorted {
-                if $0.sortMinute != $1.sortMinute { return $0.sortMinute < $1.sortMinute }
-                return $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending
-            }
+            .sorted(by: Self.byTime)
     }
+
+    /// Alarms the person created. Remote alarms stay out of the group and ungrouped sections.
+    func ownAlarms(in groupID: UUID?) -> [Alarm] {
+        alarms(in: groupID).filter { !$0.origin.isFromSomeoneElse }
+    }
+
+    /// Alarms other people created for this phone.
+    var receivedFromOthers: [Alarm] {
+        alarms
+            .filter { $0.origin.isFromSomeoneElse }
+            .sorted(by: Self.byTime)
+    }
+
+    private static func byTime(_ lhs: Alarm, _ rhs: Alarm) -> Bool {
+        if lhs.sortMinute != rhs.sortMinute { return lhs.sortMinute < rhs.sortMinute }
+        return lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
+    }
+}
+
+struct SentAlarm: Codable, Equatable, Identifiable {
+    var alarm: Alarm
+    var recipientID: UUID
+    var recipientName: String
+    var sentAt: Date
+    var commandID: UUID
+
+    var id: UUID { commandID }
 }
 
 struct AlarmDraft: Equatable, Identifiable {

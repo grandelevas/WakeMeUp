@@ -270,7 +270,60 @@ final class AlarmLibraryTests: XCTestCase {
         XCTAssertFalse(library.alarms[0].isEnabled)
     }
 
-    private func alarm(hour: Int, group: UUID?, enabled: Bool) -> Alarm {
+    func testRemoteAlarmsLeaveTheLocalSections() {
+        var library = AlarmLibrary()
+        let group = library.addGroup(name: "Work")
+        let ownGrouped = alarm(hour: 7, group: group.id, enabled: true)
+        let ownLoose = alarm(hour: 8, group: nil, enabled: true)
+        let remoteGrouped = alarm(
+            hour: 9,
+            group: group.id,
+            enabled: true,
+            origin: .remote(senderID: UUID(), senderName: "Ola", commandID: UUID())
+        )
+        let remoteLoose = alarm(
+            hour: 10,
+            group: nil,
+            enabled: true,
+            origin: .remote(senderID: UUID(), senderName: "Jan", commandID: UUID())
+        )
+        library.upsert(ownGrouped)
+        library.upsert(ownLoose)
+        library.upsert(remoteGrouped)
+        library.upsert(remoteLoose)
+
+        XCTAssertEqual(library.ownAlarms(in: group.id).map(\.id), [ownGrouped.id])
+        XCTAssertEqual(library.ownAlarms(in: nil).map(\.id), [ownLoose.id])
+        XCTAssertEqual(library.receivedFromOthers.map(\.id), [remoteGrouped.id, remoteLoose.id])
+    }
+
+    func testSnapshotWithoutSentAlarmsDecodesAsEmpty() throws {
+        let profile = Participant(id: UUID(), displayName: "Maja")
+        let snapshot = LibrarySnapshot.empty(profile: profile)
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        var object = try JSONSerialization.jsonObject(with: encoder.encode(snapshot)) as! [String: Any]
+        object.removeValue(forKey: "sentAlarms")
+        let stripped = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try decoder.decode(LibrarySnapshot.self, from: stripped)
+        XCTAssertEqual(decoded.sentAlarms, [])
+        XCTAssertEqual(decoded.profile.displayName, "Maja")
+
+        let stored = SentAlarm(
+            alarm: alarm(hour: 6, group: nil, enabled: true),
+            recipientID: UUID(),
+            recipientName: "Ola",
+            sentAt: Date(timeIntervalSince1970: 1_700_000_000),
+            commandID: UUID()
+        )
+        var withSent = snapshot
+        withSent.sentAlarms = [stored]
+        let roundTrip = try decoder.decode(LibrarySnapshot.self, from: encoder.encode(withSent))
+        XCTAssertEqual(roundTrip.sentAlarms, [stored])
+        XCTAssertTrue(roundTrip.library.alarms.isEmpty)
+    }
+
+    private func alarm(hour: Int, group: UUID?, enabled: Bool, origin: AlarmOrigin = .local) -> Alarm {
         Alarm(
             id: UUID(),
             schedule: .wallClock(hour: hour, minute: 0, repeatDays: []),
@@ -281,7 +334,7 @@ final class AlarmLibraryTests: XCTestCase {
             isEnabled: enabled,
             groupID: group,
             songLink: nil,
-            origin: .local,
+            origin: origin,
             resumeWhenGroupEnables: nil
         )
     }

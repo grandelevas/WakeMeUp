@@ -19,7 +19,7 @@ struct AlarmListView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if model.library.alarms.isEmpty && model.library.groups.isEmpty {
+                if model.library.alarms.isEmpty && model.library.groups.isEmpty && model.snapshot.sentAlarms.isEmpty {
                     ContentUnavailableView(
                         "alarms.empty.title",
                         systemImage: "alarm",
@@ -204,16 +204,36 @@ struct AlarmListView: View {
             .onMove { source, destination in
                 model.moveGroups(from: source, to: destination)
             }
-            let ungrouped = model.library.alarms(in: nil)
+            let ungrouped = model.library.ownAlarms(in: nil)
             if !ungrouped.isEmpty {
                 section(groupID: nil, title: String(localized: "alarms.otherGroup"), symbol: "alarm", group: nil, alarms: ungrouped)
+            }
+            let received = model.library.receivedFromOthers
+            if !received.isEmpty {
+                Section("alarms.fromOthers") {
+                    alarmRows(received, emptyKey: "alarms.empty.group")
+                }
+            }
+            if !model.snapshot.sentAlarms.isEmpty {
+                Section("alarms.toOthers") {
+                    ForEach(model.snapshot.sentAlarms.sorted { $0.sentAt > $1.sentAt }) { sent in
+                        SentAlarmRow(sent: sent)
+                            .swipeActions {
+                                Button(role: .destructive) {
+                                    Task { await model.deleteSentAlarm(commandID: sent.commandID) }
+                                } label: {
+                                    Label("alarm.delete", systemImage: "trash")
+                                }
+                            }
+                    }
+                }
             }
         }
         .environment(\.editMode, $reorderMode)
     }
 
     private func groupRow(_ group: AlarmGroup) -> some View {
-        let alarms = model.library.alarms(in: group.id)
+        let alarms = model.library.ownAlarms(in: group.id)
         let expanded = !isReordering && !collapsedGroups.contains(group.id)
         return VStack(alignment: .leading, spacing: 0) {
             Button {
@@ -422,7 +442,7 @@ struct AlarmRow: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 if let name = alarm.origin.senderName {
-                    Text(String(format: String(localized: "sharing.remoteFrom"), name))
+                    Text(String(format: String(localized: "alarms.fromSender"), name))
                         .font(.caption)
                         .foregroundStyle(appAccent)
                 }
@@ -479,6 +499,45 @@ struct AlarmRow: View {
                     .joined(separator: " ")
             }
         }
+    }
+}
+
+private struct SentAlarmRow: View {
+    @Environment(\.appAccent) private var appAccent
+    let sent: SentAlarm
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(parts.time)
+                        .font(.system(size: 52, weight: .thin))
+                        .monospacedDigit()
+                    if !parts.period.isEmpty {
+                        Text(parts.period)
+                            .font(.title3)
+                    }
+                }
+                Text(sent.alarm.label.isEmpty ? String(localized: "alarm.defaultLabel") : sent.alarm.label)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(String(format: String(localized: "alarms.forRecipient"), sent.recipientName))
+                    .font(.caption)
+                    .foregroundStyle(appAccent)
+            }
+            Spacer(minLength: 8)
+        }
+        .padding(.vertical, 4)
+        .accessibilityIdentifier("sent-alarm-\(sent.commandID.uuidString)")
+    }
+
+    private var parts: ClockFormat.Parts {
+        ClockFormat.parts(
+            hour: sent.alarm.schedule.hour,
+            minute: sent.alarm.schedule.minute,
+            locale: .current,
+            timeZone: .current
+        )
     }
 }
 

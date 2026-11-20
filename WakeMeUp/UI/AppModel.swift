@@ -426,6 +426,46 @@ final class AppModel {
         do {
             _ = try snapshot.permissions.authorize(sender: snapshot.profile.id, recipient: grant.owner.id)
             try await cloudKit.append(command: command, grant: grant, asOwner: false)
+            if !immediately {
+                let sent = SentAlarm(
+                    alarm: alarm,
+                    recipientID: grant.owner.id,
+                    recipientName: grant.owner.displayName,
+                    sentAt: command.createdAt,
+                    commandID: command.id
+                )
+                update { $0.sentAlarms.append(sent) }
+            }
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    /// Drops a sent alarm from this phone and asks the other phone to cancel it.
+    func deleteSentAlarm(commandID: UUID) async {
+        guard let sent = snapshot.sentAlarms.first(where: { $0.commandID == commandID }) else { return }
+        let senderID = snapshot.profile.id
+        update { $0.sentAlarms.removeAll { $0.commandID == commandID } }
+        guard let cloudKit,
+              let grant = snapshot.permissions.grants.first(where: {
+                  $0.state == .active && $0.owner.id == sent.recipientID && $0.grantee?.id == senderID
+              }) else {
+            return
+        }
+        let command = RemoteAlarmCommand(
+            id: UUID(),
+            grantID: grant.id,
+            senderID: senderID,
+            recipientID: sent.recipientID,
+            action: .cancel,
+            createdAt: .now,
+            alarm: nil,
+            alarmID: sent.alarm.id,
+            enabled: nil
+        )
+        do {
+            _ = try snapshot.permissions.authorize(sender: senderID, recipient: sent.recipientID)
+            try await cloudKit.append(command: command, grant: grant, asOwner: false)
         } catch {
             lastError = error.localizedDescription
         }
