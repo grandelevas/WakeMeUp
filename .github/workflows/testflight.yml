@@ -105,9 +105,12 @@ jobs:
           if [ "${ACTION}" = "bootstrap-signing" ]; then
             bundle exec fastlane ios bootstrap_signing
           else
-            # Uploads the build, then distributes it to every external
-            # TestFlight group and submits Beta App Review. If there is no
-            # external group, that is a warning and the upload still succeeds.
+            # Uploads the build, then distributes it through the App Store
+            # Connect API to every external TestFlight group and submits Beta
+            # App Review. Pilot distribute_only is not used: without an ipa it
+            # prompts for the platform and fails in non-interactive mode.
+            # Missing groups or Test Information are warnings; the upload
+            # still succeeds.
             bundle exec fastlane ios beta
           fi
 
