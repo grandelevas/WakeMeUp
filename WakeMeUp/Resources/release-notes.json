@@ -17,6 +17,22 @@
       "date": "2026-11-20",
       "changes": {
         "en": [
+          "One invite connects both ways: after they accept, you can set alarms for each other.",
+          "You name the person when you invite them. That name stays on your lists, including while the invite is pending.",
+          "Your name on Sharing is saved on this iPhone and shown to the other person."
+        ],
+        "pl": [
+          "Jedno zaproszenie łączy w obie strony: po przyjęciu możecie ustawiać sobie budziki.",
+          "Przy zapraszaniu podajesz imię tej osoby. Zostaje na twoich listach, także gdy zaproszenie jeszcze oczekuje.",
+          "Twoje imię w Współpracy jest zapisywane na tym iPhonie i widać je u drugiej osoby."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-20",
+      "changes": {
+        "en": [
           "The campaign on Achievements can include a longer story, photos, results, and thank-you notes.",
           "A section stays hidden when that part of the story is missing."
         ],

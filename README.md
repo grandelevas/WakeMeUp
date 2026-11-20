@@ -31,7 +31,7 @@ Play my song is a `LiveActivityIntent` (`PlaySongIntent`) with `openAppWhenRun`.
 
 The transport is CloudKit, not a server you have to host.
 
-The phone that rings owns a private CloudKit zone named `WakeMeUp` and a `CKShare` on one root record. The invite is the share URL. The other person accepts the share and writes command JSON onto that record. The owner subscribes to the zone with a content-available push. When the push arrives, the app applies any new commands and schedules them with AlarmKit (or the notification fallback).
+The phone that rings owns a private CloudKit zone named `WakeMeUp` and a `CKShare` on one root record. The invite is the share URL. One acceptance connects both ways: the invitee's app creates its own share and writes that URL into the inviter's grant JSON (`returnInviteURL`, no new CloudKit field). The inviter's app fetches the metadata and accepts it. Each person can then write command JSON onto the other's root record. The zone is created with `CKModifyRecordZonesOperation` before the first record, and a missing zone is created and the save is retried. The zone subscription is content-available only. The app posts a local notice when someone joins, and a separate notice when they actually set an alarm. The name in Twoje imię is stored in UserDefaults (and copied to iCloud key-value storage) and is the sender name; the iCloud account name is the fallback. The name typed in the invite sheet is the label on the inviter's lists.
 
 Why not the public database: it does not push. The other phone would only see commands the next time the app was opened, which is too late for an alarm.
 
