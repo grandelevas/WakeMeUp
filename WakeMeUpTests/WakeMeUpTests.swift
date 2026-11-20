@@ -357,6 +357,71 @@ final class LocalAchievementTests: XCTestCase {
         XCTAssertEqual(document.peopleHelped, 0)
         XCTAssertEqual(document.campaign?.progress, 0)
         XCTAssertNil(document.visibleUserCount)
+        XCTAssertNil(document.campaign?.description)
+        XCTAssertNil(document.campaign?.photos)
+        XCTAssertNil(document.campaign?.updates)
+        XCTAssertNil(document.campaign?.thanks)
+        XCTAssertEqual(document.campaign?.hasStory, false)
+    }
+
+    func testLegacyCampaignFileOmitsTheOptionalStory() throws {
+        let document = try AchievementsDocument.decode(try Self.fixture("achievements-legacy"))
+        XCTAssertEqual(document.schemaVersion, 1)
+        XCTAssertEqual(document.campaign?.id, "placeholder")
+        XCTAssertEqual(document.campaign?.raisedAmount, 0)
+        XCTAssertNil(document.campaign?.description)
+        XCTAssertNil(document.campaign?.photos)
+        XCTAssertNil(document.campaign?.updates)
+        XCTAssertNil(document.campaign?.thanks)
+        XCTAssertEqual(document.campaign?.gallery.isEmpty, true)
+        XCTAssertEqual(document.campaign?.hasStory, false)
+    }
+
+    func testRichCampaignFileDecodesStoryPhotosUpdatesAndThanks() throws {
+        let campaign = try XCTUnwrap(AchievementsDocument.decode(try Self.fixture("achievements-rich")).campaign)
+        XCTAssertEqual(campaign.story(languageCode: "pl"), [
+            "Pierwsza część historii.",
+            "Druga część, po pustej linii."
+        ])
+        XCTAssertEqual(campaign.story(languageCode: "en").count, 2)
+        XCTAssertEqual(campaign.photos?.count, 3)
+        XCTAssertEqual(campaign.gallery.map(\.url), [
+            "https://example.com/before.jpg",
+            "https://example.com/after.jpg"
+        ])
+        XCTAssertEqual(campaign.gallery[0].visibleCaption?.pl, "Przed")
+        XCTAssertNil(campaign.gallery[1].caption)
+        XCTAssertEqual(campaign.visibleUpdates.map(\.date), ["2026-11-20", "2026-11-02"])
+        XCTAssertEqual(campaign.visibleUpdates[0].visibleTitle?.en, "Handed over")
+        XCTAssertNil(campaign.visibleUpdates[1].title)
+        XCTAssertEqual(campaign.visibleUpdates[0].gallery.count, 1)
+        XCTAssertEqual(campaign.visibleUpdates[1].gallery.isEmpty, true)
+        XCTAssertEqual(campaign.visibleThanks.count, 2)
+        XCTAssertEqual(campaign.visibleThanks[0].author, "Anna")
+        XCTAssertEqual(campaign.visibleThanks[0].video?.absoluteString, "https://example.com/anna.mp4")
+        XCTAssertNil(campaign.visibleThanks[1].author)
+        XCTAssertNil(campaign.visibleThanks[1].photo)
+        XCTAssertEqual(campaign.progress, 0.4, accuracy: 0.001)
+        XCTAssertTrue(campaign.hasStory)
+    }
+
+    func testBlankStoryAndEmptyListsStayHidden() throws {
+        let json = """
+        {"schemaVersion":1,"currency":"EUR","disclosure":{"en":"e","pl":"p"},"campaign":{"id":"x","title":{"en":"t","pl":"t"},"who":{"en":"w","pl":"w"},"why":{"en":"y","pl":"y"},"photoURL":"","goalAmount":1,"raisedAmount":0,"date":"2026-11-20","linkURL":"","description":{"en":"  ","pl":""},"photos":[],"updates":[{"date":"2026-11-20","text":{"en":"","pl":"  "}}],"thanks":[{"text":{"en":"","pl":""},"photoURL":"notaurl"}]},"history":[]}
+        """
+        let campaign = try XCTUnwrap(AchievementsDocument.decode(Data(json.utf8)).campaign)
+        XCTAssertFalse(campaign.hasStory)
+        XCTAssertTrue(campaign.gallery.isEmpty)
+        XCTAssertTrue(campaign.visibleUpdates.isEmpty)
+        XCTAssertTrue(campaign.visibleThanks.isEmpty)
+    }
+
+    private static func fixture(_ name: String) throws -> Data {
+        let bundle = Bundle(for: LocalAchievementTests.self)
+        let url = bundle.url(forResource: name, withExtension: "json")
+            ?? bundle.url(forResource: name, withExtension: "json", subdirectory: "Fixtures")
+        let file = try XCTUnwrap(url, "Missing \(name).json in the test bundle")
+        return try Data(contentsOf: file)
     }
 
     func testMissingOrZeroUserCountStaysHidden() throws {

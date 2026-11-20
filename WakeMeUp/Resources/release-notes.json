@@ -5,6 +5,20 @@
       "date": "2026-11-20",
       "changes": {
         "en": [
+          "The campaign on Achievements can include a longer story, photos, results, and thank-you notes.",
+          "A section stays hidden when that part of the story is missing."
+        ],
+        "pl": [
+          "Zbiórka w Achievements może mieć dłuższy opis, zdjęcia, efekty i podziękowania.",
+          "Sekcja znika, gdy tej części opisu nie ma."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-20",
+      "changes": {
+        "en": [
           "Eight new alarm sounds: Gentle Dawn, Classic Beep, Little Bells, Digital Pulse, Morning Melody, Dawn Chorus, Marimba, and For Heavy Sleepers.",
           "They are in the sound list and in Change sound. The original five sounds are unchanged."
         ],
