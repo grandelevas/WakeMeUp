@@ -5,6 +5,18 @@
       "date": "2026-11-20",
       "changes": {
         "en": [
+          "Group order changes only after Edit. The alarm list no longer drags groups on a long press."
+        ],
+        "pl": [
+          "Kolejność grup zmienisz dopiero po Edytuj. Lista alarmów nie przesuwa grup po przytrzymaniu."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-20",
+      "changes": {
+        "en": [
           "One invite connects both ways: after they accept, you can set alarms for each other.",
           "You name the person when you invite them. That name stays on your lists, including while the invite is pending.",
           "Your name on Sharing is saved on this iPhone and shown to the other person."

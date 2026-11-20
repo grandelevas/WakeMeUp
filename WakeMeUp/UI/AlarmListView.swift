@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import UniformTypeIdentifiers
 
 struct AlarmListView: View {
     @Environment(AppModel.self) private var model
@@ -14,7 +13,6 @@ struct AlarmListView: View {
     @State private var selectedAlarmIDs: Set<UUID> = []
     @State private var changingSelectionSound = false
     @State private var soundGroupID: UUID?
-    @State private var draggingGroupID: UUID?
 
     var body: some View {
         NavigationStack {
@@ -31,6 +29,12 @@ struct AlarmListView: View {
             }
             .navigationTitle("alarms.title")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(isReordering ? "alarms.done" : "alarms.edit") {
+                        toggleReorder()
+                    }
+                    .accessibilityIdentifier("alarms.edit")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         model.addAlarm()
@@ -201,9 +205,9 @@ struct AlarmListView: View {
             ForEach(model.library.groups) { group in
                 groupRow(group)
             }
-            .onMove { source, destination in
+            .onMove(perform: isReordering ? { source, destination in
                 model.moveGroups(from: source, to: destination)
-            }
+            } : nil)
             let ungrouped = model.library.ownAlarms(in: nil)
             if !ungrouped.isEmpty {
                 section(groupID: nil, title: String(localized: "alarms.otherGroup"), symbol: "alarm", group: nil, alarms: ungrouped)
@@ -250,13 +254,6 @@ struct AlarmListView: View {
         }
         .accessibilityIdentifier("group-row-\(group.id.uuidString)")
         .accessibilityValue(Text(alarms.count, format: .number))
-        .modifier(GroupDragModifier(
-            enabled: !isReordering,
-            groupID: group.id,
-            groups: model.library.groups,
-            draggingID: $draggingGroupID,
-            move: { source, target in model.moveGroup(source, before: target) }
-        ))
     }
 
     private func groupHeader(_ group: AlarmGroup, alarms: [Alarm]) -> some View {
@@ -538,64 +535,5 @@ private struct SentAlarmRow: View {
             locale: .current,
             timeZone: .current
         )
-    }
-}
-
-private struct GroupDragModifier: ViewModifier {
-    let enabled: Bool
-    let groupID: UUID
-    let groups: [AlarmGroup]
-    @Binding var draggingID: UUID?
-    let move: (UUID, UUID) -> Void
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if enabled {
-            content
-                .onDrag {
-                    draggingID = groupID
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    return NSItemProvider(object: groupID.uuidString as NSString)
-                }
-                .onDrop(
-                    of: [UTType.plainText],
-                    delegate: GroupReorderDropDelegate(
-                        targetID: groupID,
-                        groups: groups,
-                        draggingID: $draggingID,
-                        move: move
-                    )
-                )
-        } else {
-            content
-        }
-    }
-}
-
-private struct GroupReorderDropDelegate: DropDelegate {
-    let targetID: UUID
-    let groups: [AlarmGroup]
-    @Binding var draggingID: UUID?
-    let move: (UUID, UUID) -> Void
-
-    func dropEntered(info: DropInfo) {
-        guard let draggingID, draggingID != targetID else { return }
-        guard let from = groups.firstIndex(where: { $0.id == draggingID }),
-              let to = groups.firstIndex(where: { $0.id == targetID }),
-              from != to else { return }
-        move(draggingID, targetID)
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        draggingID = nil
-        return true
-    }
-
-    func dropSessionDidEnd(_ session: DropSession) {
-        draggingID = nil
     }
 }
