@@ -812,6 +812,22 @@ final class AudioTrimmerTests: XCTestCase {
         XCTAssertEqual(SoundFiles.notificationName(for: "classic", customSounds: []), "classic.wav")
         XCTAssertEqual(SoundFiles.alarmKitName(for: "abc", customSounds: [custom]), "abc.caf")
         XCTAssertEqual(SoundFiles.notificationName(for: "abc", customSounds: [custom]), "abc.caf")
+        XCTAssertEqual(SoundFiles.alarmKitName(for: "dawn", customSounds: []), "dawn.caf")
+        XCTAssertEqual(SoundFiles.notificationName(for: "sleepy", customSounds: []), "sleepy.caf")
+    }
+
+    func testNewSoundsSitBesideTheOriginalFive() {
+        XCTAssertEqual(SoundCatalog.defaultID, "classic")
+        XCTAssertEqual(
+            Array(SoundCatalog.bundled.prefix(5).map(\.id)),
+            ["classic", "chime", "rise", "pulse", "bell"]
+        )
+        XCTAssertEqual(
+            SoundCatalog.bundled.dropFirst(5).map(\.id),
+            ["dawn", "beep", "bells", "digital", "morning", "birds", "marimba", "sleepy"]
+        )
+        XCTAssertTrue(SoundCatalog.bundled.prefix(5).allSatisfy { $0.fileExtension == "wav" })
+        XCTAssertTrue(SoundCatalog.bundled.dropFirst(5).allSatisfy { $0.fileExtension == "caf" })
     }
 
     private static func peak(of url: URL) throws -> Float {

@@ -47,6 +47,14 @@
 "sound.rise" = "Wznoszący";
 "sound.pulse" = "Puls";
 "sound.bell" = "Miękki dzwonek";
+"sound.dawn" = "Łagodny wschód";
+"sound.beep" = "Klasyczny bip";
+"sound.bells" = "Dzwoneczki";
+"sound.digital" = "Cyfrowy puls";
+"sound.morning" = "Poranna melodia";
+"sound.birds" = "Ptasi świt";
+"sound.marimba" = "Marimba";
+"sound.sleepy" = "Pobudka dla śpiochów";
 "sound.custom" = "Własny";
 "sound.import" = "Importuj z Plików";
 "sound.trim" = "Przytnij";

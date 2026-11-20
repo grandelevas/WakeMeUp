@@ -12,7 +12,7 @@ There is no Mac in the loop. GitHub Actions `macos-26` builds the app, runs the 
 - Alarms are scheduled with **AlarmKit** (iOS 26). AlarmKit is the system API that can ring on the Lock Screen through Silent and Focus, the same class of alert as the built-in Clock app. There is no AlarmKit entitlement. The only requirement is `NSAlarmKitUsageDescription`, which is already in the Info.plist (English and Polish).
 - If the person denies AlarmKit, the app falls back to a time-sensitive local notification with the same sound and with Stop, Snooze, and Play my song actions. Those notifications **do not** ring through the silent switch. The Settings screen says so.
 - **Groups.** A group has one switch. Turning it off disables every alarm in the group and remembers which ones were on. Turning it back on restores that. Deleting a group keeps the alarms.
-- **Sounds.** Five tones ship in the app: Classic, Chime, Rise, Pulse, Soft Bell. They are synthesized by `scripts/generate-sounds.py` and dedicated to the public domain (CC0). See `WakeMeUp/Sounds/LICENSE.txt`. A person can import an audio file from Files, trim it to at most 30 seconds, and use that clip. AlarmKit and notification sounds both require a short file in the bundle or in `Library/Sounds`.
+- **Sounds.** Five original tones still ship as WAV: Classic, Chime, Rise, Pulse, Soft Bell (`scripts/generate-sounds.py`). Eight more, about 24 seconds each, ship as IMA4 CAF: Gentle Dawn, Classic Beep, Little Bells, Digital Pulse, Morning Melody, Dawn Chorus, Marimba, and For Heavy Sleepers (`scripts/generate_sounds.py`). All of them are synthesized and dedicated to the public domain (CC0). See `WakeMeUp/Sounds/LICENSE.txt`. A person can import an audio file from Files, trim it to at most 30 seconds, and use that clip. AlarmKit and notification sounds both require a short file in the bundle or in `Library/Sounds`.
 - **Favorite song.** An alarm can store a Spotify, YouTube, or Apple Music link. iOS will not open another app by itself when an alarm fires. The alarm alert's second button is **Play my song**. That button stops the alarm and opens the link. The in-app ringing screen has the same button.
 - **Remote alarms.** Person A can add, change, cancel, disable, or ring an alarm on person B's phone only after B accepts an invite. Either person can revoke. The rules live in `PermissionCenter` and `RemoteCommandApplier` and are covered by unit tests. A remote command cannot delete or edit an alarm the sender did not create.
 
@@ -88,6 +88,8 @@ Regenerate the tones or the icon locally with Python 3:
 
 ```bash
 python3 scripts/generate-sounds.py
+python3 scripts/generate_sounds.py          # needs numpy and ffmpeg
+python3 scripts/generate_sounds.py --check
 python3 scripts/generate-icon.py
 xcodegen generate   # once XcodeGen is installed
 ```
@@ -185,7 +187,7 @@ Apple only allows a few distribution certificates per team. Do not run bootstrap
 
 - Minimum system is **iOS 26.1**. AlarmKit arrived in iOS 26.0, and the alert API this app uses (a system Stop button plus one secondary button) is the iOS 26.1 form. Supporting iOS 18 would mean those phones can only use notifications, which do not ring through Silent. The notification path is still in the app, but only as the fallback when AlarmKit access is denied.
 - A third-party app cannot become the system Clock and cannot start Spotify, YouTube, or Apple Music while the phone is locked unless the person taps a button. The button is the product.
-- Custom alert sounds should stay at or under 30 seconds. Import enforces that. The bundled tones are about 12 seconds, 22.05 kHz, 16-bit mono WAV.
+- Custom alert sounds should stay at or under 30 seconds. Import enforces that. The original bundled tones are about 12 seconds, 22.05 kHz, 16-bit mono WAV. The eight newer tones are about 24 seconds, 44.1 kHz mono IMA4 CAF.
 - Force-quitting Wakito does not delete AlarmKit alarms that are already scheduled. It does stop the silent push that delivers a new remote alarm.
 - Polish and English follow the iPhone language. Day letters follow the calendar's first weekday, so a Polish phone starts the week on Monday.
 
