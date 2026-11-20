@@ -66,6 +66,13 @@ struct AlarmListView: View {
 
     private var list: some View {
         List {
+            if let next = nextAlarmDescription {
+                Section("alarms.next") {
+                    Text(next)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
             if !model.suppressPermissionBanner && model.authorization == .denied {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
@@ -106,13 +113,6 @@ struct AlarmListView: View {
             let ungrouped = model.library.alarms(in: nil)
             if !ungrouped.isEmpty {
                 section(groupID: nil, title: String(localized: "alarms.otherGroup"), symbol: "alarm", group: nil, alarms: ungrouped)
-            }
-            if let next = nextAlarmDescription {
-                Section("alarms.next") {
-                    Text(next)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
             }
         }
     }
