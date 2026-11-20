@@ -19,7 +19,13 @@ final class LibraryStore {
         guard let data = try? Data(contentsOf: url) else { return nil }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return try? decoder.decode(LibrarySnapshot.self, from: data)
+        guard var snapshot = try? decoder.decode(LibrarySnapshot.self, from: data) else { return nil }
+        let before = snapshot.library.groups
+        snapshot.library.normalizeGroupOrder()
+        if snapshot.library.groups != before {
+            save(snapshot)
+        }
+        return snapshot
     }
 
     func save(_ snapshot: LibrarySnapshot) {

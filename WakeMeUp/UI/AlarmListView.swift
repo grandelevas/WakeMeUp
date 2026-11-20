@@ -126,6 +126,15 @@ struct AlarmListView: View {
             } label: {
                 HStack(spacing: 8) {
                     Label(group.name, systemImage: group.symbol)
+                        .draggable(group.id.uuidString) {
+                            Label(group.name, systemImage: group.symbol)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                                .onAppear {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                }
+                        }
                     Text(alarms.count, format: .number)
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
@@ -142,9 +151,15 @@ struct AlarmListView: View {
                     )) {
                         Text(group.name)
                     }
-                    .labelsHidden()
-                    .accessibilityIdentifier("group-toggle-\(group.id.uuidString)")
+                .labelsHidden()
+                .accessibilityIdentifier("group-toggle-\(group.id.uuidString)")
                 }
+            }
+            .dropDestination(for: String.self) { items, _ in
+                guard let raw = items.first, let source = UUID(uuidString: raw) else { return false }
+                model.moveGroup(source, before: group.id)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                return true
             }
             .accessibilityValue(Text(alarms.count, format: .number))
         }

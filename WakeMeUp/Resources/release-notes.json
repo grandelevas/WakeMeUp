@@ -5,6 +5,18 @@
       "date": "2026-11-20",
       "changes": {
         "en": [
+          "Press and hold a group, then drag it to change the order."
+        ],
+        "pl": [
+          "Przytrzymaj grupę i przeciągnij ją, żeby zmienić kolejność."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-20",
+      "changes": {
+        "en": [
           "Send an invite with Messages, WhatsApp, Mail, or Copy.",
           "Copy the link again while an invite is still waiting.",
           "Open a group to rename it, change its icon, turn it on or off, and choose its alarms.",

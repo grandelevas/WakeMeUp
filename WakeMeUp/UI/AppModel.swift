@@ -160,6 +160,10 @@ final class AppModel {
         Task { await reschedule(requestAccess: true) }
     }
 
+    func moveGroup(_ sourceID: UUID, before targetID: UUID) {
+        update { $0.library.moveGroup(sourceID, before: targetID) }
+    }
+
     func createGroup(name: String, symbol: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
