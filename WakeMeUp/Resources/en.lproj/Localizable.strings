@@ -47,6 +47,14 @@
 "sound.rise" = "Rise";
 "sound.pulse" = "Pulse";
 "sound.bell" = "Soft Bell";
+"sound.dawn" = "Gentle Dawn";
+"sound.beep" = "Classic Beep";
+"sound.bells" = "Little Bells";
+"sound.digital" = "Digital Pulse";
+"sound.morning" = "Morning Melody";
+"sound.birds" = "Dawn Chorus";
+"sound.marimba" = "Marimba";
+"sound.sleepy" = "For Heavy Sleepers";
 "sound.custom" = "Custom";
 "sound.import" = "Import from Files";
 "sound.trim" = "Trim";

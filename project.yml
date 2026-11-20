@@ -49,6 +49,7 @@ targets:
           DEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
           mkdir -p "${DEST}"
           cp "${SRCROOT}/WakeMeUp/Sounds/"*.wav "${DEST}/"
+          cp "${SRCROOT}/WakeMeUp/Sounds/"*.caf "${DEST}/"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.grandelevas.wakemeup

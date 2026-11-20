@@ -31,6 +31,8 @@ jobs:
         run: python3 scripts/check-info-plist.py
       - name: Check community count parsing
         run: node --test scripts/community-count.test.mjs
+      - name: Check bundled alarm sounds
+        run: python3 scripts/generate_sounds.py --check
 
   build-and-test:
     name: Build and test (iOS Simulator)

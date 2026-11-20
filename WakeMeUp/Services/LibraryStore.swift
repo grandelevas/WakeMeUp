@@ -126,10 +126,11 @@ enum SoundFiles {
     }
 
     static func bundledURL(id: String) -> URL? {
-        if let url = Bundle.main.url(forResource: id, withExtension: "wav") {
+        let ext = SoundCatalog.fileExtension(for: id)
+        if let url = Bundle.main.url(forResource: id, withExtension: ext) {
             return url
         }
-        return Bundle.main.url(forResource: id, withExtension: "wav", subdirectory: "Sounds")
+        return Bundle.main.url(forResource: id, withExtension: ext, subdirectory: "Sounds")
     }
 
     static func librarySoundsDirectory() throws -> URL {
@@ -146,7 +147,7 @@ enum SoundFiles {
         if let custom = customSounds.first(where: { $0.id == soundID }) {
             return custom.filename
         }
-        return "\(soundID).wav"
+        return "\(soundID).\(SoundCatalog.fileExtension(for: soundID))"
     }
 
     static func alarmKitName(for soundID: String, customSounds: [CustomSound]) -> String {
