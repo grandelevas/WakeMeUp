@@ -176,6 +176,27 @@ final class AlarmLibraryTests: XCTestCase {
         XCTAssertEqual(library.alarm(third.id)?.soundID, "classic")
     }
 
+    func testListMoveReordersGroupsByOffset() {
+        var library = AlarmLibrary()
+        let morning = library.addGroup(name: "Morning")
+        let work = library.addGroup(name: "Work")
+        let night = library.addGroup(name: "Night")
+        library.moveGroups(from: IndexSet(integer: 2), to: 0)
+        XCTAssertEqual(library.groups.map(\.id), [night.id, morning.id, work.id])
+        XCTAssertEqual(library.groups.map(\.sortIndex), [0, 1, 2])
+    }
+
+    func testGroupSelectionCircleSelectsAndClearsEveryAlarm() {
+        let first = UUID()
+        let second = UUID()
+        XCTAssertEqual(GroupSelection.mark(alarmIDs: [first, second], selected: []), .none)
+        let all = GroupSelection.toggle(alarmIDs: [first, second], selected: [])
+        XCTAssertEqual(GroupSelection.mark(alarmIDs: [first, second], selected: all), .all)
+        let partial = GroupSelection.toggle(alarmIDs: [second], selected: all)
+        XCTAssertEqual(GroupSelection.mark(alarmIDs: [first, second], selected: partial), .partial)
+        XCTAssertEqual(GroupSelection.toggle(alarmIDs: [], selected: partial), partial)
+    }
+
     func testGroupOrderSurvivesRelaunchAndAMove() throws {
         let first = UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000001")!
         let second = UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000002")!

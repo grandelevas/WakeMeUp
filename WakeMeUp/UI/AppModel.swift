@@ -175,6 +175,10 @@ final class AppModel {
         update { $0.library.moveGroup(sourceID, before: targetID) }
     }
 
+    func moveGroups(from source: IndexSet, to destination: Int) {
+        update { $0.library.moveGroups(from: source, to: destination) }
+    }
+
     func createGroup(name: String, symbol: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
