@@ -814,6 +814,19 @@ final class AudioTrimmerTests: XCTestCase {
         XCTAssertEqual(SoundFiles.notificationName(for: "abc", customSounds: [custom]), "abc.caf")
         XCTAssertEqual(SoundFiles.alarmKitName(for: "dawn", customSounds: []), "dawn.caf")
         XCTAssertEqual(SoundFiles.notificationName(for: "sleepy", customSounds: []), "sleepy.caf")
+        XCTAssertEqual(SoundFiles.alarmKitName(for: "author1", customSounds: []), "author1.caf")
+        XCTAssertEqual(SoundFiles.notificationName(for: "author6", customSounds: []), "author6.caf")
+    }
+
+    func testAuthorSoundsStaySeparateFromTheBuiltInSet() {
+        XCTAssertEqual(
+            SoundCatalog.author.map(\.id),
+            ["author1", "author2", "author3", "author4", "author5", "author6"]
+        )
+        XCTAssertTrue(SoundCatalog.author.allSatisfy { $0.fileExtension == "caf" })
+        XCTAssertFalse(SoundCatalog.bundled.contains { $0.id.hasPrefix("author") })
+        XCTAssertTrue(SoundCatalog.isBundled("author3"))
+        XCTAssertEqual(SoundCatalog.defaultID, "classic")
     }
 
     func testNewSoundsSitBesideTheOriginalFive() {

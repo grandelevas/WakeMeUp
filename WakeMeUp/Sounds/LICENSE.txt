@@ -7,6 +7,9 @@ bell.wav) were synthesized by scripts/generate-sounds.py. The CAF files
 marimba.caf, sleepy.caf) were synthesized by scripts/generate_sounds.py.
 They are not recordings of anyone else's music or sound effects.
 
+author1.caf through author6.caf are the author's own recordings, converted
+by scripts/convert_author_sounds.py. They are not part of this dedication.
+
 License: CC0 1.0 Universal (public domain dedication)
 
 You can copy, modify, and ship these tones, including in a commercial App Store

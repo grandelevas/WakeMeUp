@@ -55,6 +55,13 @@
 "sound.birds" = "Dawn Chorus";
 "sound.marimba" = "Marimba";
 "sound.sleepy" = "For Heavy Sleepers";
+"sound.author.section" = "From the author";
+"sound.author1" = "From the author 1";
+"sound.author2" = "From the author 2";
+"sound.author3" = "From the author 3";
+"sound.author4" = "From the author 4";
+"sound.author5" = "From the author 5";
+"sound.author6" = "From the author 6";
 "sound.custom" = "Custom";
 "sound.import" = "Import from Files";
 "sound.trim" = "Trim";

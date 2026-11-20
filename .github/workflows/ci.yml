@@ -33,6 +33,8 @@ jobs:
         run: node --test scripts/community-count.test.mjs
       - name: Check bundled alarm sounds
         run: python3 scripts/generate_sounds.py --check
+      - name: Check author alarm sounds
+        run: python3 scripts/convert_author_sounds.py --check
 
   build-and-test:
     name: Build and test (iOS Simulator)

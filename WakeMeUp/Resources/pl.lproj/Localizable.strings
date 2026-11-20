@@ -55,6 +55,13 @@
 "sound.birds" = "Ptasi świt";
 "sound.marimba" = "Marimba";
 "sound.sleepy" = "Pobudka dla śpiochów";
+"sound.author.section" = "Od autora";
+"sound.author1" = "Od autora 1";
+"sound.author2" = "Od autora 2";
+"sound.author3" = "Od autora 3";
+"sound.author4" = "Od autora 4";
+"sound.author5" = "Od autora 5";
+"sound.author6" = "Od autora 6";
 "sound.custom" = "Własny";
 "sound.import" = "Importuj z Plików";
 "sound.trim" = "Przytnij";

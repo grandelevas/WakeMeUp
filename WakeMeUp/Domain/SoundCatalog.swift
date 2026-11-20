@@ -9,6 +9,15 @@ struct BundledSound: Identifiable, Equatable {
 
 enum SoundCatalog {
     static let defaultID = "classic"
+    /// The author's own recordings. Ids stay stable if the display names change.
+    static let author: [BundledSound] = [
+        BundledSound(id: "author1", localizationKey: "sound.author1", fileExtension: "caf"),
+        BundledSound(id: "author2", localizationKey: "sound.author2", fileExtension: "caf"),
+        BundledSound(id: "author3", localizationKey: "sound.author3", fileExtension: "caf"),
+        BundledSound(id: "author4", localizationKey: "sound.author4", fileExtension: "caf"),
+        BundledSound(id: "author5", localizationKey: "sound.author5", fileExtension: "caf"),
+        BundledSound(id: "author6", localizationKey: "sound.author6", fileExtension: "caf"),
+    ]
     static let bundled: [BundledSound] = [
         BundledSound(id: "classic", localizationKey: "sound.classic"),
         BundledSound(id: "chime", localizationKey: "sound.chime"),
@@ -26,11 +35,11 @@ enum SoundCatalog {
     ]
 
     static func fileExtension(for id: String) -> String {
-        bundled.first { $0.id == id }?.fileExtension ?? "wav"
+        (author + bundled).first { $0.id == id }?.fileExtension ?? "wav"
     }
 
     static func isBundled(_ id: String) -> Bool {
-        bundled.contains { $0.id == id }
+        author.contains { $0.id == id } || bundled.contains { $0.id == id }
     }
 }
 

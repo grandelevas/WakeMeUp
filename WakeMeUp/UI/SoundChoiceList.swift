@@ -9,6 +9,11 @@ struct SoundChoiceList: View {
     var onImport: () -> Void = {}
 
     var body: some View {
+        Section("sound.author.section") {
+            ForEach(SoundCatalog.author) { sound in
+                row(id: sound.id, title: Text(LocalizedStringKey(sound.localizationKey)))
+            }
+        }
         Section("alarm.sound") {
             ForEach(SoundCatalog.bundled) { sound in
                 row(id: sound.id, title: Text(LocalizedStringKey(sound.localizationKey)))
