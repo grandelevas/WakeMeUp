@@ -67,6 +67,12 @@
 "groups.delete" = "Usuń grupę";
 "groups.symbol" = "Symbol";
 "groups.create" = "Utwórz";
+"groups.edit" = "Edytuj grupę";
+"groups.enabled" = "Włączona";
+"groups.alarms" = "Alarmy";
+"groups.alarms.empty" = "W tej grupie nie ma jeszcze alarmów.";
+"groups.addAlarm" = "Dodaj alarm";
+"groups.addAlarm.none" = "Wszystkie alarmy są już w tej grupie.";
 "groups.delete.confirm" = "Usunąć tę grupę? Jej alarmy zostaną na telefonie, poza grupą.";
 
 "sharing.title" = "Współpraca";
@@ -129,7 +135,9 @@
 "settings.appearance.icon.minimal" = "Jasna";
 "settings.appearance.icon.color" = "Kolorowa";
 "settings.appearance.icon.unavailable" = "Ikonę można zmienić na iPhonie. Symulator zostawia ikonę domyślną.";
-"settings.tagline" = "Przypomnij mi o";
+"settings.tagline" = "Wakito";
+"settings.history" = "Historia aktualizacji";
+"settings.whatsNew" = "Co nowego";
 "settings.alarmAccess" = "Dostęp do alarmów";
 "settings.alarmAccess.authorized" = "Dozwolony";
 "settings.alarmAccess.denied" = "Odmowa";
@@ -164,6 +172,8 @@
 "demo.friend" = "Ola";
 
 "achievements.disclosure" = "Mateusz przekazuje 50% przychodu z subskrypcji na wybrane cele. Nie zbieramy darowizn w aplikacji.";
+"achievements.userCount" = "Jest nas już %@";
+"achievements.userCountDate" = "Stan na %@";
 "achievements.together" = "Nasz wspólny sukces";
 "achievements.support" = "Twoje wsparcie pomaga";
 "achievements.campaign" = "Aktualna zbiórka";

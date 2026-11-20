@@ -12,6 +12,7 @@ struct AchievementsView: View {
                     Text(disclosure)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                    userCountRow
                     personalCard
                     if let campaign = document?.campaign {
                         campaignCard(campaign)
@@ -35,6 +36,42 @@ struct AchievementsView: View {
     private var disclosure: String {
         document?.disclosure.resolved(languageCode: languageCode)
             ?? String(localized: "achievements.disclosure")
+    }
+
+    @ViewBuilder
+    private var userCountRow: some View {
+        if let count = document?.visibleUserCount {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(format: String(localized: "achievements.userCount"), formattedCount(count)))
+                    .font(.headline)
+                if let date = formattedUserCountDate {
+                    Text(String(format: String(localized: "achievements.userCountDate"), date))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("achievements-user-count")
+        }
+    }
+
+    private func formattedCount(_ count: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = .current
+        return formatter.string(from: NSNumber(value: count)) ?? String(count)
+    }
+
+    private var formattedUserCountDate: String? {
+        let raw = document?.userCountDate?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !raw.isEmpty else { return nil }
+        let parser = DateFormatter()
+        parser.calendar = Calendar(identifier: .gregorian)
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.timeZone = TimeZone(secondsFromGMT: 0)
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let date = parser.date(from: raw) else { return raw }
+        return date.formatted(date: .abbreviated, time: .omitted)
     }
 
     private var personalCard: some View {
@@ -196,6 +233,10 @@ struct AchievementsView: View {
         }
         if let remote = await AchievementsContentStore.refresh(urlString: AppConfig.achievementsContentURL) {
             document = remote
+        }
+        if let current = document,
+           let community = await AchievementsContentStore.communityCount(urlString: AppConfig.communityCountURL) {
+            document = current.applying(community: community)
         }
     }
 }

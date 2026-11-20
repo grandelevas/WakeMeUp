@@ -1,0 +1,45 @@
+name: Community count
+
+# Reads App Store Connect sales reports and writes stats/community.json.
+# The commit message contains [skip ci]. CI also ignores the stats path.
+on:
+  schedule:
+    - cron: "15 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Count active subscribers
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          ASC_VENDOR_NUMBER: ${{ secrets.ASC_VENDOR_NUMBER || vars.ASC_VENDOR_NUMBER }}
+        run: node scripts/community-count.mjs
+
+      - name: Commit the count when it changed
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ ! -f stats/community.json ]; then
+            echo "No community count file to commit."
+            exit 0
+          fi
+          git add stats/community.json
+          if git diff --cached --quiet; then
+            echo "Community count unchanged."
+            exit 0
+          fi
+          git commit -m "Update community user count [skip ci]"
+          git push

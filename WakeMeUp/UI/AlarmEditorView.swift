@@ -9,6 +9,7 @@ struct AlarmEditorView: View {
     @State private var time: Date
     @State private var importing = false
     @State private var trimFile: ImportedAudio?
+    @State private var preview = SoundPreviewPlayer()
 
     init(draft: AlarmDraft) {
         _draft = State(initialValue: draft)
@@ -42,7 +43,7 @@ struct AlarmEditorView: View {
                 Section("alarm.sound") {
                     ForEach(SoundCatalog.bundled) { sound in
                         Button {
-                            draft.soundID = sound.id
+                            chooseSound(sound.id)
                         } label: {
                             HStack {
                                 Text(LocalizedStringKey(sound.localizationKey))
@@ -57,7 +58,7 @@ struct AlarmEditorView: View {
                     }
                     ForEach(model.customSounds) { sound in
                         Button {
-                            draft.soundID = sound.id
+                            chooseSound(sound.id)
                         } label: {
                             HStack {
                                 Text(sound.displayName)
@@ -114,6 +115,7 @@ struct AlarmEditorView: View {
                 if !draft.isNew {
                     Section {
                         Button("alarm.delete", role: .destructive) {
+                            preview.stop()
                             model.delete(alarmID: draft.id)
                             dismiss()
                         }
@@ -124,10 +126,14 @@ struct AlarmEditorView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("alarm.cancel") { dismiss() }
+                    Button("alarm.cancel") {
+                        preview.stop()
+                        dismiss()
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("alarm.save") {
+                        preview.stop()
                         model.save(draft: draft)
                     }
                     .disabled(!draft.songIsValid)
@@ -143,13 +149,32 @@ struct AlarmEditorView: View {
                     Task {
                         if let id = await model.importSound(source: file.url, window: window, name: name) {
                             draft.soundID = id
+                            playPreview(of: id)
                         }
                     }
                 }
                 .readableWidth()
             }
+            .onDisappear { preview.stop() }
         }
         .accessibilityIdentifier("alarm-editor")
+    }
+
+    private func chooseSound(_ id: String) {
+        if draft.soundID == id, preview.isPlaying(id) {
+            preview.stop()
+            return
+        }
+        draft.soundID = id
+        playPreview(of: id)
+    }
+
+    private func playPreview(of id: String) {
+        guard let url = SoundFiles.previewURL(for: id, customSounds: model.customSounds) else {
+            preview.stop()
+            return
+        }
+        preview.play(id: id, url: url)
     }
 
     private var repeatSummary: String {

@@ -67,6 +67,12 @@
 "groups.delete" = "Delete Group";
 "groups.symbol" = "Symbol";
 "groups.create" = "Create";
+"groups.edit" = "Edit Group";
+"groups.enabled" = "On";
+"groups.alarms" = "Alarms";
+"groups.alarms.empty" = "No alarms in this group yet.";
+"groups.addAlarm" = "Add an alarm";
+"groups.addAlarm.none" = "Every alarm is already in this group.";
 "groups.delete.confirm" = "Delete this group? Its alarms stay on the phone, outside the group.";
 
 "sharing.title" = "Sharing";
@@ -129,7 +135,9 @@
 "settings.appearance.icon.minimal" = "Light";
 "settings.appearance.icon.color" = "Color";
 "settings.appearance.icon.unavailable" = "The icon can be changed on an iPhone. The Simulator keeps the default icon.";
-"settings.tagline" = "Remind me of";
+"settings.tagline" = "Wakito";
+"settings.history" = "Update history";
+"settings.whatsNew" = "What's New";
 "settings.alarmAccess" = "Alarm access";
 "settings.alarmAccess.authorized" = "Allowed";
 "settings.alarmAccess.denied" = "Denied";
@@ -164,6 +172,8 @@
 "demo.friend" = "Ola";
 
 "achievements.disclosure" = "Mateusz gives 50% of subscription proceeds to causes he chooses. The app does not collect donations.";
+"achievements.userCount" = "%@ of us already";
+"achievements.userCountDate" = "As of %@";
 "achievements.together" = "Our shared success";
 "achievements.support" = "Your support helps";
 "achievements.campaign" = "Current campaign";

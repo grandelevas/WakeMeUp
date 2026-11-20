@@ -1,4 +1,3 @@
-import AVFoundation
 import SwiftUI
 
 struct TrimSoundView: View {
@@ -10,7 +9,7 @@ struct TrimSoundView: View {
     @State private var start: Double = 0
     @State private var end: Double = 30
     @State private var name: String
-    @State private var player: AVAudioPlayer?
+    @State private var preview = SoundPreviewPlayer()
     @State private var failed = false
 
     init(source: URL, onUse: @escaping (TrimWindow, String) -> Void) {
@@ -39,7 +38,7 @@ struct TrimSoundView: View {
                     }
                     Text(format(max(0, end - start)))
                         .font(.title2.monospacedDigit())
-                    Button("sound.preview") { preview() }
+                    Button("sound.preview") { playTrimPreview() }
                     Button("sound.use") { useSelection() }
                         .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 } else {
@@ -54,7 +53,13 @@ struct TrimSoundView: View {
                 }
             }
             .task { await load() }
-            .onDisappear { player?.stop() }
+            .onChange(of: start) { _, _ in
+                if preview.isPlaying("trim") { preview.stop() }
+            }
+            .onChange(of: end) { _, _ in
+                if preview.isPlaying("trim") { preview.stop() }
+            }
+            .onDisappear { preview.stop() }
         }
     }
 
@@ -70,26 +75,20 @@ struct TrimSoundView: View {
         }
     }
 
-    private func preview() {
-        let accessing = source.startAccessingSecurityScopedResource()
-        defer { if accessing { source.stopAccessingSecurityScopedResource() } }
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [])
-            try session.setActive(true)
-            let player = try AVAudioPlayer(contentsOf: source)
-            player.volume = 1
-            player.currentTime = start
-            player.play()
-            self.player = player
-            let length = max(0.2, end - start)
-            Task {
-                try? await Task.sleep(for: .seconds(length))
-                player.stop()
-            }
-        } catch {
-            failed = true
+    private func playTrimPreview() {
+        if preview.isPlaying("trim") {
+            preview.stop()
+            return
         }
+        let window = TrimWindow(start: start, end: end).clamped(to: duration)
+            ?? TrimWindow(start: start, end: min(duration, start + TrimWindow.maximumDuration))
+        preview.play(
+            id: "trim",
+            url: source,
+            start: window.start,
+            length: window.duration,
+            securityScoped: true
+        )
     }
 
     private func useSelection() {

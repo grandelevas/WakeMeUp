@@ -3,6 +3,8 @@ import UIKit
 
 struct AlarmListView: View {
     @Environment(AppModel.self) private var model
+    @State private var collapsedGroups: Set<UUID> = GroupExpansionStore.collapsedIDs()
+    @State private var editingGroupID: UUID?
 
     var body: some View {
         NavigationStack {
@@ -51,6 +53,9 @@ struct AlarmListView: View {
             .navigationDestination(isPresented: groupsPresented) {
                 GroupListView()
             }
+            .navigationDestination(item: $editingGroupID) { id in
+                GroupEditorView(groupID: id)
+            }
         }
         .accessibilityIdentifier("alarm-list")
     }
@@ -61,6 +66,13 @@ struct AlarmListView: View {
 
     private var list: some View {
         List {
+            if let next = nextAlarmDescription {
+                Section("alarms.next") {
+                    Text(next)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
             if !model.suppressPermissionBanner && model.authorization == .denied {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
@@ -96,20 +108,62 @@ struct AlarmListView: View {
                 }
             }
             ForEach(model.library.groups) { group in
-                section(groupID: group.id, title: group.name, symbol: group.symbol, group: group)
+                groupSection(group)
             }
             let ungrouped = model.library.alarms(in: nil)
             if !ungrouped.isEmpty {
                 section(groupID: nil, title: String(localized: "alarms.otherGroup"), symbol: "alarm", group: nil, alarms: ungrouped)
             }
-            if let next = nextAlarmDescription {
-                Section("alarms.next") {
-                    Text(next)
-                        .font(.footnote)
+        }
+    }
+
+    @ViewBuilder
+    private func groupSection(_ group: AlarmGroup) -> some View {
+        let alarms = model.library.alarms(in: group.id)
+        Section {
+            DisclosureGroup(isExpanded: expandedBinding(group.id)) {
+                alarmRows(alarms, emptyKey: "alarms.empty.group")
+            } label: {
+                HStack(spacing: 8) {
+                    Label(group.name, systemImage: group.symbol)
+                    Text(alarms.count, format: .number)
                         .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
+                    Button {
+                        editingGroupID = group.id
+                    } label: {
+                        Image(systemName: "info.circle")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("groups.edit")
+                    Toggle(isOn: Binding(
+                        get: { group.isEnabled },
+                        set: { _ in model.toggle(groupID: group.id) }
+                    )) {
+                        Text(group.name)
+                    }
+                    .labelsHidden()
+                    .accessibilityIdentifier("group-toggle-\(group.id.uuidString)")
                 }
             }
+            .accessibilityValue(Text(alarms.count, format: .number))
         }
+    }
+
+    private func expandedBinding(_ groupID: UUID) -> Binding<Bool> {
+        Binding(
+            get: { !collapsedGroups.contains(groupID) },
+            set: { setExpanded($0, groupID: groupID) }
+        )
+    }
+
+    private func setExpanded(_ expanded: Bool, groupID: UUID) {
+        if expanded {
+            collapsedGroups.remove(groupID)
+        } else {
+            collapsedGroups.insert(groupID)
+        }
+        GroupExpansionStore.setExpanded(expanded, id: groupID)
     }
 
     @ViewBuilder
@@ -122,32 +176,7 @@ struct AlarmListView: View {
     ) -> some View {
         let alarms = explicit ?? model.library.alarms(in: groupID)
         Section {
-            if alarms.isEmpty {
-                Text("alarms.empty.group")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(alarms) { alarm in
-                    Button {
-                        model.edit(alarm)
-                    } label: {
-                        AlarmRow(alarm: alarm, enabled: alarm.isEnabled)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("alarm-row-\(alarm.id.uuidString)")
-                    .swipeActions {
-                        Button(role: .destructive) {
-                            model.delete(alarmID: alarm.id)
-                        } label: {
-                            Label("alarm.delete", systemImage: "trash")
-                        }
-                    }
-                }
-                .onDelete { offsets in
-                    for index in offsets {
-                        model.delete(alarmID: alarms[index].id)
-                    }
-                }
-            }
+            alarmRows(alarms, emptyKey: "alarms.empty.group")
         } header: {
             HStack {
                 Label(title, systemImage: symbol)
@@ -161,6 +190,36 @@ struct AlarmListView: View {
                     }
                     .labelsHidden()
                     .accessibilityIdentifier("group-toggle-\(group.id.uuidString)")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func alarmRows(_ alarms: [Alarm], emptyKey: LocalizedStringKey) -> some View {
+        if alarms.isEmpty {
+            Text(emptyKey)
+                .foregroundStyle(.secondary)
+        } else {
+            ForEach(alarms) { alarm in
+                Button {
+                    model.edit(alarm)
+                } label: {
+                    AlarmRow(alarm: alarm, enabled: alarm.isEnabled)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("alarm-row-\(alarm.id.uuidString)")
+                .swipeActions {
+                    Button(role: .destructive) {
+                        model.delete(alarmID: alarm.id)
+                    } label: {
+                        Label("alarm.delete", systemImage: "trash")
+                    }
+                }
+            }
+            .onDelete { offsets in
+                for index in offsets {
+                    model.delete(alarmID: alarms[index].id)
                 }
             }
         }

@@ -162,6 +162,45 @@ final class AlarmLibraryTests: XCTestCase {
         XCTAssertTrue(library.alarms[0].isEnabled)
     }
 
+    func testCollapsedGroupsStayCollapsed() {
+        let name = "wakito.tests.group-expansion"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        let id = UUID()
+        XCTAssertTrue(GroupExpansionStore.isExpanded(id, defaults: defaults))
+        GroupExpansionStore.setExpanded(false, id: id, defaults: defaults)
+        XCTAssertFalse(GroupExpansionStore.isExpanded(id, defaults: defaults))
+        GroupExpansionStore.setExpanded(true, id: id, defaults: defaults)
+        XCTAssertTrue(GroupExpansionStore.isExpanded(id, defaults: defaults))
+    }
+
+    func testRenamingAGroupKeepsItsAlarms() {
+        var library = AlarmLibrary()
+        let group = library.addGroup(name: "Work", symbol: "folder")
+        library.upsert(alarm(hour: 7, group: group.id, enabled: true))
+        library.updateGroup(id: group.id, name: "  Office ", symbol: "briefcase")
+        XCTAssertEqual(library.group(group.id)?.name, "Office")
+        XCTAssertEqual(library.group(group.id)?.symbol, "briefcase")
+        XCTAssertEqual(library.alarms[0].groupID, group.id)
+        XCTAssertTrue(library.alarms[0].isEnabled)
+    }
+
+    func testMovingAnAlarmIntoADisabledGroupTurnsItOffUntilTheGroupReturns() {
+        var library = AlarmLibrary()
+        let group = library.addGroup(name: "Work")
+        let item = alarm(hour: 7, group: nil, enabled: true)
+        library.upsert(item)
+        library.setGroupEnabled(false, groupID: group.id)
+        library.moveAlarm(item.id, to: group.id)
+        XCTAssertEqual(library.alarms[0].groupID, group.id)
+        XCTAssertFalse(library.alarms[0].isEnabled)
+        XCTAssertEqual(library.alarms[0].resumeWhenGroupEnables, true)
+        library.moveAlarm(item.id, to: nil)
+        XCTAssertNil(library.alarms[0].groupID)
+        XCTAssertTrue(library.alarms[0].isEnabled)
+        XCTAssertNil(library.alarms[0].resumeWhenGroupEnables)
+    }
+
     func testIndividualToggleWhileGroupIsOffOnlyUpdatesTheMemory() {
         var library = AlarmLibrary()
         let group = library.addGroup(name: "Work")
@@ -261,6 +300,39 @@ final class LocalAchievementTests: XCTestCase {
         XCTAssertEqual(document.totalDonated, 0)
         XCTAssertEqual(document.peopleHelped, 0)
         XCTAssertEqual(document.campaign?.progress, 0)
+        XCTAssertNil(document.visibleUserCount)
+    }
+
+    func testMissingOrZeroUserCountStaysHidden() throws {
+        let zero = """
+        {"schemaVersion":1,"currency":"EUR","disclosure":{"en":"e","pl":"p"},"userCount":0,"userCountDate":"2026-11-20","history":[]}
+        """
+        let document = try AchievementsDocument.decode(Data(zero.utf8))
+        XCTAssertEqual(document.userCount, 0)
+        XCTAssertNil(document.visibleUserCount)
+    }
+
+    func testPositiveUserCountIsShown() throws {
+        let json = """
+        {"schemaVersion":1,"currency":"EUR","disclosure":{"en":"e","pl":"p"},"userCount":1234,"userCountDate":"2026-11-20","history":[]}
+        """
+        let document = try AchievementsDocument.decode(Data(json.utf8))
+        XCTAssertEqual(document.visibleUserCount, 1234)
+        XCTAssertEqual(document.userCountDate, "2026-11-20")
+    }
+
+    func testCommunityFileOverridesTheAchievementsCount() throws {
+        let json = """
+        {"schemaVersion":1,"currency":"EUR","disclosure":{"en":"e","pl":"p"},"userCount":9,"userCountDate":"2026-11-01","history":[]}
+        """
+        let document = try AchievementsDocument.decode(Data(json.utf8))
+        let hidden = document.applying(community: CommunityCountSnapshot(userCount: 0, userCountDate: "2026-11-20"))
+        XCTAssertNil(hidden.visibleUserCount)
+        let shown = document.applying(community: CommunityCountSnapshot(userCount: 1234, userCountDate: "2026-11-20"))
+        XCTAssertEqual(shown.visibleUserCount, 1234)
+        XCTAssertEqual(shown.userCountDate, "2026-11-20")
+        let unchanged = document.applying(community: CommunityCountSnapshot(userCount: nil, userCountDate: nil))
+        XCTAssertEqual(unchanged.visibleUserCount, 9)
     }
 }
 
@@ -754,5 +826,50 @@ final class InviteLinkPolicyTests: XCTestCase {
         )
         XCTAssertNil(InviteLinkPolicy.url(from: "OLA-DEMO"))
         XCTAssertNil(InviteLinkPolicy.url(from: "http://example.com/share"))
+    }
+}
+
+final class ReleaseNotesTests: XCTestCase {
+    func testNewestEntryComesFirstAndBuildIsOptional() throws {
+        let json = """
+        {"entries":[
+          {"version":"1.0.0","date":"2026-11-19","changes":{"en":["Older"],"pl":["Starsze"]}},
+          {"version":"1.0.0","build":22,"date":"2026-11-20","changes":{"en":["Newer"],"pl":["Nowsze"]}}
+        ]}
+        """.data(using: .utf8)!
+        let notes = try ReleaseNotesDocument.decode(json).newestFirst
+        XCTAssertEqual(notes.map(\.heading), ["1.0.0 (22)", "1.0.0"])
+        XCTAssertEqual(notes[0].bullets(for: "pl"), ["Nowsze"])
+        XCTAssertEqual(notes[1].bullets(for: "fr"), ["Older"])
+    }
+
+    func testBundledHistoryStartsWithTheLatestChange() {
+        let notes = ReleaseNotesDocument.bundled().newestFirst
+        XCTAssertGreaterThanOrEqual(notes.count, 7)
+        XCTAssertEqual(notes.first?.date, notes.map(\.date).max())
+        let english = notes.flatMap { $0.bullets(for: "en") }.joined(separator: " ")
+        XCTAssertTrue(english.contains("full screen"))
+        XCTAssertTrue(english.contains("Achievements"))
+        XCTAssertFalse(english.localizedCaseInsensitiveContains("Przypomnij"))
+    }
+
+    func testWhatsNewAppearsOnlyAfterTheBuildChanges() {
+        let name = "wakito.tests.release-notes"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        XCTAssertFalse(ReleaseNotesPrompt.shouldShow(currentBuild: "22", defaults: defaults))
+        ReleaseNotesPrompt.markSeen(currentBuild: "22", defaults: defaults)
+        XCTAssertFalse(ReleaseNotesPrompt.shouldShow(currentBuild: "22", defaults: defaults))
+        XCTAssertTrue(ReleaseNotesPrompt.shouldShow(currentBuild: "23", defaults: defaults))
+    }
+}
+
+final class SoundPreviewPolicyTests: XCTestCase {
+    func testPreviewStaysWithinTenSeconds() {
+        XCTAssertEqual(SoundPreviewPolicy.length(fileDuration: 12, requested: nil), 10)
+        XCTAssertEqual(SoundPreviewPolicy.length(fileDuration: 4, requested: nil), 4)
+        XCTAssertEqual(SoundPreviewPolicy.length(fileDuration: 40, requested: 20), 10)
+        XCTAssertEqual(SoundPreviewPolicy.length(fileDuration: 40, requested: 3), 3)
+        XCTAssertEqual(SoundPreviewPolicy.length(fileDuration: 8, requested: 0), 0)
     }
 }

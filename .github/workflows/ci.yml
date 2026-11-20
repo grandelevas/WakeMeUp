@@ -2,7 +2,11 @@ name: CI
 
 on:
   push:
+    paths-ignore:
+      - "stats/**"
   pull_request:
+    paths-ignore:
+      - "stats/**"
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -25,6 +29,8 @@ jobs:
         run: bundle exec ruby scripts/check-fastlane-options.rb
       - name: Check iPad orientations in Info.plist
         run: python3 scripts/check-info-plist.py
+      - name: Check community count parsing
+        run: node --test scripts/community-count.test.mjs
 
   build-and-test:
     name: Build and test (iOS Simulator)

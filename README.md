@@ -2,7 +2,7 @@
 
 An iPhone alarm app in the spirit of Clock → Alarms, plus groups, your own sounds, a one-tap link to a song, and alarms that another person can set after you let them.
 
-The working names are **Remind me of** and **Przypomnij mi o**. The home-screen name is Wakito. The Xcode target and bundle id stay WakeMeUp and `com.grandelevas.wakemeup`. The interface is SwiftUI, in English and Polish.
+The name on the iPhone is Wakito. The Xcode target and bundle id stay WakeMeUp and `com.grandelevas.wakemeup`. The interface is SwiftUI, in English and Polish.
 
 There is no Mac in the loop. GitHub Actions `macos-26` builds the app, runs the tests, and takes Simulator screenshots. A second workflow signs a Release build and uploads it to TestFlight once the Apple secrets below exist. That workflow is expected to fail until then.
 
@@ -188,6 +188,21 @@ Apple only allows a few distribution certificates per team. Do not run bootstrap
 - Custom alert sounds should stay at or under 30 seconds. Import enforces that. The bundled tones are about 12 seconds, 22.05 kHz, 16-bit mono WAV.
 - Force-quitting Wakito does not delete AlarmKit alarms that are already scheduled. It does stop the silent push that delivers a new remote alarm.
 - Polish and English follow the iPhone language. Day letters follow the calendar's first weekday, so a Polish phone starts the week on Monday.
+
+## Liczba osób
+
+Raz dziennie workflow **Community count** może zapisać `stats/community.json`. Wakito czyta ten plik i pokazuje „Jest nas już …”. Gdy pliku nie ma, używa pola `userCount` z `achievements.json`. Zero albo brak liczby ukrywa wiersz.
+
+Jednorazowo, w Safari:
+
+1. Otwórz [App Store Connect](https://appstoreconnect.apple.com) → **Payments and Financial Reports** (Płatności i raporty finansowe). Numer sprzedawcy (Vendor Number), zwykle 8 cyfr, jest na górze strony.
+2. Otwórz `https://github.com/grandelevas/WakeMeUp/settings/secrets/actions` → **New repository secret**. Nazwa: `ASC_VENDOR_NUMBER`. Wklej sam numer. Możesz zamiast tego dodać zmienną repozytorium o tej samej nazwie.
+3. Istniejący klucz API (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY`) wystarczy, jeśli jego rola to **Admin**, **Finance** albo **Sales**. Role **Developer** i **App Manager** nie pobierają raportów sprzedaży. Sprawdź rolę w App Store Connect → **Users and Access** → **Integrations**. Nie twórz nowego certyfikatu. Jeśli rola jest za słaba, zrób drugi klucz API z rolą Sales albo Finance i podmień tylko te trzy sekrety.
+4. Po dodaniu numeru uruchom ręcznie workflow **Community count**. Dopóki subskrypcja nie ma raportu, workflow kończy się bez błędu i nic nie zapisuje.
+
+## Update history
+
+Settings shows **Update history** / **Historia aktualizacji** under the version. The list is `WakeMeUp/Resources/release-notes.json`, newest entry first. Each entry has `version`, an optional `build` (omit it when the TestFlight build number is unknown), `date` as `YYYY-MM-DD`, and `changes` with `en` and `pl` bullet lists written for people using the app. Add a new object at the top of `entries` when a build ships. The first launch after the installed build number changes shows the newest entry once. The first install only remembers the build and stays quiet.
 
 ## Project layout
 

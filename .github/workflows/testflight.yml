@@ -2,6 +2,7 @@ name: TestFlight
 
 # Stays red on purpose until the Apple Developer secrets in the README exist.
 # Run it by hand, or push a v* tag after those secrets are set.
+# A commit that only updates stats/community.json is not a tag, so it does not run this workflow.
 on:
   workflow_dispatch:
     inputs:

@@ -3,6 +3,7 @@ import SwiftUI
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
+    @State private var whatsNew: ReleaseNote?
 
     var body: some View {
         @Bindable var model = model
@@ -41,6 +42,13 @@ struct RootView: View {
             Task { await model.refreshRemote() }
         }
         .task { await model.start() }
+        .task { presentWhatsNewIfNeeded() }
+        .sheet(item: $whatsNew) { note in
+            WhatsNewSheet(note: note) {
+                ReleaseNotesPrompt.markSeen(currentBuild: currentBuild, defaults: .standard)
+                whatsNew = nil
+            }
+        }
     }
 
     private var ringingPresented: Binding<Bool> {
@@ -66,6 +74,23 @@ struct RootView: View {
             items.append(url)
         }
         return items
+    }
+
+    private var currentBuild: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+    }
+
+    private func presentWhatsNewIfNeeded() {
+        guard !model.suppressPermissionBanner else { return }
+        let build = currentBuild
+        if ReleaseNotesPrompt.shouldShow(currentBuild: build, defaults: .standard) {
+            whatsNew = ReleaseNotesDocument.bundled().newestFirst.first
+            if whatsNew == nil {
+                ReleaseNotesPrompt.markSeen(currentBuild: build, defaults: .standard)
+            }
+        } else if UserDefaults.standard.string(forKey: ReleaseNotesPrompt.storageKey) == nil {
+            ReleaseNotesPrompt.markSeen(currentBuild: build, defaults: .standard)
+        }
     }
 
     private var sharePresented: Binding<Bool> {
