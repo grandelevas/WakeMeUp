@@ -10,6 +10,7 @@ struct SharingView: View {
     @State private var renamingGrantID: UUID?
     @State private var renameDraft = ""
     @State private var voiceGrantID: UUID?
+    @State private var addingFriendGroup = false
 
     var body: some View {
         NavigationStack {
@@ -24,6 +25,9 @@ struct SharingView: View {
                     previewSection
                 } else {
                     cloudSection
+                }
+                if !model.showsSimulatedPreview {
+                    friendGroupSection
                 }
                 grantSection(title: "sharing.peopleWhoCanWakeMe", grants: incoming)
                 grantSection(title: "sharing.phonesICanWake", grants: outgoing)
@@ -47,6 +51,7 @@ struct SharingView: View {
                 }
             }
             .sheet(isPresented: $inviting) { inviteSheet }
+            .sheet(isPresented: $addingFriendGroup) { friendGroupSheet }
             .sheet(isPresented: $editingOwnName, onDismiss: {
                 Task { await model.commitOwnName() }
             }) { ownNameSheet }
@@ -178,6 +183,49 @@ struct SharingView: View {
                     .disabled(PersonName.nonempty(renameDraft) == nil)
                 }
             }
+        }
+    }
+
+    private var friendGroupSection: some View {
+        Section("sharing.friendGroups") {
+            if model.snapshot.friendGroups.isEmpty {
+                Text("sharing.friendGroups.empty").foregroundStyle(.secondary)
+            }
+            ForEach(model.snapshot.friendGroups) { group in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(group.name).font(.body)
+                    Text(memberNames(group))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("sharing.friendGroups.alarm") {
+                        Task { await model.sendToFriendGroup(id: group.id) }
+                    }
+                    Button("sharing.friendGroups.delete", role: .destructive) {
+                        model.deleteFriendGroup(id: group.id)
+                    }
+                    .font(.footnote)
+                }
+            }
+            Button("sharing.friendGroups.add") { addingFriendGroup = true }
+                .disabled(outgoing.isEmpty)
+        }
+    }
+
+    private func memberNames(_ group: FriendGroup) -> String {
+        let names = group.memberIDs.compactMap { id in
+            outgoing.first { $0.owner.id == id }.map {
+                PersonName.listLabel(for: $0, profileID: model.profile.id, grants: model.grants, generic: $0.owner.displayName)
+            }
+        }
+        return names.joined(separator: ", ")
+    }
+
+    private var friendGroupSheet: some View {
+        FriendGroupEditor(people: outgoing) { name, ids in
+            model.createFriendGroup(name: name, memberIDs: ids)
+            addingFriendGroup = false
+        } onCancel: {
+            addingFriendGroup = false
         }
     }
 
@@ -356,5 +404,49 @@ private struct VoiceMessageSheet: View {
             }
         }
         .onDisappear { recorder.stop() }
+    }
+}
+
+private struct FriendGroupEditor: View {
+    let people: [ShareGrant]
+    var onSave: (String, [UUID]) -> Void
+    var onCancel: () -> Void
+    @Environment(AppModel.self) private var model
+    @State private var name = ""
+    @State private var selected: Set<UUID> = []
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("sharing.friendGroups.name", text: $name)
+                Section("sharing.friendGroups.members") {
+                    ForEach(people) { grant in
+                        let person = grant.owner.id
+                        Button {
+                            if selected.contains(person) { selected.remove(person) } else { selected.insert(person) }
+                        } label: {
+                            HStack {
+                                Text(PersonName.listLabel(for: grant, profileID: model.profile.id, grants: model.grants, generic: grant.owner.displayName))
+                                Spacer()
+                                if selected.contains(person) {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("sharing.friendGroups.add")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("sharing.cancel") { onCancel() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("sharing.done") { onSave(name, Array(selected)) }
+                        .disabled(PersonName.nonempty(name) == nil || selected.isEmpty)
+                }
+            }
+        }
     }
 }

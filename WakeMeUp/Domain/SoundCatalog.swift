@@ -53,6 +53,8 @@ struct LibrarySnapshot: Codable, Equatable {
     var sentAlarms: [SentAlarm] = []
     /// Remote alarms that have fired here and may still need a wake-up report.
     var wakeTracking: [WakeTracking] = []
+    /// Friend groups on this phone. They are not synced.
+    var friendGroups: [FriendGroup] = []
 
     static func empty(profile: Participant) -> LibrarySnapshot {
         LibrarySnapshot(
@@ -70,7 +72,7 @@ struct LibrarySnapshot: Codable, Equatable {
 extension LibrarySnapshot {
     private enum CodingKeys: String, CodingKey {
         case library, permissions, customSounds, profile, simulatedFriend
-        case appliedCommandIDs, pendingOutbox, sentAlarms, wakeTracking
+        case appliedCommandIDs, pendingOutbox, sentAlarms, wakeTracking, friendGroups
     }
 
     init(from decoder: Decoder) throws {
@@ -84,6 +86,7 @@ extension LibrarySnapshot {
         pendingOutbox = try container.decode([RemoteAlarmCommand].self, forKey: .pendingOutbox)
         sentAlarms = try container.decodeIfPresent([SentAlarm].self, forKey: .sentAlarms) ?? []
         wakeTracking = try container.decodeIfPresent([WakeTracking].self, forKey: .wakeTracking) ?? []
+        friendGroups = try container.decodeIfPresent([FriendGroup].self, forKey: .friendGroups) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
@@ -97,5 +100,6 @@ extension LibrarySnapshot {
         try container.encode(pendingOutbox, forKey: .pendingOutbox)
         try container.encode(sentAlarms, forKey: .sentAlarms)
         try container.encode(wakeTracking, forKey: .wakeTracking)
+        try container.encode(friendGroups, forKey: .friendGroups)
     }
 }

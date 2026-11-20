@@ -220,15 +220,23 @@ struct AlarmListView: View {
             }
             if !model.snapshot.sentAlarms.isEmpty {
                 Section("alarms.toOthers") {
-                    ForEach(model.snapshot.sentAlarms.sorted { $0.sentAt > $1.sentAt }) { sent in
-                        SentAlarmRow(sent: sent)
-                            .swipeActions {
-                                Button(role: .destructive) {
-                                    Task { await model.deleteSentAlarm(commandID: sent.commandID) }
-                                } label: {
-                                    Label("alarm.delete", systemImage: "trash")
-                                }
+                    ForEach(FriendGroupRoster.sections(from: model.snapshot.sentAlarms)) { section in
+                        if let title = section.title, !title.isEmpty {
+                            Text(title)
+                                .font(.headline)
+                        }
+                        ForEach(section.rows) { row in
+                            if let sent = model.snapshot.sentAlarms.first(where: { $0.commandID == row.commandID }) {
+                                SentAlarmRow(sent: sent)
+                                    .swipeActions {
+                                        Button(role: .destructive) {
+                                            Task { await model.deleteSentAlarm(commandID: sent.commandID) }
+                                        } label: {
+                                            Label("alarm.delete", systemImage: "trash")
+                                        }
+                                    }
                             }
+                        }
                     }
                 }
             }
