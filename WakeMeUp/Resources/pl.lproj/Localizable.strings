@@ -25,6 +25,9 @@
 
 "alarm.defaultLabel" = "Alarm";
 "alarm.label" = "Etykieta";
+"alarm.note" = "Notatka";
+"alarm.note.placeholder" = "Krótka notatka";
+"alarm.note.help" = "Do 140 znaków. Widać ją na budziku i na liście.";
 "alarm.repeat" = "Powtarzanie";
 "alarm.sound" = "Dźwięk";
 "alarm.snooze" = "Drzemka";

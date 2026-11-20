@@ -439,6 +439,12 @@ struct AlarmRow: View {
                 Text(subtitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                if let note = alarm.note, !note.isEmpty {
+                    Text(note)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
                 if let name = alarm.origin.senderName {
                     Text(String(format: String(localized: "alarms.fromSender"), name))
                         .font(.caption)

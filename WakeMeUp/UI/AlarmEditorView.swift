@@ -37,6 +37,19 @@ struct AlarmEditorView: View {
                     TextField("alarm.defaultLabel", text: $draft.label)
                 }
 
+                Section("alarm.note") {
+                    TextField("alarm.note.placeholder", text: $draft.note, axis: .vertical)
+                        .lineLimit(3...5)
+                        .onChange(of: draft.note) { _, newValue in
+                            if newValue.count > AlarmNote.maxCharacters {
+                                draft.note = String(newValue.prefix(AlarmNote.maxCharacters))
+                            }
+                        }
+                    Text("alarm.note.help")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
                 SoundChoiceList(soundID: $draft.soundID, preview: preview, showsImport: true) {
                     importing = true
                 }

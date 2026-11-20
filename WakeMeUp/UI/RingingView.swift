@@ -29,6 +29,13 @@ struct RingingView: View {
                     Text(String(format: String(localized: "sharing.remoteFrom"), name))
                         .foregroundStyle(appAccent)
                 }
+                if let note = alarm.note, !note.isEmpty {
+                    Text(note)
+                        .font(.body)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white.opacity(0.9))
+                        .padding(.horizontal)
+                }
                 Spacer()
                 if alarm.songLink != nil {
                     Button {
