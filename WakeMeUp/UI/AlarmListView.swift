@@ -3,7 +3,9 @@ import UIKit
 
 struct AlarmListView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.editMode) private var editMode
     @State private var collapsedGroups: Set<UUID> = GroupExpansionStore.collapsedIDs()
+    @State private var collapseBeforeSelection: Set<UUID>?
     @State private var editingGroupID: UUID?
     @State private var selecting = false
     @State private var selectedAlarmIDs: Set<UUID> = []
@@ -27,20 +29,11 @@ struct AlarmListView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(selecting ? "alarms.done" : "alarms.select") {
-                        selecting.toggle()
-                        if !selecting { selectedAlarmIDs.removeAll() }
+                        toggleSelecting()
                     }
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     EditButton()
-                }
-                if selecting {
-                    ToolbarItem(placement: .bottomBar) {
-                        Button("alarms.changeSound") {
-                            changingSelectionSound = true
-                        }
-                        .disabled(selectedAlarmIDs.isEmpty)
-                    }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -77,6 +70,10 @@ struct AlarmListView: View {
             .sheet(isPresented: $changingSelectionSound) {
                 SoundPickerSheet { soundID in
                     model.setSound(soundID, for: selectedAlarmIDs)
+                    if let collapseBeforeSelection {
+                        collapsedGroups = collapseBeforeSelection
+                    }
+                    collapseBeforeSelection = nil
                     selecting = false
                     selectedAlarmIDs.removeAll()
                 }
@@ -88,8 +85,45 @@ struct AlarmListView: View {
                     }
                 }
             }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if selecting {
+                    Button {
+                        changingSelectionSound = true
+                    } label: {
+                        Text(String(format: String(localized: "alarms.changeSoundCount"), selectedAlarmIDs.count))
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(selectedAlarmIDs.isEmpty)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                    .padding(.bottom, 8)
+                    .background(.bar)
+                    .accessibilityIdentifier("change-sound")
+                }
+            }
         }
         .accessibilityIdentifier("alarm-list")
+    }
+
+    private var isReordering: Bool {
+        editMode?.wrappedValue == .active
+    }
+
+    private func toggleSelecting() {
+        if selecting {
+            if let collapseBeforeSelection {
+                collapsedGroups = collapseBeforeSelection
+            }
+            collapseBeforeSelection = nil
+            selecting = false
+            selectedAlarmIDs.removeAll()
+        } else {
+            collapseBeforeSelection = collapsedGroups
+            collapsedGroups = []
+            selecting = true
+        }
     }
 
     private var groupSoundPresented: Binding<Bool> {
@@ -143,14 +177,36 @@ struct AlarmListView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            ForEach(model.library.groups) { group in
-                groupSection(group)
+            if isReordering {
+                Section {
+                    ForEach(model.library.groups) { group in
+                        reorderRow(group)
+                    }
+                    .onMove { source, destination in
+                        model.moveGroups(from: source, to: destination)
+                    }
+                }
+            } else {
+                ForEach(model.library.groups) { group in
+                    groupSection(group)
+                }
             }
             let ungrouped = model.library.alarms(in: nil)
             if !ungrouped.isEmpty {
                 section(groupID: nil, title: String(localized: "alarms.otherGroup"), symbol: "alarm", group: nil, alarms: ungrouped)
             }
         }
+    }
+
+    private func reorderRow(_ group: AlarmGroup) -> some View {
+        let alarms = model.library.alarms(in: group.id)
+        return HStack(spacing: 8) {
+            Label(group.name, systemImage: group.symbol)
+            Text(alarms.count, format: .number)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+        }
+        .accessibilityIdentifier("group-reorder-\(group.id.uuidString)")
     }
 
     @ViewBuilder
@@ -160,52 +216,61 @@ struct AlarmListView: View {
             DisclosureGroup(isExpanded: expandedBinding(group.id)) {
                 alarmRows(alarms, emptyKey: "alarms.empty.group")
             } label: {
-                HStack(spacing: 8) {
-                    Label(group.name, systemImage: group.symbol)
-                        .draggable(group.id.uuidString) {
-                            Label(group.name, systemImage: group.symbol)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
-                                .onAppear {
-                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                }
-                        }
-                    Text(alarms.count, format: .number)
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    Button {
-                        editingGroupID = group.id
-                    } label: {
-                        Image(systemName: "info.circle")
-                    }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel("groups.edit")
-                    Toggle(isOn: Binding(
-                        get: { group.isEnabled },
-                        set: { _ in model.toggle(groupID: group.id) }
-                    )) {
-                        Text(group.name)
-                    }
-                    .labelsHidden()
-                    .accessibilityIdentifier("group-toggle-\(group.id.uuidString)")
-                }
+                groupHeader(group, alarms: alarms)
             }
-            .contextMenu {
+            .accessibilityValue(Text(alarms.count, format: .number))
+        }
+    }
+
+    private func groupHeader(_ group: AlarmGroup, alarms: [Alarm]) -> some View {
+        let mark = GroupSelection.mark(alarmIDs: alarms.map(\.id), selected: selectedAlarmIDs)
+        return HStack(spacing: 8) {
+            if selecting {
+                Button {
+                    selectedAlarmIDs = GroupSelection.toggle(
+                        alarmIDs: alarms.map(\.id),
+                        selected: selectedAlarmIDs
+                    )
+                } label: {
+                    Image(systemName: selectionSymbol(mark))
+                        .foregroundStyle(mark == .none ? Color.secondary : Color.accentColor)
+                }
+                .buttonStyle(.borderless)
+                .disabled(alarms.isEmpty)
+                .accessibilityLabel(group.name)
+            }
+            Label(group.name, systemImage: group.symbol)
+            Text(alarms.count, format: .number)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Menu {
                 Button("groups.changeSound", systemImage: "speaker.wave.2") {
                     soundGroupID = group.id
                 }
                 Button("groups.edit", systemImage: "info.circle") {
                     editingGroupID = group.id
                 }
+            } label: {
+                Image(systemName: "ellipsis.circle")
             }
-            .dropDestination(for: String.self) { items, _ in
-                guard let raw = items.first, let source = UUID(uuidString: raw) else { return false }
-                model.moveGroup(source, before: group.id)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                return true
+            .buttonStyle(.borderless)
+            .accessibilityLabel("groups.more")
+            Toggle(isOn: Binding(
+                get: { group.isEnabled },
+                set: { _ in model.toggle(groupID: group.id) }
+            )) {
+                Text(group.name)
             }
-            .accessibilityValue(Text(alarms.count, format: .number))
+            .labelsHidden()
+            .accessibilityIdentifier("group-toggle-\(group.id.uuidString)")
+        }
+    }
+
+    private func selectionSymbol(_ mark: GroupSelectionMark) -> String {
+        switch mark {
+        case .none: "circle"
+        case .partial: "minus.circle.fill"
+        case .all: "checkmark.circle.fill"
         }
     }
 
@@ -222,7 +287,9 @@ struct AlarmListView: View {
         } else {
             collapsedGroups.insert(groupID)
         }
-        GroupExpansionStore.setExpanded(expanded, id: groupID)
+        if !selecting {
+            GroupExpansionStore.setExpanded(expanded, id: groupID)
+        }
     }
 
     @ViewBuilder
@@ -275,9 +342,9 @@ struct AlarmListView: View {
                     HStack(spacing: 8) {
                         if selecting {
                             Image(systemName: selectedAlarmIDs.contains(alarm.id) ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(selectedAlarmIDs.contains(alarm.id) ? Color.accentColor : Color.secondary)
                         }
-                        AlarmRow(alarm: alarm, enabled: alarm.isEnabled)
+                        AlarmRow(alarm: alarm, enabled: alarm.isEnabled, showsToggle: !selecting)
                     }
                 }
                 .buttonStyle(.plain)
@@ -319,6 +386,7 @@ struct AlarmRow: View {
     @Environment(\.appAccent) private var appAccent
     let alarm: Alarm
     let enabled: Bool
+    var showsToggle: Bool = true
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -343,14 +411,16 @@ struct AlarmRow: View {
                 }
             }
             Spacer(minLength: 8)
-            Toggle(isOn: Binding(
-                get: { enabled },
-                set: { _ in model.toggle(alarmID: alarm.id) }
-            )) {
-                Text(alarm.label)
+            if showsToggle {
+                Toggle(isOn: Binding(
+                    get: { enabled },
+                    set: { _ in model.toggle(alarmID: alarm.id) }
+                )) {
+                    Text(alarm.label)
+                }
+                .labelsHidden()
+                .disabled(groupDisabled)
             }
-            .labelsHidden()
-            .disabled(groupDisabled)
         }
         .padding(.vertical, 4)
     }

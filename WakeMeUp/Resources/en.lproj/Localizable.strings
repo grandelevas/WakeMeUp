@@ -10,6 +10,8 @@
 "alarms.done" = "Done";
 "alarms.select" = "Select";
 "alarms.changeSound" = "Change sound";
+"alarms.changeSoundCount" = "Change sound (%lld)";
+"groups.more" = "More";
 "alarms.add" = "Add Alarm";
 "alarms.next" = "Next alarm";
 "alarms.otherGroup" = "Other";

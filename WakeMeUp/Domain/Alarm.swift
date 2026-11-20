@@ -225,6 +225,15 @@ struct AlarmLibrary: Codable, Equatable {
         }
     }
 
+    /// Reorders groups the way `List` `.onMove` reports offsets.
+    mutating func moveGroups(from source: IndexSet, to destination: Int) {
+        normalizeGroupOrder()
+        groups.move(fromOffsets: source, toOffset: destination)
+        for index in groups.indices {
+            groups[index].sortIndex = index
+        }
+    }
+
     /// Places `sourceID` where `targetID` currently sits. The target shifts down.
     mutating func moveGroup(_ sourceID: UUID, before targetID: UUID) {
         normalizeGroupOrder()

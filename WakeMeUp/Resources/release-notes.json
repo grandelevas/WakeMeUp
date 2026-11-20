@@ -5,12 +5,12 @@
       "date": "2026-11-20",
       "changes": {
         "en": [
-          "Press and hold a group, then drag it to change the order.",
-          "Select several alarms, or a whole group, and give them the same sound."
+          "Reorder groups from Edit, using the handles. The group menu is on the more button.",
+          "Select now marks a whole group, and Change sound stays above the tabs."
         ],
         "pl": [
-          "Przytrzymaj grupę i przeciągnij ją, żeby zmienić kolejność.",
-          "Zaznacz kilka alarmów albo całą grupę i ustaw im ten sam dzwonek."
+          "Kolejność grup zmienisz w trybie Edytuj, za uchwyty. Menu grupy jest pod przyciskiem więcej.",
+          "Zaznacz oznacza też całą grupę, a Zmień dzwonek jest nad dolnym paskiem."
         ]
       }
     },

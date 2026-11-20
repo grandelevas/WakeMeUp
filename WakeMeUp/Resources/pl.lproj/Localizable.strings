@@ -10,6 +10,8 @@
 "alarms.done" = "Gotowe";
 "alarms.select" = "Zaznacz";
 "alarms.changeSound" = "Zmień dzwonek";
+"alarms.changeSoundCount" = "Zmień dzwonek (%lld)";
+"groups.more" = "Więcej";
 "alarms.add" = "Dodaj alarm";
 "alarms.next" = "Następny alarm";
 "alarms.otherGroup" = "Inne";
