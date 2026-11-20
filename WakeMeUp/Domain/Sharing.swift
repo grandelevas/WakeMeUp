@@ -287,7 +287,7 @@ enum WakeStatusKind: String, Codable, Equatable {
     case asleep
 }
 
-struct WakeReport: Codable, Equatable, Identifiable {
+struct WakeReport: Codable, Equatable, Hashable, Identifiable {
     var id: UUID
     var commandID: UUID
     var alarmID: UUID
