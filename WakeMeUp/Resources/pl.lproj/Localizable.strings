@@ -12,6 +12,8 @@
 "alarms.changeSound" = "Zmień dzwonek";
 "alarms.changeSoundCount" = "Zmień dzwonek (%lld)";
 "groups.more" = "Więcej";
+"groups.reorder" = "Edytuj kolejność grup";
+"groups.reorder.done" = "Gotowe";
 "alarms.add" = "Dodaj alarm";
 "alarms.next" = "Następny alarm";
 "alarms.otherGroup" = "Inne";

@@ -1,16 +1,20 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct AlarmListView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.editMode) private var editMode
+    @State private var reorderMode = EditMode.inactive
     @State private var collapsedGroups: Set<UUID> = GroupExpansionStore.collapsedIDs()
     @State private var collapseBeforeSelection: Set<UUID>?
+    @State private var collapseBeforeReorder: Set<UUID>?
     @State private var editingGroupID: UUID?
+    @State private var showSettings = false
     @State private var selecting = false
     @State private var selectedAlarmIDs: Set<UUID> = []
     @State private var changingSelectionSound = false
     @State private var soundGroupID: UUID?
+    @State private var draggingGroupID: UUID?
 
     var body: some View {
         NavigationStack {
@@ -27,14 +31,6 @@ struct AlarmListView: View {
             }
             .navigationTitle("alarms.title")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(selecting ? "alarms.done" : "alarms.select") {
-                        toggleSelecting()
-                    }
-                }
-                ToolbarItem(placement: .topBarLeading) {
-                    EditButton()
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         model.addAlarm()
@@ -45,24 +41,33 @@ struct AlarmListView: View {
                     .accessibilityLabel("alarms.add")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        model.showGroups = true
+                    Menu {
+                        Button(selecting ? "alarms.done" : "alarms.select", systemImage: "checkmark.circle") {
+                            toggleSelecting()
+                        }
+                        .accessibilityIdentifier("alarms.select")
+                        Button(isReordering ? "groups.reorder.done" : "groups.reorder", systemImage: "arrow.up.arrow.down") {
+                            toggleReorder()
+                        }
+                        .accessibilityIdentifier("groups.reorder")
+                        Button("groups.add", systemImage: "folder.badge.plus") {
+                            model.showGroups = true
+                        }
+                        Button("settings.title", systemImage: "gearshape") {
+                            showSettings = true
+                        }
                     } label: {
-                        Image(systemName: "folder")
+                        Image(systemName: "ellipsis.circle")
                     }
-                    .accessibilityLabel("alarms.groups")
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        SettingsView()
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .accessibilityLabel("settings.title")
+                    .accessibilityIdentifier("alarms.more")
+                    .accessibilityLabel("groups.more")
                 }
             }
             .navigationDestination(isPresented: groupsPresented) {
                 GroupListView()
+            }
+            .navigationDestination(isPresented: $showSettings) {
+                SettingsView()
             }
             .navigationDestination(item: $editingGroupID) { id in
                 GroupEditorView(groupID: id)
@@ -108,7 +113,7 @@ struct AlarmListView: View {
     }
 
     private var isReordering: Bool {
-        editMode?.wrappedValue == .active
+        reorderMode == .active
     }
 
     private func toggleSelecting() {
@@ -120,9 +125,25 @@ struct AlarmListView: View {
             selecting = false
             selectedAlarmIDs.removeAll()
         } else {
+            if isReordering { toggleReorder() }
             collapseBeforeSelection = collapsedGroups
             collapsedGroups = []
             selecting = true
+        }
+    }
+
+    private func toggleReorder() {
+        if isReordering {
+            reorderMode = .inactive
+            if let collapseBeforeReorder {
+                collapsedGroups = collapseBeforeReorder
+            }
+            collapseBeforeReorder = nil
+        } else {
+            if selecting { toggleSelecting() }
+            collapseBeforeReorder = collapsedGroups
+            collapsedGroups = Set(model.library.groups.map(\.id))
+            reorderMode = .active
         }
     }
 
@@ -177,49 +198,45 @@ struct AlarmListView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            if isReordering {
-                Section {
-                    ForEach(model.library.groups) { group in
-                        reorderRow(group)
-                    }
-                    .onMove { source, destination in
-                        model.moveGroups(from: source, to: destination)
-                    }
-                }
-            } else {
-                ForEach(model.library.groups) { group in
-                    groupSection(group)
-                }
+            ForEach(model.library.groups) { group in
+                groupRow(group)
+            }
+            .onMove { source, destination in
+                model.moveGroups(from: source, to: destination)
             }
             let ungrouped = model.library.alarms(in: nil)
             if !ungrouped.isEmpty {
                 section(groupID: nil, title: String(localized: "alarms.otherGroup"), symbol: "alarm", group: nil, alarms: ungrouped)
             }
         }
+        .environment(\.editMode, $reorderMode)
     }
 
-    private func reorderRow(_ group: AlarmGroup) -> some View {
+    private func groupRow(_ group: AlarmGroup) -> some View {
         let alarms = model.library.alarms(in: group.id)
-        return HStack(spacing: 8) {
-            Label(group.name, systemImage: group.symbol)
-            Text(alarms.count, format: .number)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 8)
-        }
-        .accessibilityIdentifier("group-reorder-\(group.id.uuidString)")
-    }
-
-    @ViewBuilder
-    private func groupSection(_ group: AlarmGroup) -> some View {
-        let alarms = model.library.alarms(in: group.id)
-        Section {
-            DisclosureGroup(isExpanded: expandedBinding(group.id)) {
-                alarmRows(alarms, emptyKey: "alarms.empty.group")
+        let expanded = !isReordering && !collapsedGroups.contains(group.id)
+        return VStack(alignment: .leading, spacing: 0) {
+            Button {
+                guard !isReordering else { return }
+                setExpanded(!expanded, groupID: group.id)
             } label: {
                 groupHeader(group, alarms: alarms)
             }
-            .accessibilityValue(Text(alarms.count, format: .number))
+            .buttonStyle(.plain)
+            if expanded {
+                alarmRows(alarms, emptyKey: "alarms.empty.group")
+                    .padding(.leading, 8)
+            }
         }
+        .accessibilityIdentifier("group-row-\(group.id.uuidString)")
+        .accessibilityValue(Text(alarms.count, format: .number))
+        .modifier(GroupDragModifier(
+            enabled: !isReordering,
+            groupID: group.id,
+            groups: model.library.groups,
+            draggingID: $draggingGroupID,
+            move: { source, target in model.moveGroup(source, before: target) }
+        ))
     }
 
     private func groupHeader(_ group: AlarmGroup, alarms: [Alarm]) -> some View {
@@ -462,5 +479,64 @@ struct AlarmRow: View {
                     .joined(separator: " ")
             }
         }
+    }
+}
+
+private struct GroupDragModifier: ViewModifier {
+    let enabled: Bool
+    let groupID: UUID
+    let groups: [AlarmGroup]
+    @Binding var draggingID: UUID?
+    let move: (UUID, UUID) -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled {
+            content
+                .onDrag {
+                    draggingID = groupID
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    return NSItemProvider(object: groupID.uuidString as NSString)
+                }
+                .onDrop(
+                    of: [UTType.plainText],
+                    delegate: GroupReorderDropDelegate(
+                        targetID: groupID,
+                        groups: groups,
+                        draggingID: $draggingID,
+                        move: move
+                    )
+                )
+        } else {
+            content
+        }
+    }
+}
+
+private struct GroupReorderDropDelegate: DropDelegate {
+    let targetID: UUID
+    let groups: [AlarmGroup]
+    @Binding var draggingID: UUID?
+    let move: (UUID, UUID) -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingID, draggingID != targetID else { return }
+        guard let from = groups.firstIndex(where: { $0.id == draggingID }),
+              let to = groups.firstIndex(where: { $0.id == targetID }),
+              from != to else { return }
+        move(draggingID, targetID)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingID = nil
+        return true
+    }
+
+    func dropSessionDidEnd(_ session: DropSession) {
+        draggingID = nil
     }
 }

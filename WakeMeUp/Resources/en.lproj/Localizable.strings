@@ -12,6 +12,8 @@
 "alarms.changeSound" = "Change sound";
 "alarms.changeSoundCount" = "Change sound (%lld)";
 "groups.more" = "More";
+"groups.reorder" = "Reorder groups";
+"groups.reorder.done" = "Done reordering";
 "alarms.add" = "Add Alarm";
 "alarms.next" = "Next alarm";
 "alarms.otherGroup" = "Other";

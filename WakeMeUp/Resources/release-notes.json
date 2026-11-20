@@ -5,6 +5,20 @@
       "date": "2026-11-20",
       "changes": {
         "en": [
+          "Reorder groups from the more menu. Each group is a row you can drag.",
+          "The more button next to add opens select, reorder, new group, and Settings."
+        ],
+        "pl": [
+          "Kolejność grup zmienisz z menu więcej. Każda grupa to wiersz, który można przeciągnąć.",
+          "Przycisk więcej obok plusa otwiera zaznaczanie, kolejność, nową grupę i Ustawienia."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-20",
+      "changes": {
+        "en": [
           "Reorder groups from Edit, using the handles. The group menu is on the more button.",
           "Select now marks a whole group, and Change sound stays above the tabs."
         ],
