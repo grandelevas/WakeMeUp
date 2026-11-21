@@ -1,5 +1,6 @@
 import BackgroundTasks
 import CloudKit
+import os
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -108,7 +109,11 @@ final class ShareSceneDelegate: UIResponder, UIWindowSceneDelegate {
 }
 
 enum ShareAcceptance {
+    private static let cloudLog = Logger(subsystem: "com.grandelevas.wakemeup", category: "CloudKit")
+
     static func enqueue(_ metadata: CKShare.Metadata) {
+        let root = metadata.hierarchicalRootRecordID
+        cloudLog.error("userDidAcceptCloudKitShareWith root=\(root?.recordName ?? "nil", privacy: .public) owner=\(root?.zoneID.ownerName ?? "nil", privacy: .public)")
         Task { @MainActor in
             await AppRuntime.acceptWhenReady(metadata)
         }

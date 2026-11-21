@@ -141,6 +141,10 @@
 "sharing.phonesICanWake" = "Telefony, które mogę budzić";
 "sharing.contacts" = "Kontakty";
 "sharing.wakeNow" = "Obudź teraz";
+"sharing.reachError" = "Nie udało się połączyć z telefonem tej osoby.";
+"sharing.connection.waiting" = "Czekam, aż telefon tej osoby dokończy połączenie. Obudź teraz i Ustaw alarm włączą się potem.";
+"sharing.connection.missing" = "Udostępnienie iCloud tej osoby nie jest jeszcze na tym telefonie.";
+"sharing.connection.retry" = "Spróbuj połączyć ponownie";
 "sharing.setAlarm" = "Ustaw alarm";
 "sharing.addToGroup" = "Dodaj do grupy";
 "sharing.delete.title" = "Usunąć ten kontakt?";

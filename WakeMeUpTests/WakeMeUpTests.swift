@@ -1713,6 +1713,54 @@ final class MutualInviteTests: XCTestCase {
         XCTAssertEqual(ShareRecordAddress.database(isOwner: false), .sharedDatabase)
         XCTAssertNotEqual(privateID.ownerName, sharedID.ownerName)
     }
+
+    func testAMissingSharedZoneIsAcceptedAgainAndABackgroundSyncDoesNotLookLikeAFailedInvite() {
+        let owner = "_76b4ce4cbc5b09999462b2f690a9b48a"
+        XCTAssertEqual(
+            ShareAccessPlan.decide(preferredOwner: owner, sharedOwners: [owner], hasInviteURL: true),
+            .use(ownerName: owner)
+        )
+        XCTAssertEqual(
+            ShareAccessPlan.decide(preferredOwner: owner, sharedOwners: ["_other"], hasInviteURL: false),
+            .use(ownerName: "_other")
+        )
+        XCTAssertEqual(
+            ShareAccessPlan.decide(preferredOwner: owner, sharedOwners: ["_a", "_b"], hasInviteURL: true),
+            .reaccept
+        )
+        XCTAssertEqual(
+            ShareAccessPlan.decide(preferredOwner: owner, sharedOwners: ["_a", "_b"], hasInviteURL: false),
+            .unavailable
+        )
+        XCTAssertEqual(
+            ShareAccessPlan.decide(preferredOwner: CKCurrentUserDefaultName, sharedOwners: [owner], hasInviteURL: false),
+            .use(ownerName: owner)
+        )
+        let error = CKError(.zoneNotFound)
+        XCTAssertNil(CloudKitErrorText.alertMessage(for: error, context: .backgroundSync))
+        XCTAssertNil(CloudKitErrorText.alertKind(for: .backgroundSync))
+        let invite = CloudKitErrorText.alertMessage(for: error, context: .creatingInvite)
+        let reach = CloudKitErrorText.alertMessage(for: error, context: .sendingAlarm)
+        XCTAssertNotEqual(invite, reach)
+        XCTAssertEqual(
+            ContactConnectionNote.note(wakeGrantID: nil, hostedGrantID: UUID(), unreachable: []),
+            .waitingForThem
+        )
+        let wake = UUID()
+        XCTAssertEqual(
+            ContactConnectionNote.note(wakeGrantID: wake, hostedGrantID: nil, unreachable: [wake]),
+            .shareMissing
+        )
+        XCTAssertNil(ContactConnectionNote.note(wakeGrantID: wake, hostedGrantID: nil, unreachable: []))
+        XCTAssertTrue(ContactActionPolicy.canWake(SharingContact(
+            id: "a",
+            name: "Mateusz",
+            memberID: UUID(),
+            wakeGrantID: wake,
+            hostedGrantID: nil,
+            isPending: false
+        )))
+    }
 }
 
 final class FriendGroupRosterTests: XCTestCase {

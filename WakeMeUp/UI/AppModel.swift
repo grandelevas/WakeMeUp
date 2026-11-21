@@ -58,6 +58,8 @@ final class AppModel {
     var notificationAllowed = false
     var scheduleFailure: String?
     var lastError: String?
+    /// Grants whose shared zone was missing on the last refresh or send.
+    var unreachableGrantIDs: Set<UUID> = []
     var shareURL: URL?
     var shareMessage = ""
     var shareStatus: String?
@@ -509,7 +511,7 @@ final class AppModel {
             do {
                 try await createReturnShareIfNeeded(for: grant)
             } catch {
-                lastError = CloudKitErrorText.message(for: error)
+                unreachableGrantIDs.insert(grant.id)
             }
             await refreshRemote()
         } catch is AsyncDeadlineError {
@@ -525,9 +527,9 @@ final class AppModel {
         guard let cloudKit, !refreshing else { return }
         refreshing = true
         defer { refreshing = false }
+        await cloudKit.prepareForRefresh()
         await publishMissingReturnLinks()
         let grants = snapshot.permissions.grants.filter { $0.cloudKitRootRecordName != nil && $0.state != .revoked }
-        var refreshFailure: String?
         for grant in grants {
             let asOwner = grant.owner.id == snapshot.profile.id
             let updatedGrant: ShareGrant
@@ -535,9 +537,10 @@ final class AppModel {
             do {
                 (updatedGrant, commands) = try await cloudKit.refresh(grant, asOwner: asOwner)
             } catch {
-                refreshFailure = CloudKitErrorText.message(for: error)
+                unreachableGrantIDs.insert(grant.id)
                 continue
             }
+            unreachableGrantIDs.remove(grant.id)
             var updated = GrantRefreshMerge.merging(updatedGrant, with: grant)
             updated = GrantRefreshMerge.applyingOwnName(ownNames.load(), to: updated, profileID: snapshot.profile.id)
             var library = snapshot.library
@@ -602,11 +605,13 @@ final class AppModel {
                 }
             }
         }
-        if let refreshFailure {
-            lastError = refreshFailure
-        }
         await reschedule(requestAccess: false)
         await acceptReturnInvitesIfNeeded()
+    }
+
+    func retryConnection() async {
+        unreachableGrantIDs.removeAll()
+        await refreshRemote()
     }
 
     func renamePerson(grantID: UUID, to name: String) async {
@@ -729,7 +734,10 @@ final class AppModel {
                 do {
                     try await cloudKit.saveVoice(file: voiceFile, recordName: voiceName, grant: grant, asOwner: false)
                 } catch {
-                    lastError = CloudKitErrorText.message(for: error)
+                    unreachableGrantIDs.insert(grantID)
+                    if let text = CloudKitErrorText.alertMessage(for: error, context: .sendingAlarm) {
+                        lastError = text
+                    }
                     alarm.soundID = SoundCatalog.defaultID
                     command.alarm = alarm
                 }
@@ -755,7 +763,10 @@ final class AppModel {
                 }
             }
         } catch {
-            lastError = error.localizedDescription
+            unreachableGrantIDs.insert(grantID)
+            if let text = CloudKitErrorText.alertMessage(for: error, context: .sendingAlarm) {
+                lastError = text
+            }
         }
     }
 
@@ -785,7 +796,10 @@ final class AppModel {
             _ = try snapshot.permissions.authorize(sender: senderID, recipient: sent.recipientID)
             try await cloudKit.append(command: command, grant: grant, asOwner: false)
         } catch {
-            lastError = error.localizedDescription
+            unreachableGrantIDs.insert(grant.id)
+            if let text = CloudKitErrorText.alertMessage(for: error, context: .sendingAlarm) {
+                lastError = text
+            }
         }
     }
 
@@ -1000,7 +1014,7 @@ final class AppModel {
             do {
                 try await cloudKit.appendWakeReport(report, on: grant)
             } catch {
-                lastError = CloudKitErrorText.message(for: error)
+                unreachableGrantIDs.insert(grant.id)
                 return
             }
         }
@@ -1101,9 +1115,10 @@ final class AppModel {
             do {
                 try await cloudKit.publishReturnInvite(url, on: original)
                 original.returnInviteURL = url.absoluteString
+                unreachableGrantIDs.remove(original.id)
                 update { $0.permissions.replace(original) }
             } catch {
-                lastError = CloudKitErrorText.message(for: error)
+                unreachableGrantIDs.insert(original.id)
             }
         }
     }
@@ -1125,10 +1140,8 @@ final class AppModel {
             }
             update { $0.permissions.replace(grant) }
             grantsToSeal.insert(grant.id)
-        } catch is AsyncDeadlineError {
-            lastError = String(localized: "sharing.timedOut")
         } catch {
-            lastError = CloudKitErrorText.message(for: error)
+            // The contact stays on the waiting note until the return share can be accepted.
         }
     }
 
