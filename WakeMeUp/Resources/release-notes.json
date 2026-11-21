@@ -5,6 +5,18 @@
       "date": "2026-11-20",
       "changes": {
         "en": [
+          "When you set an alarm for a friend, you can record a voice message of up to 20 seconds. It rings on their phone, and you can play it from the alarm."
+        ],
+        "pl": [
+          "Ustawiając budzik znajomemu, możesz nagrać wiadomość do 20 sekund. Zadzwoni na jego telefonie i da się ją odtworzyć przy alarmie."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-20",
+      "changes": {
+        "en": [
           "When a friend stops an alarm you set, you are told they are up, with the time. If they snooze twice or leave it for 10 minutes, you are told they are still asleep.",
           "That status is shown on the alarm under For friends."
         ],

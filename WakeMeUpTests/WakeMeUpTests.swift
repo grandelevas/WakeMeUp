@@ -1192,6 +1192,23 @@ final class ReleaseNotesTests: XCTestCase {
     }
 }
 
+final class VoiceClipPolicyTests: XCTestCase {
+    func testAVoiceClipStopsAtTwentySeconds() {
+        XCTAssertEqual(VoiceClipPolicy.clamped(0), 0)
+        XCTAssertEqual(VoiceClipPolicy.clamped(12), 12)
+        XCTAssertEqual(VoiceClipPolicy.clamped(20), 20)
+        XCTAssertEqual(VoiceClipPolicy.clamped(45), 20)
+        XCTAssertEqual(VoiceClipPolicy.clamped(.nan), 0)
+    }
+
+    func testAMissingVoiceFileFallsBackToTheDefaultSound() {
+        XCTAssertEqual(VoiceClipPolicy.soundID(installed: true, voiceID: "voice-1"), "voice-1")
+        XCTAssertEqual(VoiceClipPolicy.soundID(installed: false, voiceID: "voice-1"), SoundCatalog.defaultID)
+        XCTAssertEqual(VoiceClipPolicy.soundID(installed: true, voiceID: nil), SoundCatalog.defaultID)
+        XCTAssertEqual(VoiceClipPolicy.soundID(installed: true, voiceID: ""), SoundCatalog.defaultID)
+    }
+}
+
 final class SoundPreviewPolicyTests: XCTestCase {
     func testPreviewStaysWithinTenSeconds() {
         XCTAssertEqual(SoundPreviewPolicy.length(fileDuration: 12, requested: nil), 10)

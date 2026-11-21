@@ -137,6 +137,15 @@
 "sharing.phonesICanWake" = "Telefony, które mogę budzić";
 "sharing.ringNow" = "Obudź teraz";
 "sharing.schedule" = "Zaplanuj";
+"sharing.voice.title" = "Wiadomość głosowa";
+"sharing.voice.help" = "Nagraj do 20 sekund. Zadzwoni jako ich budzik. Możesz wysłać alarm bez nagrania.";
+"sharing.voice.record" = "Nagraj";
+"sharing.voice.stop" = "Stop";
+"sharing.voice.preview" = "Odsłuchaj";
+"sharing.voice.rerecord" = "Nagraj ponownie";
+"sharing.voice.send" = "Wyślij alarm";
+"sound.voice" = "Wiadomość głosowa";
+"sound.voice.play" = "Odtwórz wiadomość głosową";
 "sharing.simulatedFriend" = "Symulowana osoba";
 "sharing.addFriend" = "Dodaj symulowaną osobę";
 "sharing.friendName" = "Imię osoby";

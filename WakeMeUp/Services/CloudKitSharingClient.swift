@@ -276,6 +276,26 @@ final class CloudKitSharingClient {
         }
     }
 
+    /// Saves a voice clip next to the shared root. Record type `WMVoice`, field `audio` (Asset).
+    func saveVoice(file: URL, recordName: String, grant: ShareGrant, asOwner: Bool) async throws {
+        try await requireAccount()
+        let database = asOwner ? container.privateCloudDatabase : container.sharedCloudDatabase
+        let rootID = try recordID(for: grant)
+        let voice = CKRecord(recordType: "WMVoice", recordID: CKRecord.ID(recordName: recordName, zoneID: rootID.zoneID))
+        voice["audio"] = CKAsset(fileURL: file)
+        voice.parent = CKRecord.Reference(recordID: rootID, action: .none)
+        _ = try await database.save(voice)
+    }
+
+    func voiceFile(named recordName: String, grant: ShareGrant, asOwner: Bool) async throws -> URL? {
+        try await requireAccount()
+        let database = asOwner ? container.privateCloudDatabase : container.sharedCloudDatabase
+        let zoneID = try recordID(for: grant).zoneID
+        let record = try await fetchRecord(CKRecord.ID(recordName: recordName, zoneID: zoneID), in: database)
+        guard let asset = record["audio"] as? CKAsset else { return nil }
+        return asset.fileURL
+    }
+
     func revoke(_ grant: ShareGrant) async throws {
         try await requireAccount()
         var revoked = grant

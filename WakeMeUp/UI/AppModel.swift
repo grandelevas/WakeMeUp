@@ -498,8 +498,21 @@ final class AppModel {
             if asOwner, let joined = ShareChangeNotice.joinedName(previous: grant, updated: updated) {
                 notices.append(String(format: String(localized: "sharing.push.joined"), joined))
             }
+            var newSounds: [CustomSound] = []
             for command in commands where !applied.contains(command.id) {
+                var command = command
                 if updated.state == .active {
+                    if var alarm = command.alarm, command.voiceRecordName != nil {
+                        let voiceID = command.voiceRecordName ?? ""
+                        var installed = false
+                        if let file = try? await cloudKit.voiceFile(named: voiceID, grant: grant, asOwner: asOwner),
+                           let sound = try? VoiceFiles.install(from: file, soundID: voiceID) {
+                            newSounds.append(sound)
+                            installed = true
+                        }
+                        alarm.soundID = VoiceClipPolicy.soundID(installed: installed, voiceID: voiceID)
+                        command.alarm = alarm
+                    }
                     if (command.action == .upsert || command.action == .triggerNow), let alarm = command.alarm {
                         notices.append(RemoteAlarmNotice.text(sender: PersonName.senderName(grant: updated), schedule: alarm.schedule))
                     }
@@ -527,6 +540,9 @@ final class AppModel {
                     guard let index = $0.sentAlarms.firstIndex(where: { $0.commandID == change.commandID }) else { continue }
                     $0.sentAlarms[index].wakeStatus = change.status
                     $0.sentAlarms[index].wakeStatusAt = change.at
+                }
+                for sound in newSounds where !$0.customSounds.contains(where: { $0.id == sound.id }) {
+                    $0.customSounds.append(sound)
                 }
             }
         }
@@ -570,9 +586,9 @@ final class AppModel {
         try? await cloudKit.revoke(revoked)
     }
 
-    func sendToPhone(grantID: UUID, immediately: Bool) async {
+    func sendToPhone(grantID: UUID, immediately: Bool, voiceFile: URL? = nil) async {
         guard let grant = snapshot.permissions.grant(id: grantID), let cloudKit else { return }
-        let alarm = Alarm(
+        var alarm = Alarm(
             id: UUID(),
             schedule: immediately
                 ? .oneShot(fireAt: Date().addingTimeInterval(3))
@@ -587,7 +603,17 @@ final class AppModel {
             origin: .local,
             resumeWhenGroupEnables: nil
         )
-        let command = RemoteAlarmCommand(
+        var voiceName: String?
+        var installed: CustomSound?
+        if let voiceFile {
+            let name = "voice-\(UUID().uuidString)"
+            if let sound = try? VoiceFiles.install(from: voiceFile, soundID: name) {
+                alarm.soundID = sound.id
+                voiceName = name
+                installed = sound
+            }
+        }
+        var command = RemoteAlarmCommand(
             id: UUID(),
             grantID: grant.id,
             senderID: snapshot.profile.id,
@@ -598,18 +624,36 @@ final class AppModel {
             alarmID: alarm.id,
             enabled: true
         )
+        command.voiceRecordName = voiceName
         do {
             _ = try snapshot.permissions.authorize(sender: snapshot.profile.id, recipient: grant.owner.id)
             try await cloudKit.append(command: command, grant: grant, asOwner: false)
+            if let voiceFile, let voiceName {
+                do {
+                    try await cloudKit.saveVoice(file: voiceFile, recordName: voiceName, grant: grant, asOwner: false)
+                } catch {
+                    lastError = CloudKitErrorText.message(for: error)
+                    alarm.soundID = SoundCatalog.defaultID
+                    command.alarm = alarm
+                }
+            }
             if !immediately {
                 let sent = SentAlarm(
                     alarm: alarm,
                     recipientID: grant.owner.id,
-                    recipientName: grant.owner.displayName,
+                    recipientName: PersonName.listLabel(
+                        for: grant,
+                        profileID: snapshot.profile.id,
+                        grants: snapshot.permissions.grants,
+                        generic: grant.owner.displayName
+                    ),
                     sentAt: command.createdAt,
                     commandID: command.id
                 )
-                update { $0.sentAlarms.append(sent) }
+                update {
+                    if let installed { $0.customSounds.append(installed) }
+                    $0.sentAlarms.append(sent)
+                }
             }
         } catch {
             lastError = error.localizedDescription
