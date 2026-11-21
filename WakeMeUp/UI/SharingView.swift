@@ -11,6 +11,9 @@ struct SharingView: View {
     @State private var renameDraft = ""
     @State private var voiceGrantID: UUID?
     @State private var addingFriendGroup = false
+    @State private var expandedContactID: String?
+    @State private var contactPendingDelete: SharingContact?
+    @State private var groupingMemberID: UUID?
 
     var body: some View {
         NavigationStack {
@@ -29,8 +32,7 @@ struct SharingView: View {
                 if !model.showsSimulatedPreview {
                     friendGroupSection
                 }
-                grantSection(title: "sharing.peopleWhoCanWakeMe", grants: incoming)
-                grantSection(title: "sharing.phonesICanWake", grants: outgoing)
+                contactSection
             }
             .navigationTitle("sharing.title")
             .toolbar {
@@ -52,6 +54,26 @@ struct SharingView: View {
             }
             .sheet(isPresented: $inviting) { inviteSheet }
             .sheet(isPresented: $addingFriendGroup) { friendGroupSheet }
+            .sheet(isPresented: groupMemberPresented) { addToGroupSheet }
+            .confirmationDialog(
+                "sharing.delete.title",
+                isPresented: deletePresented,
+                titleVisibility: .visible
+            ) {
+                Button("sharing.delete.confirm", role: .destructive) {
+                    guard let contact = contactPendingDelete else { return }
+                    if let id = contact.hostedGrantID {
+                        Task { await model.revoke(grantID: id) }
+                    }
+                    if let id = contact.wakeGrantID {
+                        Task { await model.revoke(grantID: id) }
+                    }
+                    contactPendingDelete = nil
+                }
+                Button("sharing.cancel", role: .cancel) { contactPendingDelete = nil }
+            } message: {
+                Text("sharing.delete.message")
+            }
             .sheet(isPresented: $editingOwnName, onDismiss: {
                 Task { await model.commitOwnName() }
             }) { ownNameSheet }
@@ -229,10 +251,6 @@ struct SharingView: View {
         }
     }
 
-    private var incoming: [ShareGrant] {
-        ShareRoster.canSetAlarmsHere(profileID: model.profile.id, grants: model.grants)
-    }
-
     private var outgoing: [ShareGrant] {
         ShareRoster.phonesICanSet(profileID: model.profile.id, grants: model.grants)
     }
@@ -287,45 +305,105 @@ struct SharingView: View {
         }
     }
 
-    @ViewBuilder
-    private func grantSection(title: LocalizedStringKey, grants: [ShareGrant]) -> some View {
-        Section(title) {
-            if grants.isEmpty {
+    private var contacts: [SharingContact] {
+        ContactRoster.contacts(profileID: model.profile.id, grants: model.grants)
+    }
+
+    private var deletePresented: Binding<Bool> {
+        Binding(get: { contactPendingDelete != nil }, set: { if !$0 { contactPendingDelete = nil } })
+    }
+
+    private var groupMemberPresented: Binding<Bool> {
+        Binding(get: { groupingMemberID != nil }, set: { if !$0 { groupingMemberID = nil } })
+    }
+
+    private var contactSection: some View {
+        Section("sharing.contacts") {
+            if contacts.isEmpty {
                 Text("sharing.none").foregroundStyle(.secondary)
             }
-            ForEach(grants) { grant in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(otherName(in: grant))
-                        .font(.body)
-                    Text(stateName(grant.state))
-                        .font(.caption)
+            ForEach(contacts) { contact in
+                VStack(alignment: .leading, spacing: 8) {
+                    Button {
+                        expandedContactID = expandedContactID == contact.id ? nil : contact.id
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(contact.name)
+                                if contact.isPending {
+                                    Text("sharing.pending")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Image(systemName: expandedContactID == contact.id ? "chevron.up" : "chevron.down")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    if expandedContactID == contact.id {
+                        Button("sharing.wakeNow") {
+                            guard let id = contact.wakeGrantID else { return }
+                            Task { await model.sendToPhone(grantID: id, immediately: true) }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(contact.wakeGrantID == nil)
+                        Button("sharing.setAlarm") {
+                            guard let id = contact.wakeGrantID else { return }
+                            model.editAlarm(forContactGrant: id)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(contact.wakeGrantID == nil)
+                        Button("sharing.addToGroup") {
+                            groupingMemberID = contact.memberID
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(contact.memberID == nil)
+                    }
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button("sharing.delete.confirm", role: .destructive) {
+                        contactPendingDelete = contact
+                    }
+                }
+                .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                    Button("sharing.rename") { beginRename(contact) }
+                        .tint(.indigo)
+                }
+            }
+        }
+    }
+
+    private func beginRename(_ contact: SharingContact) {
+        let grantID = contact.hostedGrantID ?? contact.wakeGrantID
+        guard let grantID else { return }
+        renameDraft = contact.name == String(localized: "sharing.someone") ? "" : contact.name
+        renamingGrantID = grantID
+    }
+
+    private var addToGroupSheet: some View {
+        NavigationStack {
+            Form {
+                if model.snapshot.friendGroups.isEmpty {
+                    Text("sharing.friendGroups.empty")
                         .foregroundStyle(.secondary)
-                    if grant.owner.id == model.profile.id,
-                       grant.state == .pending,
-                       InviteLinkPolicy.url(from: grant.inviteCode) != nil {
-                        Button("sharing.copyLink") {
-                            model.copyInviteLink(grantID: grant.id)
+                }
+                ForEach(model.snapshot.friendGroups) { group in
+                    Button(group.name) {
+                        if let groupingMemberID {
+                            model.addMember(groupingMemberID, toGroup: group.id)
                         }
-                        .font(.footnote)
+                        self.groupingMemberID = nil
                     }
-                    Button("sharing.rename") {
-                        let label = otherName(in: grant)
-                        renameDraft = label == String(localized: "sharing.someone") ? "" : label
-                        renamingGrantID = grant.id
-                    }
-                    .font(.footnote)
-                    if grant.grantee?.id == model.profile.id && model.usesCloudKit {
-                        Button("sharing.schedule") {
-                            voiceGrantID = grant.id
-                        }
-                        Button("sharing.ringNow") {
-                            Task { await model.sendToPhone(grantID: grant.id, immediately: true) }
-                        }
-                    }
-                    Button("sharing.revoke", role: .destructive) {
-                        Task { await model.revoke(grantID: grant.id) }
-                    }
-                    .font(.footnote)
+                }
+            }
+            .navigationTitle("sharing.addToGroup")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("sharing.cancel") { groupingMemberID = nil }
                 }
             }
         }

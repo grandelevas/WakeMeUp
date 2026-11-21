@@ -27,7 +27,8 @@
 "alarm.label" = "Label";
 "alarm.note" = "Note";
 "alarm.note.placeholder" = "A short note";
-"alarm.note.help" = "Up to 140 characters. It shows on the alarm and in the list.";
+"alarm.note.help" = "Up to 1000 characters. It shows on the alarm and in the list.";
+"alarm.voice.help" = "Record up to 20 seconds. It plays when this alarm rings.";
 "alarm.repeat" = "Repeat";
 "alarm.sound" = "Sound";
 "alarm.snooze" = "Snooze";
@@ -138,6 +139,13 @@
 "sharing.revoke.message" = "They will no longer be able to set alarms on this iPhone.";
 "sharing.peopleWhoCanWakeMe" = "Can set alarms here";
 "sharing.phonesICanWake" = "Phones I can set";
+"sharing.contacts" = "Contacts";
+"sharing.wakeNow" = "Wake now";
+"sharing.setAlarm" = "Set alarm";
+"sharing.addToGroup" = "Add to group";
+"sharing.delete.title" = "Delete this contact?";
+"sharing.delete.message" = "They will no longer be able to set alarms for you, and you will no longer be able to set alarms for them.";
+"sharing.delete.confirm" = "Delete";
 "sharing.ringNow" = "Ring now";
 "sharing.schedule" = "Schedule";
 "sharing.voice.title" = "Voice message";

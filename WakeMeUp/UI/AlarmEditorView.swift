@@ -7,6 +7,8 @@ struct AlarmEditorView: View {
     @State private var time: Date
     @State private var importing = false
     @State private var preview = SoundPreviewPlayer()
+    @State private var recorder = VoiceClipRecorder()
+    @State private var voiceInstalled = false
 
     init(draft: AlarmDraft) {
         _draft = State(initialValue: draft)
@@ -39,16 +41,19 @@ struct AlarmEditorView: View {
 
                 Section("alarm.note") {
                     TextField("alarm.note.placeholder", text: $draft.note, axis: .vertical)
-                        .lineLimit(3...5)
+                        .lineLimit(3...8)
                         .onChange(of: draft.note) { _, newValue in
                             if newValue.count > AlarmNote.maxCharacters {
                                 draft.note = String(newValue.prefix(AlarmNote.maxCharacters))
                             }
                         }
-                    Text("alarm.note.help")
+                    Text("\(draft.note.count)/\(AlarmNote.maxCharacters)")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
+
+                voiceSection
 
                 SoundChoiceList(soundID: $draft.soundID, preview: preview, showsImport: true) {
                     importing = true
@@ -109,7 +114,8 @@ struct AlarmEditorView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("alarm.cancel") {
                         preview.stop()
-                        dismiss()
+                        recorder.stop()
+                        model.closeEditor()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -124,9 +130,46 @@ struct AlarmEditorView: View {
                 draft.soundID = id
                 playPreview(of: id)
             }
-            .onDisappear { preview.stop() }
+            .onChange(of: recorder.isRecording) { _, recording in
+                guard !recording, !voiceInstalled, let url = recorder.fileURL else { return }
+                if let id = model.installLocalVoice(url) {
+                    draft.soundID = id
+                    voiceInstalled = true
+                }
+            }
+            .onDisappear {
+                preview.stop()
+                recorder.stop()
+            }
         }
         .accessibilityIdentifier("alarm-editor")
+    }
+
+    private var voiceSection: some View {
+        Section("sharing.voice.title") {
+            Text("alarm.voice.help")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            if recorder.isRecording {
+                Button("sharing.voice.stop") { recorder.stop() }
+            } else if draft.soundID.hasPrefix("voice-") || recorder.fileURL != nil {
+                Button("sharing.voice.preview") { playPreview(of: draft.soundID) }
+                Button("sharing.voice.rerecord") {
+                    preview.stop()
+                    recorder.discard()
+                    voiceInstalled = false
+                    if draft.soundID.hasPrefix("voice-") {
+                        draft.soundID = SoundCatalog.defaultID
+                    }
+                }
+            } else {
+                Button("sharing.voice.record") {
+                    do { try recorder.record() } catch {
+                        recorder.discard()
+                    }
+                }
+            }
+        }
     }
 
     private func playPreview(of id: String) {
@@ -134,7 +177,11 @@ struct AlarmEditorView: View {
             preview.stop()
             return
         }
-        preview.play(id: id, url: url)
+        preview.play(
+            id: id,
+            url: url,
+            cap: id.hasPrefix("voice-") ? VoiceClipPolicy.maxSeconds : SoundPreviewPolicy.maximumDuration
+        )
     }
 
     private var repeatSummary: String {
