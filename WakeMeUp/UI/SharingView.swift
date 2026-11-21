@@ -347,6 +347,19 @@ struct SharingView: View {
                     }
                     .buttonStyle(.borderless)
                     if expandedContactID == contact.id {
+                        if let note = ContactConnectionNote.note(
+                            wakeGrantID: contact.wakeGrantID,
+                            hostedGrantID: contact.hostedGrantID,
+                            unreachable: model.unreachableGrantIDs
+                        ) {
+                            Text(note == .shareMissing ? "sharing.connection.missing" : "sharing.connection.waiting")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Button("sharing.connection.retry") {
+                                Task { await model.retryConnection() }
+                            }
+                            .buttonStyle(.borderless)
+                        }
                         Button("sharing.wakeNow") {
                             guard let id = contact.wakeGrantID else { return }
                             Task { await model.sendToPhone(grantID: id, immediately: true) }

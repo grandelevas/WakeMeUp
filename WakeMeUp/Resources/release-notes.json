@@ -5,6 +5,18 @@
       "date": "2026-11-21",
       "changes": {
         "en": [
+          "Opening the app no longer reports a failed invite when a friend's iCloud share is still connecting. Retry connection finishes it, and Wake now works once that share is on this phone."
+        ],
+        "pl": [
+          "Otwarcie aplikacji nie zgłasza już nieudanego zaproszenia, gdy udział iCloud znajomego jeszcze się łączy. Spróbuj połączyć ponownie kończy to, a Obudź teraz działa, gdy ten udział jest na tym telefonie."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-21",
+      "changes": {
+        "en": [
           "Accepting an invite no longer shows the same person twice, and the return connection is created in your own iCloud zone.",
           "New group, Wake now, Set alarm, and Add to group respond when you tap them.",
           "While you record a voice message you see a timer, and afterwards you can play it. That recording is what rings, on your alarms and on a friend's."
