@@ -5,6 +5,18 @@
       "date": "2026-11-21",
       "changes": {
         "en": [
+          "Sharing refreshes when you pull the list, when you open the tab, and when the app becomes active. Swipe in from the screen edge to move between Alarms, Sharing, and Achievements."
+        ],
+        "pl": [
+          "Współpraca odświeża się po pociągnięciu listy, po otwarciu karty i gdy aplikacja wraca na wierzch. Przesuń od krawędzi ekranu, żeby przejść między Alarmami, Współpracą i Achievements."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-21",
+      "changes": {
+        "en": [
           "Wake now, Set alarm, and Add to group are large tiles on a contact."
         ],
         "pl": [

@@ -201,7 +201,6 @@
 "sharing.label" = "Label for their alarm";
 "sharing.copy" = "Copy";
 "sharing.share" = "Share link";
-"sharing.refresh" = "Refresh";
 "sharing.queued" = "Waiting for their phone";
 "sharing.signIn" = "Sign in to iCloud to share alarms.";
 
