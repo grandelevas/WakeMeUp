@@ -347,28 +347,31 @@ struct SharingView: View {
                     }
                     .buttonStyle(.borderless)
                     if expandedContactID == contact.id {
-                        if ContactConnectionNote.note(wakeGrantID: contact.wakeGrantID, isPending: contact.isPending) == .connecting {
-                            Text("sharing.connection.connecting")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        HStack(alignment: .top, spacing: 8) {
+                            ContactActionTile(
+                                title: "sharing.wakeNow",
+                                systemImage: "sun.max.fill",
+                                disabled: !ContactActionPolicy.canWake(contact)
+                            ) {
+                                guard let id = contact.wakeGrantID else { return }
+                                Task { await model.sendToPhone(grantID: id, immediately: true) }
+                            }
+                            ContactActionTile(
+                                title: "sharing.setAlarm",
+                                systemImage: "alarm.fill",
+                                disabled: !ContactActionPolicy.canWake(contact)
+                            ) {
+                                guard let id = contact.wakeGrantID else { return }
+                                model.editAlarm(forContactGrant: id)
+                            }
+                            ContactActionTile(
+                                title: "sharing.addToGroup",
+                                systemImage: "person.badge.plus",
+                                disabled: !ContactActionPolicy.canAddToGroup(contact)
+                            ) {
+                                groupingMemberID = contact.memberID
+                            }
                         }
-                        Button("sharing.wakeNow") {
-                            guard let id = contact.wakeGrantID else { return }
-                            Task { await model.sendToPhone(grantID: id, immediately: true) }
-                        }
-                        .buttonStyle(.borderless)
-                        .disabled(!ContactActionPolicy.canWake(contact))
-                        Button("sharing.setAlarm") {
-                            guard let id = contact.wakeGrantID else { return }
-                            model.editAlarm(forContactGrant: id)
-                        }
-                        .buttonStyle(.borderless)
-                        .disabled(!ContactActionPolicy.canWake(contact))
-                        Button("sharing.addToGroup") {
-                            groupingMemberID = contact.memberID
-                        }
-                        .buttonStyle(.borderless)
-                        .disabled(!ContactActionPolicy.canAddToGroup(contact))
                     }
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -432,6 +435,39 @@ struct SharingView: View {
         case .active: String(localized: "sharing.active")
         case .revoked: String(localized: "sharing.revoked")
         }
+    }
+}
+
+private struct ContactActionTile: View {
+    @Environment(\.appAccent) private var appAccent
+    let title: LocalizedStringKey
+    let systemImage: String
+    var disabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.title2)
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
+            }
+            .foregroundStyle(disabled ? Color.secondary : appAccent)
+            .frame(maxWidth: .infinity, minHeight: 80)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 8)
+            .background(
+                (disabled ? Color.secondary.opacity(0.12) : appAccent.opacity(0.16)),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.borderless)
+        .disabled(disabled)
     }
 }
 
