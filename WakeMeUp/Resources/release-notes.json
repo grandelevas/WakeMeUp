@@ -5,6 +5,18 @@
       "date": "2026-11-21",
       "changes": {
         "en": [
+          "One invite link connects both ways. After the other person accepts, each of you can wake the other. Nothing else has to be opened or sent."
+        ],
+        "pl": [
+          "Jeden link zaproszenia łączy w obie strony. Gdy druga osoba go przyjmie, każde z was może obudzić drugie. Nie trzeba nic więcej otwierać ani wysyłać."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-21",
+      "changes": {
+        "en": [
           "Wake now rings on their phone about 2 minutes after they receive it, full screen. If a voice message cannot be sent, the alarm still goes through without it."
         ],
         "pl": [

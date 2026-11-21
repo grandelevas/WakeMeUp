@@ -155,26 +155,6 @@ enum PrivateZonePolicy {
     }
 }
 
-struct OwnedShareRepair: Equatable {
-    var grant: ShareGrant
-    var url: URL
-    var needsNewLink: Bool
-}
-
-enum OwnedShareAction: Equatable {
-    case keep
-    case reopen
-    case create
-
-    /// A missing share is created on the existing root. A closed public link is opened again.
-    /// Nothing here deletes the zone.
-    static func decide(shareExists: Bool, publicPermissionNone: Bool, urlMissing: Bool) -> OwnedShareAction {
-        if !shareExists { return .create }
-        if publicPermissionNone || urlMissing { return .reopen }
-        return .keep
-    }
-}
-
 enum ShareFailureKind: Equatable {
     case shareLinkGone
     case zoneMissing
@@ -237,28 +217,12 @@ enum ShareAccessPlan: Equatable {
 }
 
 enum ContactConnectionNote: Equatable {
-    /// The other phone has not published the share that lets us ring it.
-    case waitingForThem
-    /// Their share should be on this phone, but the shared zone was missing.
-    case shareMissing
-    /// The stored share URL no longer exists. The other person has to send a new one.
-    case askForNewLink
-    /// This phone owns the share and just minted a link the other person does not have.
-    case sendNewLink
+    /// The return share is still being accepted in the background. No button.
+    case connecting
 
-    static func note(
-        wakeGrantID: UUID?,
-        hostedGrantID: UUID?,
-        unreachable: Set<UUID>,
-        sendNewLink: Bool = false,
-        askNewLink: Bool = false
-    ) -> ContactConnectionNote? {
-        if askNewLink { return .askForNewLink }
-        if sendNewLink { return .sendNewLink }
-        let ids = [wakeGrantID, hostedGrantID].compactMap { $0 }
-        if ids.contains(where: { unreachable.contains($0) }) { return .shareMissing }
-        if wakeGrantID == nil { return .waitingForThem }
-        return nil
+    static func note(wakeGrantID: UUID?, isPending: Bool) -> ContactConnectionNote? {
+        if wakeGrantID != nil || isPending { return nil }
+        return .connecting
     }
 }
 
@@ -483,63 +447,6 @@ final class CloudKitSharingClient {
 
     /// Makes sure the share on this phone's root still has a link. Never deletes the zone or the root.
     /// Closing the public link used to run after someone accepted, and that made the saved URL return "share not found".
-    func repairOwnedShare(_ grant: ShareGrant) async throws -> OwnedShareRepair {
-        try await requireAccount()
-        _ = try await ensurePrivateZone()
-        let database = container.privateCloudDatabase
-        let root = try await fetchRecord(try recordID(for: grant, database: database), in: database)
-        let existing = await existingShare(on: root, grant: grant, database: database)
-        let action = OwnedShareAction.decide(
-            shareExists: existing != nil,
-            publicPermissionNone: existing?.publicPermission == .none,
-            urlMissing: existing?.url == nil
-        )
-        cloudLog.error("repairOwnedShare \(String(describing: action), privacy: .public) root=\(root.recordID.recordName, privacy: .public)")
-        switch action {
-        case .keep:
-            guard let existing, let url = existing.url else { throw RemoteBackendError.shareURLMissing }
-            var updated = grant
-            updated.inviteCode = url.absoluteString
-            updated.cloudKitShareRecordName = existing.recordID.recordName
-            return OwnedShareRepair(grant: updated, url: url, needsNewLink: false)
-        case .reopen:
-            guard let existing else { throw RemoteBackendError.missingRoot }
-            existing.publicPermission = .readWrite
-            existing[CKShare.SystemFieldKey.title] = "Wakito" as NSString
-            guard let saved = try await database.save(existing) as? CKShare, let url = saved.url else {
-                throw RemoteBackendError.shareURLMissing
-            }
-            var updated = grant
-            updated.inviteCode = url.absoluteString
-            updated.cloudKitShareRecordName = saved.recordID.recordName
-            try await save(updated, commands: readCommands(from: root), database: database, record: root)
-            return OwnedShareRepair(grant: updated, url: url, needsNewLink: true)
-        case .create:
-            let share = CKShare(rootRecord: root)
-            share.publicPermission = .readWrite
-            share[CKShare.SystemFieldKey.title] = "Wakito" as NSString
-            let (results, _) = try await database.modifyRecords(saving: [root, share], deleting: [], savePolicy: .allKeys)
-            var savedShare: CKShare?
-            var savedRoot: CKRecord?
-            for result in results.values {
-                switch result {
-                case let .success(record):
-                    if let saved = record as? CKShare { savedShare = saved } else { savedRoot = record }
-                case let .failure(error):
-                    throw error
-                }
-            }
-            guard let savedShare, let url = savedShare.url else { throw RemoteBackendError.shareURLMissing }
-            var updated = grant
-            updated.inviteCode = url.absoluteString
-            updated.cloudKitShareRecordName = savedShare.recordID.recordName
-            if let savedRoot {
-                try await save(updated, commands: readCommands(from: savedRoot), database: database, record: savedRoot)
-            }
-            return OwnedShareRepair(grant: updated, url: url, needsNewLink: true)
-        }
-    }
-
     func publishReturnInvite(_ url: URL, on grant: ShareGrant) async throws {
         try await requireAccount()
         try await mutate(grant: grant, database: container.sharedCloudDatabase, alter: { stored in
@@ -654,18 +561,6 @@ final class CloudKitSharingClient {
         let root = try await fetchRecord(try recordID(for: grant, database: container.privateCloudDatabase), in: container.privateCloudDatabase)
         try await save(revoked, commands: readCommands(from: root), database: container.privateCloudDatabase, record: root)
         await closePublicLink(on: root, grant: revoked, database: container.privateCloudDatabase)
-    }
-
-    private func existingShare(on root: CKRecord, grant: ShareGrant, database: CKDatabase) async -> CKShare? {
-        let shareID: CKRecord.ID
-        if let reference = root.share {
-            shareID = reference.recordID
-        } else if let name = grant.cloudKitShareRecordName {
-            shareID = CKRecord.ID(recordName: name, zoneID: root.recordID.zoneID)
-        } else {
-            return nil
-        }
-        return try? await fetchRecord(shareID, in: database) as? CKShare
     }
 
     /// Used only when the owner revokes a contact. Do not call this after a normal accept:
