@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import Observation
 
 enum SoundPreviewPolicy {
     static let maximumDuration: TimeInterval = 10
@@ -15,6 +16,7 @@ enum SoundPreviewPolicy {
 }
 
 @MainActor
+@Observable
 final class SoundPreviewPlayer {
     private var player: AVAudioPlayer?
     private var stopTask: Task<Void, Never>?
@@ -36,9 +38,7 @@ final class SoundPreviewPlayer {
         stop()
         let accessing = securityScoped && url.startAccessingSecurityScopedResource()
         do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [])
-            try session.setActive(true)
+            try VoiceAudioRoute.applyPreview()
             let player = try AVAudioPlayer(contentsOf: url)
             let available = max(0, player.duration - max(0, start))
             let playLength = SoundPreviewPolicy.length(fileDuration: available, requested: length, cap: cap)

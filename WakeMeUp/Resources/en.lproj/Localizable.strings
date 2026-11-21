@@ -155,6 +155,12 @@
 "sharing.voice.preview" = "Preview";
 "sharing.voice.rerecord" = "Record again";
 "sharing.voice.send" = "Send alarm";
+"sharing.voice.play" = "Play";
+"sharing.voice.pause" = "Pause";
+"sharing.voice.delete" = "Delete";
+"sharing.voice.recording" = "Recording";
+"sharing.voice.denied" = "Microphone access is off. Turn it on in Settings to record a voice message.";
+"sharing.voice.duration" = "Length %@";
 "sound.voice" = "Voice message";
 "sound.voice.play" = "Play voice message";
 "sharing.simulatedFriend" = "Simulated friend";
@@ -168,6 +174,7 @@
 "sharing.friendGroups" = "Groups";
 "sharing.friendGroups.empty" = "No groups yet. A group lets you set one alarm for several people.";
 "sharing.friendGroups.add" = "New group";
+"sharing.friendGroups.nobody" = "No one to add yet. You can add people after they are connected.";
 "sharing.friendGroups.name" = "Group name";
 "sharing.friendGroups.members" = "People";
 "sharing.friendGroups.alarm" = "Set an alarm for this group";

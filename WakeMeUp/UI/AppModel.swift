@@ -209,10 +209,22 @@ final class AppModel {
     }
 
     func installLocalVoice(_ url: URL) -> String? {
-        let name = "voice-\(UUID().uuidString)"
+        let stem = url.deletingPathExtension().lastPathComponent
+        let name = stem.hasPrefix("voice-") ? stem : "voice-\(UUID().uuidString)"
         guard let sound = try? VoiceFiles.install(from: url, soundID: name) else { return nil }
-        update { $0.customSounds.append(sound) }
+        update {
+            $0.customSounds.removeAll { $0.id == sound.id }
+            $0.customSounds.append(sound)
+        }
         return sound.id
+    }
+
+    func removeLocalVoice(_ soundID: String) {
+        let filename = snapshot.customSounds.first { $0.id == soundID }?.filename
+        update { $0.customSounds.removeAll { $0.id == soundID } }
+        if let filename {
+            VoiceFiles.remove(relativeFilename: filename)
+        }
     }
 
     func save(draft: AlarmDraft) {

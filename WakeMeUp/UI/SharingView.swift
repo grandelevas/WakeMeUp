@@ -222,14 +222,17 @@ struct SharingView: View {
                     Button("sharing.friendGroups.alarm") {
                         Task { await model.sendToFriendGroup(id: group.id) }
                     }
+                    .buttonStyle(.borderless)
                     Button("sharing.friendGroups.delete", role: .destructive) {
                         model.deleteFriendGroup(id: group.id)
                     }
+                    .buttonStyle(.borderless)
                     .font(.footnote)
                 }
             }
             Button("sharing.friendGroups.add") { addingFriendGroup = true }
-                .disabled(outgoing.isEmpty)
+                .buttonStyle(.borderless)
+                .disabled(!GroupButtonPolicy.canAddGroup(contactCount: contacts.count))
         }
     }
 
@@ -342,25 +345,25 @@ struct SharingView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.borderless)
                     if expandedContactID == contact.id {
                         Button("sharing.wakeNow") {
                             guard let id = contact.wakeGrantID else { return }
                             Task { await model.sendToPhone(grantID: id, immediately: true) }
                         }
-                        .buttonStyle(.bordered)
-                        .disabled(contact.wakeGrantID == nil)
+                        .buttonStyle(.borderless)
+                        .disabled(!ContactActionPolicy.canWake(contact))
                         Button("sharing.setAlarm") {
                             guard let id = contact.wakeGrantID else { return }
                             model.editAlarm(forContactGrant: id)
                         }
-                        .buttonStyle(.bordered)
-                        .disabled(contact.wakeGrantID == nil)
+                        .buttonStyle(.borderless)
+                        .disabled(!ContactActionPolicy.canWake(contact))
                         Button("sharing.addToGroup") {
                             groupingMemberID = contact.memberID
                         }
-                        .buttonStyle(.bordered)
-                        .disabled(contact.memberID == nil)
+                        .buttonStyle(.borderless)
+                        .disabled(!ContactActionPolicy.canAddToGroup(contact))
                     }
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -437,28 +440,13 @@ private struct VoiceMessageSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("sharing.voice.help")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    if recorder.isRecording {
-                        Button("sharing.voice.stop") { recorder.stop() }
-                    } else if recorder.fileURL == nil {
-                        Button("sharing.voice.record") {
-                            do { try recorder.record() } catch {
-                                recorder.discard()
-                            }
-                        }
-                    } else {
-                        Button("sharing.voice.preview") {
-                            if let url = recorder.fileURL {
-                                preview.play(id: "voice-draft", url: url, cap: VoiceClipPolicy.maxSeconds)
-                            }
-                        }
-                        Button("sharing.voice.rerecord") {
-                            preview.stop()
-                            recorder.discard()
-                        }
-                    }
+                    VoiceRecorderPanel(
+                        recorder: recorder,
+                        preview: preview,
+                        help: "sharing.voice.help",
+                        onUse: { _ in },
+                        onClear: { recorder.discard() }
+                    )
                 }
             }
             .navigationTitle("sharing.voice.title")
@@ -498,6 +486,10 @@ private struct FriendGroupEditor: View {
             Form {
                 TextField("sharing.friendGroups.name", text: $name)
                 Section("sharing.friendGroups.members") {
+                    if people.isEmpty {
+                        Text("sharing.friendGroups.nobody")
+                            .foregroundStyle(.secondary)
+                    }
                     ForEach(people) { grant in
                         let person = grant.owner.id
                         Button {
@@ -511,6 +503,7 @@ private struct FriendGroupEditor: View {
                                 }
                             }
                         }
+                        .buttonStyle(.borderless)
                     }
                 }
             }

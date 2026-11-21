@@ -8,7 +8,7 @@ struct AlarmEditorView: View {
     @State private var importing = false
     @State private var preview = SoundPreviewPlayer()
     @State private var recorder = VoiceClipRecorder()
-    @State private var voiceInstalled = false
+    @State private var installedVoiceID: String?
 
     init(draft: AlarmDraft) {
         _draft = State(initialValue: draft)
@@ -130,13 +130,6 @@ struct AlarmEditorView: View {
                 draft.soundID = id
                 playPreview(of: id)
             }
-            .onChange(of: recorder.isRecording) { _, recording in
-                guard !recording, !voiceInstalled, let url = recorder.fileURL else { return }
-                if let id = model.installLocalVoice(url) {
-                    draft.soundID = id
-                    voiceInstalled = true
-                }
-            }
             .onDisappear {
                 preview.stop()
                 recorder.stop()
@@ -147,29 +140,37 @@ struct AlarmEditorView: View {
 
     private var voiceSection: some View {
         Section("sharing.voice.title") {
-            Text("alarm.voice.help")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            if recorder.isRecording {
-                Button("sharing.voice.stop") { recorder.stop() }
-            } else if draft.soundID.hasPrefix("voice-") || recorder.fileURL != nil {
-                Button("sharing.voice.preview") { playPreview(of: draft.soundID) }
-                Button("sharing.voice.rerecord") {
-                    preview.stop()
+            VoiceRecorderPanel(
+                recorder: recorder,
+                preview: preview,
+                savedURL: savedVoiceURL,
+                help: "alarm.voice.help",
+                onUse: { url in
+                    if let previous = installedVoiceID {
+                        model.removeLocalVoice(previous)
+                    }
+                    if let id = model.installLocalVoice(url) {
+                        installedVoiceID = id
+                        draft.soundID = id
+                    }
+                },
+                onClear: {
+                    if let previous = installedVoiceID {
+                        model.removeLocalVoice(previous)
+                        installedVoiceID = nil
+                    }
                     recorder.discard()
-                    voiceInstalled = false
                     if draft.soundID.hasPrefix("voice-") {
                         draft.soundID = SoundCatalog.defaultID
                     }
                 }
-            } else {
-                Button("sharing.voice.record") {
-                    do { try recorder.record() } catch {
-                        recorder.discard()
-                    }
-                }
-            }
+            )
         }
+    }
+
+    private var savedVoiceURL: URL? {
+        guard draft.soundID.hasPrefix("voice-") else { return nil }
+        return SoundFiles.previewURL(for: draft.soundID, customSounds: model.customSounds)
     }
 
     private func playPreview(of id: String) {
