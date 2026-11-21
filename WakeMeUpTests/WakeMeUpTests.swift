@@ -1493,6 +1493,35 @@ final class MutualInviteTests: XCTestCase {
         ])
         XCTAssertTrue(CloudKitZoneFailure.isZoneNotFound(partial))
     }
+
+    func testADeletedOrMissingZoneIsCreatedAgainAndAMissingGrantIsCreated() {
+        XCTAssertTrue(CloudKitZoneFailure.shouldRecreateZone(CKError(.zoneNotFound)))
+        XCTAssertTrue(CloudKitZoneFailure.shouldRecreateZone(CKError(.userDeletedZone)))
+        XCTAssertFalse(CloudKitZoneFailure.shouldRecreateZone(CKError(.unknownItem)))
+        XCTAssertTrue(CloudKitZoneFailure.isMissingRecord(CKError(.unknownItem)))
+        XCTAssertTrue(GrantRecordRecovery.shouldCreateInstead(of: CKError(.zoneNotFound)))
+        XCTAssertTrue(GrantRecordRecovery.shouldCreateInstead(of: CKError(.userDeletedZone)))
+        XCTAssertTrue(GrantRecordRecovery.shouldCreateInstead(of: CKError(.unknownItem)))
+        XCTAssertFalse(GrantRecordRecovery.shouldCreateInstead(of: CKError(.networkUnavailable)))
+        let wrapped = CKError(.partialFailure, userInfo: [
+            CKPartialErrorsByItemIDKey: ["zone": CKError(.userDeletedZone)]
+        ])
+        XCTAssertTrue(CloudKitZoneFailure.shouldRecreateZone(wrapped))
+    }
+
+    func testTheServerZoneOwnerReplacesTheDefaultOwnerPlaceholder() {
+        let requested = CKRecordZone.ID(zoneName: "WakeMeUp", ownerName: CKCurrentUserDefaultName)
+        let server = CKRecordZone.ID(zoneName: "WakeMeUp", ownerName: "_76b4ce4cbc5b09999462b2f690a9b48a")
+        let resolved = PrivateCloudZone.canonical(requested: requested, server: server)
+        XCTAssertEqual(resolved.zoneName, "WakeMeUp")
+        XCTAssertEqual(resolved.ownerName, "_76b4ce4cbc5b09999462b2f690a9b48a")
+        XCTAssertEqual(PrivateCloudZone.canonical(requested: requested, server: nil).ownerName, CKCurrentUserDefaultName)
+        let placeholder = CKRecordZone.ID(zoneName: "WakeMeUp", ownerName: CKCurrentUserDefaultName)
+        XCTAssertEqual(
+            PrivateCloudZone.canonical(requested: requested, server: placeholder).ownerName,
+            CKCurrentUserDefaultName
+        )
+    }
 }
 
 final class FriendGroupRosterTests: XCTestCase {

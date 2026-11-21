@@ -34,17 +34,54 @@ enum CloudKitErrorText {
 
 enum CloudKitZoneFailure {
     static func isZoneNotFound(_ error: Error) -> Bool {
-        guard let cloudError = error as? CKError else { return false }
-        if cloudError.code == .zoneNotFound { return true }
-        guard cloudError.code == .partialFailure, let partial = cloudError.partialErrorsByItemID else { return false }
-        return partial.values.contains { isZoneNotFound($0) }
+        contains(error, code: .zoneNotFound)
+    }
+
+    static func isUserDeletedZone(_ error: Error) -> Bool {
+        contains(error, code: .userDeletedZone)
+    }
+
+    /// The custom zone has to be created again before any record operation can succeed.
+    static func shouldRecreateZone(_ error: Error) -> Bool {
+        isZoneNotFound(error) || isUserDeletedZone(error)
+    }
+
+    /// The grant record itself is not on the server yet.
+    static func isMissingRecord(_ error: Error) -> Bool {
+        contains(error, code: .unknownItem)
     }
 
     static func isZoneAlreadyExists(_ error: Error) -> Bool {
+        contains(error, code: .serverRecordChanged)
+    }
+
+    private static func contains(_ error: Error, code: CKError.Code) -> Bool {
         guard let cloudError = error as? CKError else { return false }
-        if cloudError.code == .serverRecordChanged { return true }
+        if cloudError.code == code { return true }
         guard cloudError.code == .partialFailure, let partial = cloudError.partialErrorsByItemID else { return false }
-        return partial.values.contains { isZoneAlreadyExists($0) }
+        return partial.values.contains { contains($0, code: code) }
+    }
+}
+
+enum PrivateCloudZone {
+    static let name = "WakeMeUp"
+
+    /// Prefer the zone id CloudKit stored. `__defaultOwner__` is only the local placeholder.
+    static func canonical(requested: CKRecordZone.ID, server: CKRecordZone.ID?) -> CKRecordZone.ID {
+        guard let server else { return requested }
+        let owner = server.ownerName
+        if owner.isEmpty || owner == CKCurrentUserDefaultName {
+            let zoneName = server.zoneName.isEmpty ? requested.zoneName : server.zoneName
+            return CKRecordZone.ID(zoneName: zoneName, ownerName: requested.ownerName)
+        }
+        return server
+    }
+}
+
+enum GrantRecordRecovery {
+    /// A missing zone or a missing grant means invite creation should create them, not surface the fetch error.
+    static func shouldCreateInstead(of error: Error) -> Bool {
+        CloudKitZoneFailure.shouldRecreateZone(error) || CloudKitZoneFailure.isMissingRecord(error)
     }
 }
 
@@ -77,6 +114,9 @@ enum RemoteBackendError: LocalizedError {
 /// iOS to wake the owner when the record changes. That wake is best-effort.
 final class CloudKitSharingClient {
     let container: CKContainer
+    private let zoneLock = NSLock()
+    private var cachedPrivateZoneID: CKRecordZone.ID?
+    private var zoneTask: Task<CKRecordZone.ID, Error>?
 
     init(containerID: String) {
         container = CKContainer(identifier: containerID)
@@ -112,12 +152,13 @@ final class CloudKitSharingClient {
         try await requireAccount()
         var grant = grant
         let database = container.privateCloudDatabase
+        let zoneID = try await ensurePrivateZone()
         do {
-            let zoneID = try await ensurePrivateZone()
             return try await saveNewShare(&grant, zoneID: zoneID, database: database)
         } catch {
-            guard CloudKitZoneFailure.isZoneNotFound(error) else { throw error }
-            let zoneID = try await ensurePrivateZone()
+            // The zone was missing or the grant record was not there yet. Create it and try once more.
+            guard GrantRecordRecovery.shouldCreateInstead(of: error) else { throw error }
+            let zoneID = try await ensurePrivateZone(resetCache: CloudKitZoneFailure.shouldRecreateZone(error))
             return try await saveNewShare(&grant, zoneID: zoneID, database: database)
         }
     }
@@ -165,7 +206,17 @@ final class CloudKitSharingClient {
         grant.cloudKitOwnerName = savedZone.ownerName
         grant.cloudKitShareRecordName = savedShare.recordID.recordName
         if let savedRoot {
-            try? await save(grant, commands: [], database: database, record: savedRoot)
+            do {
+                try await save(grant, commands: [], database: database, record: savedRoot)
+            } catch {
+                guard GrantRecordRecovery.shouldCreateInstead(of: error) else { throw error }
+                let zoneID = try await ensurePrivateZone(resetCache: CloudKitZoneFailure.shouldRecreateZone(error))
+                let rebuilt = CKRecord(
+                    recordType: savedRoot.recordType,
+                    recordID: CKRecord.ID(recordName: savedRoot.recordID.recordName, zoneID: zoneID)
+                )
+                try await save(grant, commands: [], database: database, record: rebuilt)
+            }
         }
         try? await subscribe(zoneID: savedZone)
         return (grant, savedShare)
@@ -281,10 +332,22 @@ final class CloudKitSharingClient {
         try await requireAccount()
         let database = asOwner ? container.privateCloudDatabase : container.sharedCloudDatabase
         let rootID = try recordID(for: grant)
+        if database.databaseScope == .private {
+            _ = try await ensurePrivateZone()
+        }
         let voice = CKRecord(recordType: "WMVoice", recordID: CKRecord.ID(recordName: recordName, zoneID: rootID.zoneID))
         voice["audio"] = CKAsset(fileURL: file)
         voice.parent = CKRecord.Reference(recordID: rootID, action: .none)
-        _ = try await database.save(voice)
+        do {
+            _ = try await database.save(voice)
+        } catch {
+            guard database.databaseScope == .private, CloudKitZoneFailure.shouldRecreateZone(error) else { throw error }
+            let zoneID = try await ensurePrivateZone(resetCache: true)
+            let rebuilt = CKRecord(recordType: "WMVoice", recordID: CKRecord.ID(recordName: recordName, zoneID: zoneID))
+            rebuilt["audio"] = CKAsset(fileURL: file)
+            rebuilt.parent = CKRecord.Reference(recordID: CKRecord.ID(recordName: rootID.recordName, zoneID: zoneID), action: .none)
+            _ = try await database.save(rebuilt)
+        }
     }
 
     func voiceFile(named recordName: String, grant: ShareGrant, asOwner: Bool) async throws -> URL? {
@@ -362,38 +425,134 @@ final class CloudKitSharingClient {
         }
     }
 
-    private func ensurePrivateZone() async throws -> CKRecordZone.ID {
-        let requested = CKRecordZone.ID(zoneName: "WakeMeUp", ownerName: CKCurrentUserDefaultName)
-        let operation = CKModifyRecordZonesOperation(
-            recordZonesToSave: [CKRecordZone(zoneID: requested)],
-            recordZoneIDsToDelete: nil
-        )
-        operation.qualityOfService = .userInitiated
-        let box = ZoneSaveBox()
-        return try await withCheckedThrowingContinuation { continuation in
-            operation.perRecordZoneSaveBlock = { zoneID, result in
-                switch result {
-                case .success:
-                    box.setSaved(zoneID)
-                case let .failure(error):
-                    if CloudKitZoneFailure.isZoneAlreadyExists(error) {
-                        box.setSaved(zoneID)
-                    } else {
-                        box.setFailure(error)
-                    }
+    private func ensurePrivateZone(resetCache: Bool = false) async throws -> CKRecordZone.ID {
+        if resetCache {
+            clearZoneCache()
+        }
+        zoneLock.lock()
+        if let cachedPrivateZoneID {
+            zoneLock.unlock()
+            return cachedPrivateZoneID
+        }
+        if let zoneTask {
+            zoneLock.unlock()
+            return try await zoneTask.value
+        }
+        let task = Task { try await self.createOrFetchPrivateZone() }
+        zoneTask = task
+        zoneLock.unlock()
+        do {
+            let zoneID = try await task.value
+            zoneLock.lock()
+            cachedPrivateZoneID = zoneID
+            zoneTask = nil
+            zoneLock.unlock()
+            return zoneID
+        } catch {
+            zoneLock.lock()
+            zoneTask = nil
+            zoneLock.unlock()
+            throw error
+        }
+    }
+
+    private func clearZoneCache() {
+        zoneLock.lock()
+        cachedPrivateZoneID = nil
+        zoneTask = nil
+        zoneLock.unlock()
+    }
+
+    /// Fetch the zone CloudKit already has. If it is missing, create it and keep the id the server returns.
+    private func createOrFetchPrivateZone() async throws -> CKRecordZone.ID {
+        let requested = CKRecordZone.ID(zoneName: PrivateCloudZone.name, ownerName: CKCurrentUserDefaultName)
+        do {
+            return try await fetchZone(matching: requested)
+        } catch {
+            guard CloudKitZoneFailure.shouldRecreateZone(error) else { throw error }
+        }
+        do {
+            let created = try await saveZone(requested)
+            if created.ownerName == CKCurrentUserDefaultName {
+                if let fetched = try? await fetchZone(matching: created) {
+                    return fetched
                 }
             }
-            operation.modifyRecordZonesResultBlock = { result in
+            return created
+        } catch {
+            guard CloudKitZoneFailure.isZoneAlreadyExists(error) else { throw error }
+            return try await fetchZone(matching: requested)
+        }
+    }
+
+    private func fetchZone(matching requested: CKRecordZone.ID) async throws -> CKRecordZone.ID {
+        try await withCheckedThrowingContinuation { continuation in
+            let operation = CKFetchRecordZonesOperation(recordZoneIDs: [requested])
+            operation.qualityOfService = .userInitiated
+            let box = ZoneSaveBox()
+            operation.perRecordZoneResultBlock = { _, result in
+                switch result {
+                case let .success(zone):
+                    box.setSaved(zone.zoneID)
+                case let .failure(error):
+                    box.setFailure(error)
+                }
+            }
+            operation.fetchRecordZonesResultBlock = { result in
+                if let saved = box.saved {
+                    continuation.resume(returning: PrivateCloudZone.canonical(requested: requested, server: saved))
+                    return
+                }
                 if let failure = box.failure {
                     continuation.resume(throwing: failure)
                     return
                 }
                 switch result {
                 case .success:
-                    continuation.resume(returning: box.saved ?? requested)
+                    continuation.resume(throwing: CKError(.zoneNotFound))
+                case let .failure(error):
+                    continuation.resume(throwing: error)
+                }
+            }
+            container.privateCloudDatabase.add(operation)
+        }
+    }
+
+    private func saveZone(_ requested: CKRecordZone.ID) async throws -> CKRecordZone.ID {
+        try await withCheckedThrowingContinuation { continuation in
+            let operation = CKModifyRecordZonesOperation(
+                recordZonesToSave: [CKRecordZone(zoneID: requested)],
+                recordZoneIDsToDelete: nil
+            )
+            operation.qualityOfService = .userInitiated
+            let box = ZoneSaveBox()
+            operation.perRecordZoneSaveBlock = { _, result in
+                switch result {
+                case let .success(zone):
+                    box.setSaved(zone.zoneID)
                 case let .failure(error):
                     if CloudKitZoneFailure.isZoneAlreadyExists(error) {
-                        continuation.resume(returning: box.saved ?? requested)
+                        box.setSaved(requested)
+                    } else {
+                        box.setFailure(error)
+                    }
+                }
+            }
+            operation.modifyRecordZonesResultBlock = { result in
+                if let saved = box.saved {
+                    continuation.resume(returning: PrivateCloudZone.canonical(requested: requested, server: saved))
+                    return
+                }
+                if let failure = box.failure {
+                    continuation.resume(throwing: failure)
+                    return
+                }
+                switch result {
+                case .success:
+                    continuation.resume(returning: requested)
+                case let .failure(error):
+                    if CloudKitZoneFailure.isZoneAlreadyExists(error) {
+                        continuation.resume(returning: requested)
                     } else {
                         continuation.resume(throwing: error)
                     }
@@ -404,11 +563,15 @@ final class CloudKitSharingClient {
     }
 
     private func fetchRecord(_ id: CKRecord.ID, in database: CKDatabase) async throws -> CKRecord {
-        do {
+        if database.databaseScope != .private {
             return try await database.record(for: id)
+        }
+        let zoneID = try await ensurePrivateZone()
+        do {
+            return try await database.record(for: CKRecord.ID(recordName: id.recordName, zoneID: zoneID))
         } catch {
-            guard database.databaseScope == .private, CloudKitZoneFailure.isZoneNotFound(error) else { throw error }
-            let zoneID = try await ensurePrivateZone()
+            guard CloudKitZoneFailure.shouldRecreateZone(error) else { throw error }
+            let zoneID = try await ensurePrivateZone(resetCache: true)
             return try await database.record(for: CKRecord.ID(recordName: id.recordName, zoneID: zoneID))
         }
     }
@@ -420,13 +583,36 @@ final class CloudKitSharingClient {
         record: CKRecord
     ) async throws {
         write(grant, commands: commands, to: record)
-        do {
+        if database.databaseScope != .private {
             _ = try await database.save(record)
-        } catch {
-            guard database.databaseScope == .private, CloudKitZoneFailure.isZoneNotFound(error) else { throw error }
-            _ = try await ensurePrivateZone()
-            _ = try await database.save(record)
+            return
         }
+        let zoneID = try await ensurePrivateZone()
+        let prepared = record.recordID.zoneID == zoneID ? record : cloned(record, zoneID: zoneID)
+        do {
+            _ = try await database.save(prepared)
+        } catch {
+            guard CloudKitZoneFailure.shouldRecreateZone(error) else { throw error }
+            let zoneID = try await ensurePrivateZone(resetCache: true)
+            _ = try await database.save(cloned(prepared, zoneID: zoneID))
+        }
+    }
+
+    private func cloned(_ record: CKRecord, zoneID: CKRecordZone.ID) -> CKRecord {
+        let copy = CKRecord(
+            recordType: record.recordType,
+            recordID: CKRecord.ID(recordName: record.recordID.recordName, zoneID: zoneID)
+        )
+        for key in record.allKeys() {
+            copy[key] = record[key]
+        }
+        if let parent = record.parent {
+            copy.parent = CKRecord.Reference(
+                recordID: CKRecord.ID(recordName: parent.recordID.recordName, zoneID: zoneID),
+                action: parent.action
+            )
+        }
+        return copy
     }
 
     private func recordID(for grant: ShareGrant) throws -> CKRecord.ID {
