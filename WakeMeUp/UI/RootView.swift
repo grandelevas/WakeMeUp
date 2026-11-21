@@ -9,17 +9,7 @@ struct RootView: View {
 
     var body: some View {
         @Bindable var model = model
-        TabView(selection: $model.selectedTab) {
-            AlarmListView()
-                .tabItem { Label("tab.alarms", systemImage: "alarm.fill") }
-                .tag(AppTab.alarms)
-            SharingView()
-                .tabItem { Label("tab.sharing", systemImage: "person.2.fill") }
-                .tag(AppTab.sharing)
-            AchievementsView()
-                .tabItem { Label("tab.achievements", systemImage: "trophy.fill") }
-                .tag(AppTab.achievements)
-        }
+        MainTabPager(selection: $model.selectedTab)
         .readableWidth()
         .sheet(item: $model.editor) { draft in
             AlarmEditorView(draft: draft)
@@ -139,5 +129,115 @@ struct RootView: View {
             get: { model.shareURL != nil },
             set: { if !$0 { model.shareURL = nil; model.shareMessage = "" } }
         )
+    }
+}
+
+private struct MainTabPager: View {
+    @Environment(\.appAccent) private var appAccent
+    @Binding var selection: AppTab
+    @State private var pageWidth: CGFloat = 0
+    @State private var edgeDrag: CGFloat = 0
+    @State private var trackingEdge = false
+
+    var body: some View {
+        HStack(spacing: 0) {
+            AlarmListView().frame(width: max(pageWidth, 1))
+            SharingView().frame(width: max(pageWidth, 1))
+            AchievementsView().frame(width: max(pageWidth, 1))
+        }
+        .offset(x: -CGFloat(selection.tabIndex) * pageWidth + edgeDrag)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .clipped()
+        .background {
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { pageWidth = geo.size.width }
+                    .onChange(of: geo.size.width) { _, newWidth in pageWidth = newWidth }
+            }
+        }
+        .simultaneousGesture(edgeSwipe(width: pageWidth))
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            tabBar
+        }
+    }
+
+    private var tabBar: some View {
+        HStack(spacing: 0) {
+            ForEach(AppTab.displayOrder, id: \.self) { tab in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.28)) {
+                        selection = tab
+                    }
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: symbol(tab))
+                            .font(.system(size: 22))
+                        Text(title(tab))
+                            .font(.caption2)
+                    }
+                    .foregroundStyle(selection == tab ? appAccent : Color.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
+                    .padding(.bottom, 6)
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selection == tab ? .isSelected : [])
+            }
+        }
+        .background(.bar)
+    }
+
+    private func edgeSwipe(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .local)
+            .onChanged { value in
+                let atEdge = value.startLocation.x <= TabEdgeSwipe.edgeInset
+                    || value.startLocation.x >= width - TabEdgeSwipe.edgeInset
+                if !trackingEdge {
+                    guard atEdge else { return }
+                    trackingEdge = true
+                }
+                edgeDrag = rubberBand(value.translation.width, width: width)
+            }
+            .onEnded { value in
+                guard trackingEdge else { return }
+                let direction = TabEdgeSwipe.direction(
+                    startX: value.startLocation.x,
+                    translationX: value.translation.width,
+                    translationY: value.translation.height,
+                    width: width
+                )
+                trackingEdge = false
+                withAnimation(.easeInOut(duration: 0.28)) {
+                    edgeDrag = 0
+                    if let direction {
+                        selection = selection.shifted(direction)
+                    }
+                }
+            }
+    }
+
+    private func rubberBand(_ translation: CGFloat, width: CGFloat) -> CGFloat {
+        let index = selection.tabIndex
+        let last = AppTab.displayOrder.count - 1
+        if index == 0, translation > 0 { return translation * 0.25 }
+        if index == last, translation < 0 { return translation * 0.25 }
+        let limit = width * 0.85
+        return min(max(translation, -limit), limit)
+    }
+
+    private func symbol(_ tab: AppTab) -> String {
+        switch tab {
+        case .alarms: "alarm.fill"
+        case .sharing: "person.2.fill"
+        case .achievements: "trophy.fill"
+        }
+    }
+
+    private func title(_ tab: AppTab) -> LocalizedStringKey {
+        switch tab {
+        case .alarms: "tab.alarms"
+        case .sharing: "tab.sharing"
+        case .achievements: "tab.achievements"
+        }
     }
 }

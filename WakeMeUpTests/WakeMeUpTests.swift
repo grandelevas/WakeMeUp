@@ -1955,6 +1955,28 @@ final class WakeReportTests: XCTestCase {
     }
 }
 
+final class TabEdgeSwipeTests: XCTestCase {
+    func testOnlyAnEdgeSwipeChangesTabs() {
+        let width: CGFloat = 390
+        XCTAssertEqual(
+            TabEdgeSwipe.direction(startX: 8, translationX: 90, translationY: 4, width: width),
+            .previous
+        )
+        XCTAssertEqual(
+            TabEdgeSwipe.direction(startX: 370, translationX: -90, translationY: 6, width: width),
+            .next
+        )
+        XCTAssertNil(TabEdgeSwipe.direction(startX: 180, translationX: -120, translationY: 0, width: width))
+        XCTAssertNil(TabEdgeSwipe.direction(startX: 10, translationX: 20, translationY: 0, width: width))
+        XCTAssertNil(TabEdgeSwipe.direction(startX: 10, translationX: 40, translationY: 80, width: width))
+        XCTAssertEqual(AppTab.alarms.shifted(.next), .sharing)
+        XCTAssertEqual(AppTab.sharing.shifted(.next), .achievements)
+        XCTAssertEqual(AppTab.sharing.shifted(.previous), .alarms)
+        XCTAssertEqual(AppTab.alarms.shifted(.previous), .alarms)
+        XCTAssertEqual(AppTab.achievements.shifted(.next), .achievements)
+    }
+}
+
 final class HandshakeTests: XCTestCase {
     func testOneLinkLetsBothPeopleWakeEachOtherAndTheLinkStays() throws {
         let mateusz = Participant(id: UUID(), displayName: "Mateusz")

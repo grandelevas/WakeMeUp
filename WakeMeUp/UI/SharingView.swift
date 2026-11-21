@@ -34,7 +34,18 @@ struct SharingView: View {
                 }
                 contactSection
             }
+            .refreshable {
+                await model.refreshRemote()
+            }
             .navigationTitle("sharing.title")
+            .onAppear {
+                guard model.selectedTab == .sharing else { return }
+                Task { await model.refreshRemote() }
+            }
+            .onChange(of: model.selectedTab) { _, tab in
+                guard tab == .sharing else { return }
+                Task { await model.refreshRemote() }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
@@ -43,13 +54,6 @@ struct SharingView: View {
                         Image(systemName: "gearshape")
                     }
                     .accessibilityLabel("settings.title")
-                }
-                if !model.showsSimulatedPreview {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("sharing.refresh") {
-                            Task { await model.refreshRemote() }
-                        }
-                    }
                 }
             }
             .sheet(isPresented: $inviting) { inviteSheet }
