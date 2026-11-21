@@ -151,10 +151,18 @@ enum SoundFiles {
     }
 
     static func alarmKitName(for soundID: String, customSounds: [CustomSound]) -> String {
-        soundFilename(for: soundID, customSounds: customSounds)
+        ringingFilename(for: soundID, customSounds: customSounds)
     }
 
     static func notificationName(for soundID: String, customSounds: [CustomSound]) -> String {
-        soundFilename(for: soundID, customSounds: customSounds)
+        ringingFilename(for: soundID, customSounds: customSounds)
+    }
+
+    /// Voice messages are stored as m4a. The alarm plays the CAF copy beside that file.
+    private static func ringingFilename(for soundID: String, customSounds: [CustomSound]) -> String {
+        if let custom = customSounds.first(where: { $0.id == soundID }) {
+            return VoiceFiles.ringingFilename(stored: custom.filename)
+        }
+        return soundFilename(for: soundID, customSounds: customSounds)
     }
 }

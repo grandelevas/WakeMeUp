@@ -170,6 +170,23 @@ enum ShareRoster {
     }
 }
 
+enum GroupButtonPolicy {
+    /// A group can be started as soon as anyone is on the contact list.
+    static func canAddGroup(contactCount: Int) -> Bool {
+        contactCount > 0
+    }
+}
+
+enum ContactActionPolicy {
+    static func canWake(_ contact: SharingContact) -> Bool {
+        contact.wakeGrantID != nil
+    }
+
+    static func canAddToGroup(_ contact: SharingContact) -> Bool {
+        contact.memberID != nil
+    }
+}
+
 enum PersonName {
     static func nonempty(_ value: String?) -> String? {
         let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -437,8 +454,19 @@ enum ContactRoster {
             let key: String
             let memberID: UUID?
             if grant.owner.id == profileID {
-                memberID = grant.grantee?.id
-                key = memberID?.uuidString ?? "invite-\(grant.id.uuidString)"
+                if let grantee = grant.grantee?.id {
+                    memberID = grantee
+                    key = grantee.uuidString
+                } else if let originalID = grant.reciprocalForGrantID,
+                          let original = grants.first(where: { $0.id == originalID }) {
+                    // The return share has no grantee until the inviter accepts it.
+                    // It is the same person as the invite we already accepted.
+                    memberID = original.owner.id
+                    key = original.owner.id.uuidString
+                } else {
+                    memberID = nil
+                    key = "invite-\(grant.id.uuidString)"
+                }
             } else if grant.grantee?.id == profileID {
                 memberID = grant.owner.id
                 key = memberID?.uuidString ?? grant.id.uuidString

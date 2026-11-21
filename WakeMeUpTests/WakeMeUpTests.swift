@@ -1207,6 +1207,62 @@ final class VoiceClipPolicyTests: XCTestCase {
         XCTAssertEqual(VoiceClipPolicy.soundID(installed: true, voiceID: nil), SoundCatalog.defaultID)
         XCTAssertEqual(VoiceClipPolicy.soundID(installed: true, voiceID: ""), SoundCatalog.defaultID)
     }
+
+    func testAVoicePathStaysARelativeFilenameInsideTheAppContainer() throws {
+        XCTAssertEqual(VoiceFiles.relativeFilename(soundID: "voice-abc"), "voice-abc.m4a")
+        XCTAssertFalse(VoiceFiles.relativeFilename(soundID: "/tmp/voice-abc.m4a").contains("/"))
+        XCTAssertEqual(VoiceFiles.ringingFilename(stored: "voice-abc.m4a"), "voice-abc.caf")
+        XCTAssertEqual(VoiceFiles.ringingFilename(stored: "clip.caf"), "clip.caf")
+        let directory = URL(fileURLWithPath: "/tmp/WakeMeUpSounds", isDirectory: true)
+        let resolved = VoiceFiles.url(
+            relativeFilename: "/var/mobile/Containers/Data/Application/tmp/voice-x.m4a",
+            in: directory
+        )
+        XCTAssertEqual(resolved.lastPathComponent, "voice-x.m4a")
+        XCTAssertEqual(
+            resolved.deletingLastPathComponent().standardizedFileURL.path,
+            directory.standardizedFileURL.path
+        )
+        XCTAssertEqual(VoiceRecordingFormat.fileExtension, "m4a")
+        XCTAssertEqual(VoiceRecordingFormat.settings()[AVFormatIDKey] as? Int, Int(kAudioFormatMPEG4AAC))
+        let recording = VoiceAudioRoute.recording()
+        XCTAssertEqual(recording.category, .playAndRecord)
+        XCTAssertTrue(recording.options.contains(.defaultToSpeaker))
+        let preview = VoiceAudioRoute.preview()
+        XCTAssertEqual(preview.category, .playback)
+        XCTAssertTrue(preview.options.contains(.defaultToSpeaker))
+        XCTAssertEqual(VoiceClipPolicy.clock(0), "0:00")
+        XCTAssertEqual(VoiceClipPolicy.clock(12.8), "0:12")
+        XCTAssertEqual(VoiceClipPolicy.clock(20), "0:20")
+        XCTAssertEqual(VoiceClipPolicy.clock(65), "0:20")
+        XCTAssertEqual(MicrophoneAccess.map(.granted), .granted)
+        XCTAssertEqual(MicrophoneAccess.map(.denied), .denied)
+        XCTAssertEqual(MicrophoneAccess.map(.undetermined), .undetermined)
+    }
+
+    func testInstallingAVoiceKeepsAACAndWritesTheAlarmCAF() throws {
+        let directory = try SoundFiles.librarySoundsDirectory()
+        let source = directory.appendingPathComponent("src-\(UUID().uuidString).m4a")
+        try M4AFixture.write(to: source, seconds: 0.3)
+        defer { try? FileManager.default.removeItem(at: source) }
+        let id = "voice-\(UUID().uuidString)"
+        let sound = try VoiceFiles.install(from: source, soundID: id)
+        defer { VoiceFiles.remove(relativeFilename: sound.filename) }
+        XCTAssertEqual(sound.filename, "\(id).m4a")
+        XCTAssertFalse(sound.filename.contains("/"))
+        let stored = VoiceFiles.url(relativeFilename: sound.filename, in: directory)
+        XCTAssertTrue(VoiceFileCheck.isStoredAAC(stored))
+        XCTAssertGreaterThan(VoiceFileCheck.byteCount(at: stored), 0)
+        let ringingName = VoiceFiles.ringingFilename(stored: sound.filename)
+        let ringing = directory.appendingPathComponent(ringingName)
+        XCTAssertGreaterThan(VoiceFileCheck.byteCount(at: ringing), 0)
+        XCTAssertEqual(ringing.pathExtension, "caf")
+        XCTAssertEqual(SoundFiles.alarmKitName(for: id, customSounds: [sound]), ringingName)
+        XCTAssertEqual(SoundFiles.notificationName(for: id, customSounds: [sound]), ringingName)
+        XCTAssertEqual(SoundFiles.previewURL(for: id, customSounds: [sound])?.lastPathComponent, sound.filename)
+        let replayed = try AVAudioFile(forReading: stored)
+        XCTAssertGreaterThan(replayed.length, 0)
+    }
 }
 
 final class RemoteCommandGateTests: XCTestCase {
@@ -1273,6 +1329,54 @@ final class ContactRosterTests: XCTestCase {
         XCTAssertEqual(contacts[0].hostedGrantID, hosted.id)
         XCTAssertFalse(contacts[0].isPending)
         XCTAssertEqual(contacts[0].memberID, them)
+    }
+
+    func testAPendingReturnShareDoesNotDuplicateAConnectedPerson() {
+        let me = UUID()
+        let them = UUID()
+        let acceptedID = UUID()
+        let accepted = ShareGrant(
+            id: acceptedID,
+            inviteCode: "https://www.icloud.com/share/theirs",
+            secret: "s",
+            owner: Participant(id: them, displayName: "Mateusz"),
+            grantee: Participant(id: me, displayName: "Akhi"),
+            state: .active,
+            createdAt: .now,
+            cloudKitRootRecordName: "grant-accepted",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: "_76b4ce4cbc5b09999462b2f690a9b48a"
+        )
+        var reciprocal = ShareGrant(
+            id: UUID(),
+            inviteCode: "https://www.icloud.com/share/mine",
+            secret: "s2",
+            owner: Participant(id: me, displayName: "Akhi"),
+            grantee: nil,
+            state: .pending,
+            createdAt: .now,
+            cloudKitRootRecordName: "grant-8CFDCC36-07B5-4392-9CC6-2F21EFFC7B48",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: "_mine"
+        )
+        reciprocal.reciprocal = true
+        reciprocal.reciprocalForGrantID = acceptedID
+        let contacts = ContactRoster.contacts(profileID: me, grants: [accepted, reciprocal])
+        XCTAssertEqual(contacts.count, 1)
+        XCTAssertFalse(contacts[0].isPending)
+        XCTAssertEqual(contacts[0].wakeGrantID, acceptedID)
+        XCTAssertEqual(contacts[0].hostedGrantID, reciprocal.id)
+        XCTAssertEqual(contacts[0].memberID, them)
+        XCTAssertTrue(ContactActionPolicy.canWake(contacts[0]))
+        XCTAssertTrue(ContactActionPolicy.canAddToGroup(contacts[0]))
+        XCTAssertTrue(GroupButtonPolicy.canAddGroup(contactCount: contacts.count))
+        XCTAssertFalse(GroupButtonPolicy.canAddGroup(contactCount: 0))
+        XCTAssertFalse(
+            MutualInvite.shouldCreateReturnShare(accepted: accepted, profileID: me, existing: [accepted, reciprocal])
+        )
+        XCTAssertTrue(
+            MutualInvite.shouldCreateReturnShare(accepted: accepted, profileID: me, existing: [accepted])
+        )
     }
 }
 
@@ -1588,6 +1692,26 @@ final class MutualInviteTests: XCTestCase {
             PrivateCloudZone.canonical(requested: requested, server: placeholder).ownerName,
             CKCurrentUserDefaultName
         )
+    }
+
+    func testPrivateRecordsUseTheCurrentUserAndSharedRecordsKeepTheShareOwner() {
+        let foreign = "_76b4ce4cbc5b09999462b2f690a9b48a"
+        let privateID = ShareRecordAddress.zoneID(
+            zoneName: "WakeMeUp",
+            storedOwnerName: foreign,
+            database: .privateDatabase
+        )
+        XCTAssertEqual(privateID.zoneName, "WakeMeUp")
+        XCTAssertEqual(privateID.ownerName, CKCurrentUserDefaultName)
+        let sharedID = ShareRecordAddress.zoneID(
+            zoneName: "WakeMeUp",
+            storedOwnerName: foreign,
+            database: .sharedDatabase
+        )
+        XCTAssertEqual(sharedID.ownerName, foreign)
+        XCTAssertEqual(ShareRecordAddress.database(isOwner: true), .privateDatabase)
+        XCTAssertEqual(ShareRecordAddress.database(isOwner: false), .sharedDatabase)
+        XCTAssertNotEqual(privateID.ownerName, sharedID.ownerName)
     }
 }
 

@@ -155,6 +155,12 @@
 "sharing.voice.preview" = "Odsłuchaj";
 "sharing.voice.rerecord" = "Nagraj ponownie";
 "sharing.voice.send" = "Wyślij alarm";
+"sharing.voice.play" = "Odtwórz";
+"sharing.voice.pause" = "Pauza";
+"sharing.voice.delete" = "Usuń";
+"sharing.voice.recording" = "Nagrywanie";
+"sharing.voice.denied" = "Mikrofon jest wyłączony. Włącz go w Ustawieniach, żeby nagrać wiadomość głosową.";
+"sharing.voice.duration" = "Długość %@";
 "sound.voice" = "Wiadomość głosowa";
 "sound.voice.play" = "Odtwórz wiadomość głosową";
 "sharing.simulatedFriend" = "Symulowana osoba";
@@ -168,6 +174,7 @@
 "sharing.friendGroups" = "Grupy";
 "sharing.friendGroups.empty" = "Nie ma jeszcze grup. Grupa pozwala ustawić jeden budzik kilku osobom.";
 "sharing.friendGroups.add" = "Nowa grupa";
+"sharing.friendGroups.nobody" = "Nie ma jeszcze kogo dodać. Osoby pojawią się, gdy połączenie będzie aktywne.";
 "sharing.friendGroups.name" = "Nazwa grupy";
 "sharing.friendGroups.members" = "Osoby";
 "sharing.friendGroups.alarm" = "Ustaw budzik tej grupie";
