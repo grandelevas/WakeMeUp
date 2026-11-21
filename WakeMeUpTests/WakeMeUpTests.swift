@@ -1209,6 +1209,15 @@ final class VoiceClipPolicyTests: XCTestCase {
     }
 }
 
+final class AlarmNoteTests: XCTestCase {
+    func testANoteIsTrimmedTo140CharactersAndBlankBecomesNil() {
+        XCTAssertNil(AlarmNote.cleaned("   "))
+        XCTAssertEqual(AlarmNote.cleaned("  Bring the keys  "), "Bring the keys")
+        let long = String(repeating: "a", count: 180)
+        XCTAssertEqual(AlarmNote.cleaned(long)?.count, 140)
+    }
+}
+
 final class SoundPreviewPolicyTests: XCTestCase {
     func testPreviewStaysWithinTenSeconds() {
         XCTAssertEqual(SoundPreviewPolicy.length(fileDuration: 12, requested: nil), 10)

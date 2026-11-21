@@ -25,6 +25,9 @@
 
 "alarm.defaultLabel" = "Alarm";
 "alarm.label" = "Label";
+"alarm.note" = "Note";
+"alarm.note.placeholder" = "A short note";
+"alarm.note.help" = "Up to 140 characters. It shows on the alarm and in the list.";
 "alarm.repeat" = "Repeat";
 "alarm.sound" = "Sound";
 "alarm.snooze" = "Snooze";

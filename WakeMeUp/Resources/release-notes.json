@@ -5,6 +5,18 @@
       "date": "2026-11-20",
       "changes": {
         "en": [
+          "An alarm can include a short note, up to 140 characters. It shows on the ringing screen and in the list, including alarms you set for a friend."
+        ],
+        "pl": [
+          "Alarm może mieć krótką notatkę, do 140 znaków. Widać ją na ekranie budzika i na liście, także przy alarmie dla znajomego."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-20",
+      "changes": {
+        "en": [
           "When you set an alarm for a friend, you can record a voice message of up to 20 seconds. It rings on their phone, and you can play it from the alarm."
         ],
         "pl": [

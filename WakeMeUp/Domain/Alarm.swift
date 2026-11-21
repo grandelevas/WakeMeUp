@@ -71,6 +71,8 @@ struct Alarm: Codable, Equatable, Hashable, Identifiable {
     var isEnabled: Bool
     var groupID: UUID?
     var songLink: SongLink?
+    /// Optional short note, at most 140 characters. Empty means no note.
+    var note: String? = nil
     var origin: AlarmOrigin
     /// Enabled state to restore when a disabled group is turned back on.
     var resumeWhenGroupEnables: Bool?
@@ -298,6 +300,16 @@ struct AlarmLibrary: Codable, Equatable {
     }
 }
 
+enum AlarmNote {
+    static let maxCharacters = 140
+
+    static func cleaned(_ text: String) -> String? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return String(trimmed.prefix(maxCharacters))
+    }
+}
+
 struct SentAlarm: Codable, Equatable, Identifiable {
     var alarm: Alarm
     var recipientID: UUID
@@ -334,6 +346,7 @@ struct AlarmDraft: Equatable, Identifiable {
     var isEnabled: Bool
     var groupID: UUID?
     var songText: String
+    var note: String
     var origin: AlarmOrigin
     var isNew: Bool
 
@@ -351,6 +364,7 @@ struct AlarmDraft: Equatable, Identifiable {
             isEnabled: true,
             groupID: nil,
             songText: "",
+            note: "",
             origin: .local,
             isNew: true
         )
@@ -375,6 +389,7 @@ struct AlarmDraft: Equatable, Identifiable {
         isEnabled = alarm.isEnabled || (alarm.resumeWhenGroupEnables ?? false)
         groupID = alarm.groupID
         songText = alarm.songLink?.url.absoluteString ?? ""
+        note = alarm.note ?? ""
         origin = alarm.origin
         isNew = false
     }
@@ -391,6 +406,7 @@ struct AlarmDraft: Equatable, Identifiable {
         isEnabled: Bool,
         groupID: UUID?,
         songText: String,
+        note: String,
         origin: AlarmOrigin,
         isNew: Bool
     ) {
@@ -405,6 +421,7 @@ struct AlarmDraft: Equatable, Identifiable {
         self.isEnabled = isEnabled
         self.groupID = groupID
         self.songText = songText
+        self.note = note
         self.origin = origin
         self.isNew = isNew
     }
@@ -436,6 +453,7 @@ struct AlarmDraft: Equatable, Identifiable {
             isEnabled: isEnabled,
             groupID: groupID,
             songLink: parsedSong,
+            note: AlarmNote.cleaned(note),
             origin: origin,
             resumeWhenGroupEnables: nil
         )
