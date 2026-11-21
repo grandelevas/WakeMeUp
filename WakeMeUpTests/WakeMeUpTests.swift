@@ -822,6 +822,34 @@ final class PermissionTests: XCTestCase {
         var library = AlarmLibrary()
         try RemoteCommandApplier.apply(command: command, grant: grant, library: &library)
         XCTAssertEqual(library.alarms.count, 1)
+        let processed = Date(timeIntervalSince1970: 1_700_000_000)
+        let soon = WakeNowSchedule.applying(to: alarm, processedAt: processed)
+        if case let .oneShot(fireAt) = soon.schedule {
+            XCTAssertEqual(fireAt.timeIntervalSince(processed), WakeNowSchedule.leadTime, accuracy: 0.001)
+        } else {
+            XCTFail("Wake now has to be a one-shot alarm")
+        }
+        XCTAssertEqual(
+            OutgoingVoice.payload(soundID: "voice-1", voiceName: "voice-1", uploaded: false),
+            OutgoingVoice.Payload(soundID: SoundCatalog.defaultID, voiceRecordName: nil, warn: true)
+        )
+        XCTAssertEqual(
+            OutgoingVoice.payload(soundID: "classic", voiceName: "voice-1", uploaded: true),
+            OutgoingVoice.Payload(soundID: "voice-1", voiceRecordName: "voice-1", warn: false)
+        )
+        func assetFile() throws -> CKAsset {
+            let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(UUID().uuidString).m4a")
+            try Data([0]).write(to: file)
+            return CKAsset(fileURL: file)
+        }
+        let production = CKRecord(recordType: VoiceAssetField.recordType)
+        VoiceAssetField.assign(try assetFile(), on: production)
+        XCTAssertNotNil(production[VoiceAssetField.key])
+        XCTAssertNil(production[VoiceAssetField.legacyKey])
+        XCTAssertNotNil(VoiceAssetField.asset(from: production))
+        let legacy = CKRecord(recordType: VoiceAssetField.recordType)
+        legacy[VoiceAssetField.legacyKey] = try assetFile()
+        XCTAssertNotNil(VoiceAssetField.asset(from: legacy))
         XCTAssertTrue(library.alarms[0].origin.isOwned(by: friend.id))
         XCTAssertEqual(library.alarms[0].origin.senderName, "Ola")
         let cancel = RemoteAlarmCommand(

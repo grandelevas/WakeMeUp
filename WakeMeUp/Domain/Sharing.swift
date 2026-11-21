@@ -528,6 +528,40 @@ enum RemoteCommandGate {
     }
 }
 
+enum WakeNowSchedule {
+    /// AlarmKit does not present a full-screen alarm for a time that is already past.
+    /// CloudKit delivery is slower than a few seconds, so the receiver picks the fire time.
+    static let leadTime: TimeInterval = 120
+
+    static func fireDate(processedAt: Date) -> Date {
+        processedAt.addingTimeInterval(leadTime)
+    }
+
+    static func applying(to alarm: Alarm, processedAt: Date) -> Alarm {
+        var copy = alarm
+        copy.schedule = .oneShot(fireAt: fireDate(processedAt: processedAt))
+        copy.isEnabled = true
+        return copy
+    }
+}
+
+enum OutgoingVoice {
+    struct Payload: Equatable {
+        var soundID: String
+        var voiceRecordName: String?
+        var warn: Bool
+    }
+
+    /// A failed voice upload must not cancel the alarm. The command goes out with the default sound.
+    static func payload(soundID: String, voiceName: String?, uploaded: Bool) -> Payload {
+        if let voiceName, uploaded {
+            return Payload(soundID: voiceName, voiceRecordName: voiceName, warn: false)
+        }
+        let sound = soundID.hasPrefix("voice-") ? SoundCatalog.defaultID : soundID
+        return Payload(soundID: sound, voiceRecordName: nil, warn: voiceName != nil)
+    }
+}
+
 enum RemoteAction: String, Codable, Equatable {
     case upsert
     case cancel

@@ -141,6 +141,8 @@
 "sharing.phonesICanWake" = "Phones I can set";
 "sharing.contacts" = "Contacts";
 "sharing.wakeNow" = "Wake now";
+"sharing.wakeNow.soon" = "Alarm will ring in about 2 minutes.";
+"sharing.voice.skipped" = "The alarm was sent without the voice message.";
 "sharing.reachError" = "Could not reach their phone.";
 "sharing.connection.waiting" = "Waiting for their phone to finish connecting. Wake and Set alarm turn on after that.";
 "sharing.connection.missing" = "Their iCloud share is not on this phone yet.";
