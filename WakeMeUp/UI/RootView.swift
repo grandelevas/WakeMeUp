@@ -135,27 +135,23 @@ struct RootView: View {
 private struct MainTabPager: View {
     @Environment(\.appAccent) private var appAccent
     @Binding var selection: AppTab
-    @State private var pageWidth: CGFloat = 0
     @State private var edgeDrag: CGFloat = 0
     @State private var trackingEdge = false
 
     var body: some View {
-        HStack(spacing: 0) {
-            AlarmListView().frame(width: max(pageWidth, 1))
-            SharingView().frame(width: max(pageWidth, 1))
-            AchievementsView().frame(width: max(pageWidth, 1))
-        }
-        .offset(x: -CGFloat(selection.tabIndex) * pageWidth + edgeDrag)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .clipped()
-        .background {
-            GeometryReader { geo in
-                Color.clear
-                    .onAppear { pageWidth = geo.size.width }
-                    .onChange(of: geo.size.width) { _, newWidth in pageWidth = newWidth }
+        GeometryReader { geo in
+            let width = geo.size.width.isFinite ? geo.size.width : 0
+            let height = geo.size.height.isFinite ? geo.size.height : 0
+            HStack(spacing: 0) {
+                AlarmListView().frame(width: width, height: height)
+                SharingView().frame(width: width, height: height)
+                AchievementsView().frame(width: width, height: height)
             }
+            .offset(x: -CGFloat(selection.tabIndex) * width + edgeDrag)
+            .frame(width: width, height: height, alignment: .leading)
+            .clipped()
+            .simultaneousGesture(edgeSwipe(width: width))
         }
-        .simultaneousGesture(edgeSwipe(width: pageWidth))
         .safeAreaInset(edge: .bottom, spacing: 0) {
             tabBar
         }
