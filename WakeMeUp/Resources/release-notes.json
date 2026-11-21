@@ -5,9 +5,11 @@
       "date": "2026-11-20",
       "changes": {
         "en": [
+          "Inviting someone creates the iCloud zone first, so a fresh install no longer fails with a missing-zone error.",
           "You can make a group of friends on this iPhone and set one alarm for all of them. For friends shows who is up and who is still asleep."
         ],
         "pl": [
+          "Zapraszanie najpierw tworzy strefę iCloud, więc świeża instalacja nie kończy się błędem brakującej strefy.",
           "Możesz zrobić na tym iPhonie grupę znajomych i ustawić im jeden budzik. W Dla znajomych widać, kto wstał, a kto jeszcze śpi."
         ]
       }
