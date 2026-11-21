@@ -4,6 +4,8 @@ struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
     @State private var whatsNew: ReleaseNote?
+    @State private var showErrorDetail = false
+    @State private var errorDetail = ""
 
     var body: some View {
         @Bindable var model = model
@@ -32,9 +34,33 @@ struct RootView: View {
             ActivityShareSheet(items: shareItems)
         }
         .alert("error.generic", isPresented: errorPresented) {
+            if model.presentedError?.detail.isEmpty == false {
+                Button("sharing.error.details") {
+                    errorDetail = model.presentedError?.detail ?? ""
+                    showErrorDetail = true
+                }
+            }
             Button("alarms.done", role: .cancel) {}
         } message: {
-            Text(model.lastError ?? "")
+            Text(model.presentedError?.summary ?? "")
+        }
+        .sheet(isPresented: $showErrorDetail) {
+            NavigationStack {
+                ScrollView {
+                    Text(errorDetail)
+                        .font(.footnote)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                }
+                .navigationTitle("sharing.error.details")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("alarms.done") { showErrorDetail = false }
+                    }
+                }
+            }
         }
         .onOpenURL { model.handle(url: $0) }
         .onChange(of: scenePhase) { _, phase in
@@ -60,8 +86,8 @@ struct RootView: View {
 
     private var errorPresented: Binding<Bool> {
         Binding(
-            get: { model.lastError != nil },
-            set: { if !$0 { model.lastError = nil } }
+            get: { model.presentedError != nil },
+            set: { if !$0 { model.presentedError = nil } }
         )
     }
 

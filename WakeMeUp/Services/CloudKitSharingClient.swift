@@ -68,7 +68,7 @@ enum CloudKitZoneFailure {
         contains(error, code: .userDeletedZone)
     }
 
-    /// The custom zone has to be created again before any record operation can succeed.
+    /// True for a missing or deleted zone. Creating a replacement is a separate decision.
     static func shouldRecreateZone(_ error: Error) -> Bool {
         isZoneNotFound(error) || isUserDeletedZone(error)
     }
@@ -130,6 +130,73 @@ enum ShareRecordAddress {
     }
 }
 
+enum PrivateZonePolicy {
+    /// Create the private zone only when CloudKit says it is not there.
+    /// Never delete a zone, and never replace one that already exists. A deleted zone stays deleted
+    /// so its shares are not silently thrown away.
+    static func shouldCreate(after error: Error) -> Bool {
+        CloudKitZoneFailure.isZoneNotFound(error)
+    }
+}
+
+struct OwnedShareRepair: Equatable {
+    var grant: ShareGrant
+    var url: URL
+    var needsNewLink: Bool
+}
+
+enum OwnedShareAction: Equatable {
+    case keep
+    case reopen
+    case create
+
+    /// A missing share is created on the existing root. A closed public link is opened again.
+    /// Nothing here deletes the zone.
+    static func decide(shareExists: Bool, publicPermissionNone: Bool, urlMissing: Bool) -> OwnedShareAction {
+        if !shareExists { return .create }
+        if publicPermissionNone || urlMissing { return .reopen }
+        return .keep
+    }
+}
+
+enum ShareFailureKind: Equatable {
+    case shareLinkGone
+    case zoneMissing
+    case notSignedIn
+    case network
+    case timedOut
+    case other
+
+    static func isShareNotFound(_ error: Error) -> Bool {
+        if let backend = error as? RemoteBackendError, case .shareLinkGone = backend { return true }
+        let blob = (error.localizedDescription + " " + String(describing: error)).lowercased()
+        if blob.contains("share not found") { return true }
+        if blob.contains("short token") && blob.contains("not found") { return true }
+        if let cloudError = error as? CKError, cloudError.code == .partialFailure, let partial = cloudError.partialErrorsByItemID {
+            return partial.values.contains { isShareNotFound($0) }
+        }
+        return false
+    }
+
+    static func classify(_ error: Error) -> ShareFailureKind {
+        if error is AsyncDeadlineError { return .timedOut }
+        if isShareNotFound(error) { return .shareLinkGone }
+        if let backend = error as? RemoteBackendError {
+            switch backend {
+            case .notSignedIn: return .notSignedIn
+            case .shareLinkGone: return .shareLinkGone
+            case .shareZoneMissing: return .zoneMissing
+            default: return .other
+            }
+        }
+        if CloudKitZoneFailure.isZoneNotFound(error) { return .zoneMissing }
+        if let cloudError = error as? CKError, cloudError.code == .networkUnavailable || cloudError.code == .networkFailure {
+            return .network
+        }
+        return .other
+    }
+}
+
 enum ShareAccessPlan: Equatable {
     case use(ownerName: String)
     /// The share is not in the shared database yet. Accept it again from the link.
@@ -158,8 +225,20 @@ enum ContactConnectionNote: Equatable {
     case waitingForThem
     /// Their share should be on this phone, but the shared zone was missing.
     case shareMissing
+    /// The stored share URL no longer exists. The other person has to send a new one.
+    case askForNewLink
+    /// This phone owns the share and just minted a link the other person does not have.
+    case sendNewLink
 
-    static func note(wakeGrantID: UUID?, hostedGrantID: UUID?, unreachable: Set<UUID>) -> ContactConnectionNote? {
+    static func note(
+        wakeGrantID: UUID?,
+        hostedGrantID: UUID?,
+        unreachable: Set<UUID>,
+        sendNewLink: Bool = false,
+        askNewLink: Bool = false
+    ) -> ContactConnectionNote? {
+        if askNewLink { return .askForNewLink }
+        if sendNewLink { return .sendNewLink }
         let ids = [wakeGrantID, hostedGrantID].compactMap { $0 }
         if ids.contains(where: { unreachable.contains($0) }) { return .shareMissing }
         if wakeGrantID == nil { return .waitingForThem }
@@ -169,8 +248,9 @@ enum ContactConnectionNote: Equatable {
 
 enum GrantRecordRecovery {
     /// A missing zone or a missing grant means invite creation should create them, not surface the fetch error.
+    /// A zone the user deleted is not created again.
     static func shouldCreateInstead(of error: Error) -> Bool {
-        CloudKitZoneFailure.shouldRecreateZone(error) || CloudKitZoneFailure.isMissingRecord(error)
+        PrivateZonePolicy.shouldCreate(after: error) || CloudKitZoneFailure.isMissingRecord(error)
     }
 }
 
@@ -180,6 +260,7 @@ enum RemoteBackendError: LocalizedError {
     case shareURLMissing
     case missingRoot
     case shareZoneMissing(recordName: String, ownerName: String, visibleOwners: [String])
+    case shareLinkGone
     case underlying(String)
 
     var errorDescription: String? {
@@ -194,6 +275,8 @@ enum RemoteBackendError: LocalizedError {
             "The shared alarm record is missing."
         case let .shareZoneMissing(recordName, ownerName, visibleOwners):
             "The iCloud share is not on this phone. record=\(recordName) owner=\(ownerName) visible=\(visibleOwners.joined(separator: ","))"
+        case .shareLinkGone:
+            "The saved invite link no longer exists."
         case let .underlying(message):
             message
         }
@@ -263,7 +346,7 @@ final class CloudKitSharingClient {
         } catch {
             // The zone was missing or the grant record was not there yet. Create it and try once more.
             guard GrantRecordRecovery.shouldCreateInstead(of: error) else { throw error }
-            let ensured = try await ensurePrivateZone(resetCache: CloudKitZoneFailure.shouldRecreateZone(error))
+            let ensured = try await ensurePrivateZone(resetCache: PrivateZonePolicy.shouldCreate(after: error))
             let zoneID = ShareRecordAddress.zoneID(
                 zoneName: ensured.zoneName,
                 storedOwnerName: ensured.ownerName,
@@ -320,7 +403,7 @@ final class CloudKitSharingClient {
                 try await save(grant, commands: [], database: database, record: savedRoot)
             } catch {
                 guard GrantRecordRecovery.shouldCreateInstead(of: error) else { throw error }
-                let zoneID = try await ensurePrivateZone(resetCache: CloudKitZoneFailure.shouldRecreateZone(error))
+                let zoneID = try await ensurePrivateZone(resetCache: PrivateZonePolicy.shouldCreate(after: error))
                 let rebuilt = CKRecord(
                     recordType: savedRoot.recordType,
                     recordID: CKRecord.ID(recordName: savedRoot.recordID.recordName, zoneID: zoneID)
@@ -379,10 +462,66 @@ final class CloudKitSharingClient {
         updated.cloudKitOwnerName = zoneID.ownerName
         updated.inviteCode = grant.inviteCode
         updated.cloudKitShareRecordName = updated.cloudKitShareRecordName ?? grant.cloudKitShareRecordName
-        if asOwner, !InviteLinkPolicy.allowsAnyoneWithLink(grantState: updated.state) {
-            await closePublicLink(on: root, grant: updated, database: database)
-        }
         return (updated, readCommands(from: root))
+    }
+
+    /// Makes sure the share on this phone's root still has a link. Never deletes the zone or the root.
+    /// Closing the public link used to run after someone accepted, and that made the saved URL return "share not found".
+    func repairOwnedShare(_ grant: ShareGrant) async throws -> OwnedShareRepair {
+        try await requireAccount()
+        _ = try await ensurePrivateZone()
+        let database = container.privateCloudDatabase
+        let root = try await fetchRecord(try recordID(for: grant, database: database), in: database)
+        let existing = await existingShare(on: root, grant: grant, database: database)
+        let action = OwnedShareAction.decide(
+            shareExists: existing != nil,
+            publicPermissionNone: existing?.publicPermission == .none,
+            urlMissing: existing?.url == nil
+        )
+        cloudLog.error("repairOwnedShare \(String(describing: action), privacy: .public) root=\(root.recordID.recordName, privacy: .public)")
+        switch action {
+        case .keep:
+            guard let existing, let url = existing.url else { throw RemoteBackendError.shareURLMissing }
+            var updated = grant
+            updated.inviteCode = url.absoluteString
+            updated.cloudKitShareRecordName = existing.recordID.recordName
+            return OwnedShareRepair(grant: updated, url: url, needsNewLink: false)
+        case .reopen:
+            guard let existing else { throw RemoteBackendError.missingRoot }
+            existing.publicPermission = .readWrite
+            existing[CKShare.SystemFieldKey.title] = "Wakito" as NSString
+            guard let saved = try await database.save(existing) as? CKShare, let url = saved.url else {
+                throw RemoteBackendError.shareURLMissing
+            }
+            var updated = grant
+            updated.inviteCode = url.absoluteString
+            updated.cloudKitShareRecordName = saved.recordID.recordName
+            try await save(updated, commands: readCommands(from: root), database: database, record: root)
+            return OwnedShareRepair(grant: updated, url: url, needsNewLink: true)
+        case .create:
+            let share = CKShare(rootRecord: root)
+            share.publicPermission = .readWrite
+            share[CKShare.SystemFieldKey.title] = "Wakito" as NSString
+            let (results, _) = try await database.modifyRecords(saving: [root, share], deleting: [], savePolicy: .allKeys)
+            var savedShare: CKShare?
+            var savedRoot: CKRecord?
+            for result in results.values {
+                switch result {
+                case let .success(record):
+                    if let saved = record as? CKShare { savedShare = saved } else { savedRoot = record }
+                case let .failure(error):
+                    throw error
+                }
+            }
+            guard let savedShare, let url = savedShare.url else { throw RemoteBackendError.shareURLMissing }
+            var updated = grant
+            updated.inviteCode = url.absoluteString
+            updated.cloudKitShareRecordName = savedShare.recordID.recordName
+            if let savedRoot {
+                try await save(updated, commands: readCommands(from: savedRoot), database: database, record: savedRoot)
+            }
+            return OwnedShareRepair(grant: updated, url: url, needsNewLink: true)
+        }
     }
 
     func publishReturnInvite(_ url: URL, on grant: ShareGrant) async throws {
@@ -456,7 +595,7 @@ final class CloudKitSharingClient {
             _ = try await database.save(voice)
         } catch {
             if database.databaseScope != .private,
-               CloudKitZoneFailure.shouldRecreateZone(error),
+               CloudKitZoneFailure.isZoneNotFound(error),
                let url = inviteURL(for: grant) {
                 let root = try await reopenShare(url)
                 let rebuilt = CKRecord(recordType: "WMVoice", recordID: CKRecord.ID(recordName: recordName, zoneID: root.zoneID))
@@ -465,7 +604,7 @@ final class CloudKitSharingClient {
                 _ = try await database.save(rebuilt)
                 return
             }
-            guard database.databaseScope == .private, CloudKitZoneFailure.shouldRecreateZone(error) else { throw error }
+            guard database.databaseScope == .private, PrivateZonePolicy.shouldCreate(after: error) else { throw error }
             _ = try await ensurePrivateZone(resetCache: true)
             let zoneID = ShareRecordAddress.zoneID(
                 zoneName: PrivateCloudZone.name,
@@ -501,7 +640,20 @@ final class CloudKitSharingClient {
         await closePublicLink(on: root, grant: revoked, database: container.privateCloudDatabase)
     }
 
-    /// Stops new people from joining. People who already accepted keep their access.
+    private func existingShare(on root: CKRecord, grant: ShareGrant, database: CKDatabase) async -> CKShare? {
+        let shareID: CKRecord.ID
+        if let reference = root.share {
+            shareID = reference.recordID
+        } else if let name = grant.cloudKitShareRecordName {
+            shareID = CKRecord.ID(recordName: name, zoneID: root.recordID.zoneID)
+        } else {
+            return nil
+        }
+        return try? await fetchRecord(shareID, in: database) as? CKShare
+    }
+
+    /// Used only when the owner revokes a contact. Do not call this after a normal accept:
+    /// `publicPermission = .none` makes the short invite URL return "share not found".
     private func closePublicLink(on root: CKRecord, grant: ShareGrant, database: CKDatabase) async {
         let shareID: CKRecord.ID
         if let reference = root.share {
@@ -607,7 +759,7 @@ final class CloudKitSharingClient {
         do {
             return try await fetchZone(matching: requested)
         } catch {
-            guard CloudKitZoneFailure.shouldRecreateZone(error) else { throw error }
+            guard PrivateZonePolicy.shouldCreate(after: error) else { throw error }
         }
         do {
             let created = try await saveZone(requested)
@@ -714,7 +866,7 @@ final class CloudKitSharingClient {
         do {
             return try await database.record(for: recordID)
         } catch {
-            guard CloudKitZoneFailure.shouldRecreateZone(error) else { throw error }
+            guard PrivateZonePolicy.shouldCreate(after: error) else { throw error }
             cloudLog.error("private zone missing; creating it and retrying \(recordID.recordName, privacy: .public)")
             _ = try await ensurePrivateZone(resetCache: true)
             return try await database.record(for: recordID)
@@ -730,13 +882,13 @@ final class CloudKitSharingClient {
         } catch {
             cloudLog.error("shared fetch failed \(resolved.recordName, privacy: .public) owner=\(resolved.zoneID.ownerName, privacy: .public) \(error.localizedDescription, privacy: .public)")
             if !didReaccept,
-               CloudKitZoneFailure.shouldRecreateZone(error),
+               CloudKitZoneFailure.isZoneNotFound(error),
                let inviteURL,
                InviteLinkPolicy.isCloudShare(inviteURL) {
                 let root = try await reopenShare(inviteURL)
                 return try await fetchShared(root, inviteURL: inviteURL, didReaccept: true)
             }
-            guard CloudKitZoneFailure.shouldRecreateZone(error) else { throw error }
+            guard CloudKitZoneFailure.isZoneNotFound(error) else { throw error }
             let owners = (try? await sharedWakeMeUpOwners(refresh: true)) ?? []
             throw RemoteBackendError.shareZoneMissing(
                 recordName: resolved.recordName,
@@ -772,7 +924,15 @@ final class CloudKitSharingClient {
     /// CKFetchShareMetadata plus CKAcceptSharesOperation. Used when the shared zone list does not contain the inviter's zone.
     private func reopenShare(_ url: URL) async throws -> CKRecord.ID {
         cloudLog.error("CKFetchShareMetadata + CKAcceptSharesOperation")
-        let metadata = try await container.shareMetadata(for: url)
+        let metadata: CKShare.Metadata
+        do {
+            metadata = try await container.shareMetadata(for: url)
+        } catch {
+            if ShareFailureKind.isShareNotFound(error) {
+                throw RemoteBackendError.shareLinkGone
+            }
+            throw error
+        }
         guard let rootID = metadata.hierarchicalRootRecordID else { throw RemoteBackendError.missingRoot }
         do {
             _ = try await container.accept([metadata])
@@ -810,7 +970,7 @@ final class CloudKitSharingClient {
         do {
             _ = try await database.save(prepared)
         } catch {
-            guard CloudKitZoneFailure.shouldRecreateZone(error) else { throw error }
+            guard PrivateZonePolicy.shouldCreate(after: error) else { throw error }
             _ = try await ensurePrivateZone(resetCache: true)
             _ = try await database.save(cloned(prepared, zoneID: privateRecordZoneID()))
         }

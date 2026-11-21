@@ -145,6 +145,15 @@
 "sharing.connection.waiting" = "Czekam, aż telefon tej osoby dokończy połączenie. Obudź teraz i Ustaw alarm włączą się potem.";
 "sharing.connection.missing" = "Udostępnienie iCloud tej osoby nie jest jeszcze na tym telefonie.";
 "sharing.connection.retry" = "Spróbuj połączyć ponownie";
+"sharing.connection.checking" = "Sprawdzam połączenie iCloud…";
+"sharing.connection.ready" = "Połączenie jest gotowe.";
+"sharing.connection.sendLink" = "Wyślij nowy link zaproszenia";
+"sharing.connection.newLink" = "Stary link już nie działa. Wyślij nowy.";
+"sharing.connection.askLink" = "Poproś %@ o nowy link zaproszenia.";
+"sharing.connection.linkGone" = "Zapisany link zaproszenia już nie działa.";
+"sharing.connection.failed" = "Nie udało się dokończyć połączenia.";
+"sharing.connection.network" = "Brak połączenia z siecią.";
+"sharing.error.details" = "Szczegóły";
 "sharing.setAlarm" = "Ustaw alarm";
 "sharing.addToGroup" = "Dodaj do grupy";
 "sharing.delete.title" = "Usunąć ten kontakt?";

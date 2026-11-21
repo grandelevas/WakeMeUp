@@ -347,19 +347,41 @@ struct SharingView: View {
                     }
                     .buttonStyle(.borderless)
                     if expandedContactID == contact.id {
+                        if model.retryingContactID == contact.id {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                Text(model.connectionStatus ?? "")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else if let result = model.connectionResult[contact.id] {
+                            Text(result)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                         if let note = ContactConnectionNote.note(
                             wakeGrantID: contact.wakeGrantID,
                             hostedGrantID: contact.hostedGrantID,
-                            unreachable: model.unreachableGrantIDs
+                            unreachable: model.unreachableGrantIDs,
+                            sendNewLink: contact.hostedGrantID.map { model.sendNewLinkGrantIDs.contains($0) } ?? false,
+                            askNewLink: contact.wakeGrantID.map { model.askNewLinkGrantIDs.contains($0) } ?? false
                         ) {
-                            Text(note == .shareMissing ? "sharing.connection.missing" : "sharing.connection.waiting")
+                            Text(connectionText(note, name: contact.name))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Button("sharing.connection.retry") {
-                                Task { await model.retryConnection() }
+                            if note == .sendNewLink, let grantID = contact.hostedGrantID,
+                               let grant = model.grants.first(where: { $0.id == grantID }) {
+                                Button("sharing.connection.sendLink") {
+                                    model.presentInvite(grant.inviteCode)
+                                }
+                                .buttonStyle(.borderless)
                             }
-                            .buttonStyle(.borderless)
                         }
+                        Button("sharing.connection.retry") {
+                            Task { await model.retryConnection(for: contact) }
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(model.retryingContactID != nil)
                         Button("sharing.wakeNow") {
                             guard let id = contact.wakeGrantID else { return }
                             Task { await model.sendToPhone(grantID: id, immediately: true) }
@@ -389,6 +411,19 @@ struct SharingView: View {
                         .tint(.indigo)
                 }
             }
+        }
+    }
+
+    private func connectionText(_ note: ContactConnectionNote, name: String) -> String {
+        switch note {
+        case .waitingForThem:
+            String(localized: "sharing.connection.waiting")
+        case .shareMissing:
+            String(localized: "sharing.connection.missing")
+        case .askForNewLink:
+            String(format: String(localized: "sharing.connection.askLink"), name)
+        case .sendNewLink:
+            String(localized: "sharing.connection.newLink")
         }
     }
 

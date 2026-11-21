@@ -4,6 +4,11 @@ import Observation
 import UIKit
 import UserNotifications
 
+struct UserFacingError: Equatable {
+    var summary: String
+    var detail: String
+}
+
 enum AppTab: Hashable {
     case alarms
     case sharing
@@ -57,9 +62,14 @@ final class AppModel {
     var authorization: AlarmAccessState = .unknown
     var notificationAllowed = false
     var scheduleFailure: String?
-    var lastError: String?
+    var presentedError: UserFacingError?
     /// Grants whose shared zone was missing on the last refresh or send.
     var unreachableGrantIDs: Set<UUID> = []
+    var retryingContactID: String?
+    var connectionStatus: String?
+    var connectionResult: [String: String] = [:]
+    var sendNewLinkGrantIDs: Set<UUID> = []
+    var askNewLinkGrantIDs: Set<UUID> = []
     var shareURL: URL?
     var shareMessage = ""
     var shareStatus: String?
@@ -231,7 +241,7 @@ final class AppModel {
 
     func save(draft: AlarmDraft) {
         guard let alarm = draft.makeAlarm() else {
-            lastError = String(localized: "song.invalid")
+            report(summary: String(localized: "song.invalid"))
             return
         }
         let recipient = editorRecipientGrantID
@@ -346,7 +356,7 @@ final class AppModel {
             update { $0.customSounds.append(sound) }
             return id
         } catch {
-            lastError = String(localized: "sound.unreadable")
+            report(summary: String(localized: "sound.unreadable"))
             return nil
         }
     }
@@ -402,14 +412,14 @@ final class AppModel {
             update { $0.library = library }
             Task { await reschedule(requestAccess: true) }
         } catch {
-            lastError = String(localized: "error.generic")
+            report(summary: String(localized: "error.generic"))
         }
     }
 
     @discardableResult
     func createCloudInvite(inviteeName: String) async -> Bool {
         guard let cloudKit else {
-            lastError = RemoteBackendError.notConfigured.errorDescription
+            report(summary: RemoteBackendError.notConfigured.errorDescription ?? String(localized: "error.generic"))
             return false
         }
         guard let label = PersonName.nonempty(inviteeName) else { return false }
@@ -442,7 +452,7 @@ final class AppModel {
             return true
         } catch {
             update { $0.permissions.removeUnsharedInvites() }
-            lastError = CloudKitErrorText.message(for: error)
+            reportCloud(error)
             return false
         }
     }
@@ -482,7 +492,7 @@ final class AppModel {
 
     func acceptShareLink(_ url: URL) async {
         guard InviteLinkPolicy.isCloudShare(url) else {
-            lastError = String(localized: "sharing.badLink")
+            report(summary: String(localized: "sharing.badLink"))
             return
         }
         guard let me = await identityForSharing() else {
@@ -515,11 +525,11 @@ final class AppModel {
             }
             await refreshRemote()
         } catch is AsyncDeadlineError {
-            lastError = String(localized: "sharing.timedOut")
+            report(summary: String(localized: "sharing.timedOut"))
         } catch is CancellationError {
             return
         } catch {
-            lastError = CloudKitErrorText.message(for: error)
+            reportCloud(error)
         }
     }
 
@@ -609,9 +619,92 @@ final class AppModel {
         await acceptReturnInvitesIfNeeded()
     }
 
-    func retryConnection() async {
-        unreachableGrantIDs.removeAll()
-        await refreshRemote()
+    func retryConnection(for contact: SharingContact) async {
+        guard retryingContactID == nil else { return }
+        retryingContactID = contact.id
+        connectionStatus = String(localized: "sharing.connection.checking")
+        connectionResult[contact.id] = nil
+        defer {
+            retryingContactID = nil
+            connectionStatus = nil
+        }
+        var needsLink = false
+        var askLink = false
+        if let hostedID = contact.hostedGrantID,
+           let grant = snapshot.permissions.grant(id: hostedID),
+           grant.owner.id == snapshot.profile.id,
+           let cloudKit {
+            do {
+                let repair = try await cloudKit.repairOwnedShare(grant)
+                update { $0.permissions.replace(repair.grant) }
+                if repair.needsNewLink {
+                    sendNewLinkGrantIDs.insert(repair.grant.id)
+                    needsLink = true
+                } else {
+                    sendNewLinkGrantIDs.remove(repair.grant.id)
+                }
+            } catch {
+                reportCloud(error)
+                connectionResult[contact.id] = presentedError?.summary
+                return
+            }
+        }
+        if let wakeID = contact.wakeGrantID,
+           var grant = snapshot.permissions.grant(id: wakeID),
+           let cloudKit {
+            do {
+                _ = try await cloudKit.refresh(grant, asOwner: false)
+                unreachableGrantIDs.remove(wakeID)
+                askNewLinkGrantIDs.remove(wakeID)
+            } catch {
+                let kind = ShareFailureKind.classify(error)
+                if kind == .shareLinkGone || kind == .zoneMissing {
+                    grant.inviteCode = ""
+                    update { $0.permissions.replace(grant) }
+                    unreachableGrantIDs.insert(wakeID)
+                    askNewLinkGrantIDs.insert(wakeID)
+                    askLink = true
+                } else {
+                    reportCloud(error)
+                    connectionResult[contact.id] = presentedError?.summary
+                    return
+                }
+            }
+        }
+        await publishMissingReturnLinks()
+        await acceptReturnInvitesIfNeeded()
+        if askLink {
+            connectionResult[contact.id] = String(format: String(localized: "sharing.connection.askLink"), contact.name)
+        } else if needsLink {
+            connectionResult[contact.id] = String(localized: "sharing.connection.newLink")
+        } else if contact.wakeGrantID == nil {
+            connectionResult[contact.id] = String(localized: "sharing.connection.waiting")
+        } else {
+            connectionResult[contact.id] = String(localized: "sharing.connection.ready")
+        }
+    }
+
+    func report(summary: String, detail: String = "") {
+        presentedError = UserFacingError(summary: summary, detail: detail)
+    }
+
+    func reportCloud(_ error: Error) {
+        let summary: String
+        switch ShareFailureKind.classify(error) {
+        case .shareLinkGone:
+            summary = String(localized: "sharing.connection.linkGone")
+        case .zoneMissing:
+            summary = String(localized: "sharing.connection.missing")
+        case .notSignedIn:
+            summary = String(localized: "sharing.signIn")
+        case .network:
+            summary = String(localized: "sharing.connection.network")
+        case .timedOut:
+            summary = String(localized: "sharing.timedOut")
+        case .other:
+            summary = String(localized: "sharing.connection.failed")
+        }
+        presentedError = UserFacingError(summary: summary, detail: CloudKitErrorText.detail(for: error))
     }
 
     func renamePerson(grantID: UUID, to name: String) async {
@@ -735,9 +828,7 @@ final class AppModel {
                     try await cloudKit.saveVoice(file: voiceFile, recordName: voiceName, grant: grant, asOwner: false)
                 } catch {
                     unreachableGrantIDs.insert(grantID)
-                    if let text = CloudKitErrorText.alertMessage(for: error, context: .sendingAlarm) {
-                        lastError = text
-                    }
+                    reportCloud(error)
                     alarm.soundID = SoundCatalog.defaultID
                     command.alarm = alarm
                 }
@@ -764,8 +855,23 @@ final class AppModel {
             }
         } catch {
             unreachableGrantIDs.insert(grantID)
-            if let text = CloudKitErrorText.alertMessage(for: error, context: .sendingAlarm) {
-                lastError = text
+            let kind = ShareFailureKind.classify(error)
+            if kind == .shareLinkGone || kind == .zoneMissing, var stored = snapshot.permissions.grant(id: grantID) {
+                stored.inviteCode = ""
+                update { $0.permissions.replace(stored) }
+                askNewLinkGrantIDs.insert(grantID)
+                let name = PersonName.listLabel(
+                    for: grant,
+                    profileID: snapshot.profile.id,
+                    grants: snapshot.permissions.grants,
+                    generic: grant.owner.displayName
+                )
+                report(
+                    summary: String(format: String(localized: "sharing.connection.askLink"), name),
+                    detail: CloudKitErrorText.detail(for: error)
+                )
+            } else {
+                reportCloud(error)
             }
         }
     }
@@ -797,9 +903,7 @@ final class AppModel {
             try await cloudKit.append(command: command, grant: grant, asOwner: false)
         } catch {
             unreachableGrantIDs.insert(grant.id)
-            if let text = CloudKitErrorText.alertMessage(for: error, context: .sendingAlarm) {
-                lastError = text
-            }
+            reportCloud(error)
         }
     }
 
