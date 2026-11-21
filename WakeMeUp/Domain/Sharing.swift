@@ -233,6 +233,43 @@ enum PersonName {
     }
 }
 
+enum HandshakeAction: Equatable {
+    /// Invitee creates the share in their own zone so the inviter can ring them.
+    case createReturnShare(acceptedID: UUID)
+    /// Invitee writes that share's URL onto the inviter's root. The original link is not changed.
+    case publishReturnURL(URL, on: UUID)
+    /// Inviter accepts that URL in the background. Nobody has to open it.
+    case acceptReturnURL(URL)
+}
+
+enum HandshakePlanner {
+    /// One link from the inviter. The return direction is only these automatic steps.
+    static func actions(profileID: UUID, grants: [ShareGrant]) -> [HandshakeAction] {
+        var actions: [HandshakeAction] = []
+        for grant in grants where MutualInvite.shouldCreateReturnShare(accepted: grant, profileID: profileID, existing: grants) {
+            actions.append(.createReturnShare(acceptedID: grant.id))
+        }
+        for back in grants where back.reciprocal == true && back.owner.id == profileID && back.state != .revoked {
+            guard let url = InviteLinkPolicy.url(from: back.inviteCode),
+                  let originalID = back.reciprocalForGrantID,
+                  let original = grants.first(where: { $0.id == originalID }),
+                  InviteLinkPolicy.url(from: original.returnInviteURL ?? "") == nil else { continue }
+            actions.append(.publishReturnURL(url, on: originalID))
+        }
+        if let url = MutualInvite.returnURLToAccept(in: grants, profileID: profileID) {
+            actions.append(.acceptReturnURL(url))
+        }
+        return actions
+    }
+}
+
+enum ShareLinkLifetime {
+    /// The public link stays after someone accepts. It is closed only when the owner revokes the contact.
+    static func mayClosePublicLink(revoking: Bool) -> Bool {
+        revoking
+    }
+}
+
 enum MutualInvite {
     static func shouldCreateReturnShare(accepted: ShareGrant, profileID: UUID, existing: [ShareGrant]) -> Bool {
         guard accepted.grantee?.id == profileID, accepted.reciprocal != true else { return false }

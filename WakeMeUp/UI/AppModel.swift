@@ -66,11 +66,6 @@ final class AppModel {
     var statusNotice: String?
     /// Grants whose shared zone was missing on the last refresh or send.
     var unreachableGrantIDs: Set<UUID> = []
-    var retryingContactID: String?
-    var connectionStatus: String?
-    var connectionResult: [String: String] = [:]
-    var sendNewLinkGrantIDs: Set<UUID> = []
-    var askNewLinkGrantIDs: Set<UUID> = []
     var shareURL: URL?
     var shareMessage = ""
     var shareStatus: String?
@@ -519,11 +514,6 @@ final class AppModel {
             let grant = try await work()
             update { $0.permissions.replace(grant) }
             grantsToSeal.insert(grant.id)
-            do {
-                try await createReturnShareIfNeeded(for: grant)
-            } catch {
-                unreachableGrantIDs.insert(grant.id)
-            }
             await refreshRemote()
         } catch is AsyncDeadlineError {
             report(summary: String(localized: "sharing.timedOut"))
@@ -539,6 +529,7 @@ final class AppModel {
         refreshing = true
         defer { refreshing = false }
         await cloudKit.prepareForRefresh()
+        await createMissingReturnShares()
         await publishMissingReturnLinks()
         let grants = snapshot.permissions.grants.filter { $0.cloudKitRootRecordName != nil && $0.state != .revoked }
         for grant in grants {
@@ -548,7 +539,11 @@ final class AppModel {
             do {
                 (updatedGrant, commands) = try await cloudKit.refresh(grant, asOwner: asOwner)
             } catch {
-                unreachableGrantIDs.insert(grant.id)
+                if ShareFailureKind.isShareNotFound(error) {
+                    update { $0.permissions.grants.removeAll { $0.id == grant.id } }
+                } else {
+                    unreachableGrantIDs.insert(grant.id)
+                }
                 continue
             }
             unreachableGrantIDs.remove(grant.id)
@@ -624,68 +619,9 @@ final class AppModel {
         await acceptReturnInvitesIfNeeded()
     }
 
-    func retryConnection(for contact: SharingContact) async {
-        guard retryingContactID == nil else { return }
-        retryingContactID = contact.id
-        connectionStatus = String(localized: "sharing.connection.checking")
-        connectionResult[contact.id] = nil
-        defer {
-            retryingContactID = nil
-            connectionStatus = nil
-        }
-        var needsLink = false
-        var askLink = false
-        if let hostedID = contact.hostedGrantID,
-           let grant = snapshot.permissions.grant(id: hostedID),
-           grant.owner.id == snapshot.profile.id,
-           let cloudKit {
-            do {
-                let repair = try await cloudKit.repairOwnedShare(grant)
-                update { $0.permissions.replace(repair.grant) }
-                if repair.needsNewLink {
-                    sendNewLinkGrantIDs.insert(repair.grant.id)
-                    needsLink = true
-                } else {
-                    sendNewLinkGrantIDs.remove(repair.grant.id)
-                }
-            } catch {
-                reportCloud(error)
-                connectionResult[contact.id] = presentedError?.summary
-                return
-            }
-        }
-        if let wakeID = contact.wakeGrantID,
-           var grant = snapshot.permissions.grant(id: wakeID),
-           let cloudKit {
-            do {
-                _ = try await cloudKit.refresh(grant, asOwner: false)
-                unreachableGrantIDs.remove(wakeID)
-                askNewLinkGrantIDs.remove(wakeID)
-            } catch {
-                let kind = ShareFailureKind.classify(error)
-                if kind == .shareLinkGone || kind == .zoneMissing {
-                    grant.inviteCode = ""
-                    update { $0.permissions.replace(grant) }
-                    unreachableGrantIDs.insert(wakeID)
-                    askNewLinkGrantIDs.insert(wakeID)
-                    askLink = true
-                } else {
-                    reportCloud(error)
-                    connectionResult[contact.id] = presentedError?.summary
-                    return
-                }
-            }
-        }
-        await publishMissingReturnLinks()
-        await acceptReturnInvitesIfNeeded()
-        if askLink {
-            connectionResult[contact.id] = String(format: String(localized: "sharing.connection.askLink"), contact.name)
-        } else if needsLink {
-            connectionResult[contact.id] = String(localized: "sharing.connection.newLink")
-        } else if contact.wakeGrantID == nil {
-            connectionResult[contact.id] = String(localized: "sharing.connection.waiting")
-        } else {
-            connectionResult[contact.id] = String(localized: "sharing.connection.ready")
+    private func createMissingReturnShares() async {
+        for grant in snapshot.permissions.grants where grant.state != .revoked {
+            try? await createReturnShareIfNeeded(for: grant)
         }
     }
 
@@ -875,20 +811,9 @@ final class AppModel {
         } catch {
             unreachableGrantIDs.insert(grantID)
             let kind = ShareFailureKind.classify(error)
-            if kind == .shareLinkGone || kind == .zoneMissing, var stored = snapshot.permissions.grant(id: grantID) {
-                stored.inviteCode = ""
-                update { $0.permissions.replace(stored) }
-                askNewLinkGrantIDs.insert(grantID)
-                let name = PersonName.listLabel(
-                    for: grant,
-                    profileID: snapshot.profile.id,
-                    grants: snapshot.permissions.grants,
-                    generic: grant.owner.displayName
-                )
-                report(
-                    summary: String(format: String(localized: "sharing.connection.askLink"), name),
-                    detail: CloudKitErrorText.detail(for: error)
-                )
+            if kind == .shareLinkGone {
+                update { $0.permissions.grants.removeAll { $0.id == grantID } }
+                report(summary: String(localized: "sharing.connection.gone"), detail: CloudKitErrorText.detail(for: error))
             } else {
                 reportCloud(error)
             }

@@ -145,6 +145,8 @@
 "sharing.voice.skipped" = "The alarm was sent without the voice message.";
 "sharing.reachError" = "Could not reach their phone.";
 "sharing.connection.waiting" = "Waiting for their phone to finish connecting. Wake and Set alarm turn on after that.";
+"sharing.connection.connecting" = "Connecting…";
+"sharing.connection.gone" = "This connection is no longer available. Send one new invite.";
 "sharing.connection.missing" = "Their iCloud share is not on this phone yet.";
 "sharing.connection.retry" = "Retry connection";
 "sharing.connection.checking" = "Checking the iCloud connection…";

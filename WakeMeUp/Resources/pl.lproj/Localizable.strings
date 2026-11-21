@@ -145,6 +145,8 @@
 "sharing.voice.skipped" = "Alarm został wysłany bez wiadomości głosowej.";
 "sharing.reachError" = "Nie udało się połączyć z telefonem tej osoby.";
 "sharing.connection.waiting" = "Czekam, aż telefon tej osoby dokończy połączenie. Obudź teraz i Ustaw alarm włączą się potem.";
+"sharing.connection.connecting" = "Łączenie…";
+"sharing.connection.gone" = "To połączenie już nie działa. Wyślij jedno nowe zaproszenie.";
 "sharing.connection.missing" = "Udostępnienie iCloud tej osoby nie jest jeszcze na tym telefonie.";
 "sharing.connection.retry" = "Spróbuj połączyć ponownie";
 "sharing.connection.checking" = "Sprawdzam połączenie iCloud…";

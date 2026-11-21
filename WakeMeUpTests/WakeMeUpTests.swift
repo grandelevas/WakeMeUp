@@ -1772,19 +1772,12 @@ final class MutualInviteTests: XCTestCase {
         let invite = CloudKitErrorText.alertMessage(for: error, context: .creatingInvite)
         let reach = CloudKitErrorText.alertMessage(for: error, context: .sendingAlarm)
         XCTAssertNotEqual(invite, reach)
-        XCTAssertEqual(
-            ContactConnectionNote.note(wakeGrantID: nil, hostedGrantID: UUID(), unreachable: []),
-            .waitingForThem
-        )
+        XCTAssertEqual(ContactConnectionNote.note(wakeGrantID: nil, isPending: false), .connecting)
         let wake = UUID()
-        XCTAssertEqual(
-            ContactConnectionNote.note(wakeGrantID: wake, hostedGrantID: nil, unreachable: [wake]),
-            .shareMissing
-        )
-        XCTAssertNil(ContactConnectionNote.note(wakeGrantID: wake, hostedGrantID: nil, unreachable: []))
-        XCTAssertEqual(OwnedShareAction.decide(shareExists: false, publicPermissionNone: false, urlMissing: true), .create)
-        XCTAssertEqual(OwnedShareAction.decide(shareExists: true, publicPermissionNone: true, urlMissing: false), .reopen)
-        XCTAssertEqual(OwnedShareAction.decide(shareExists: true, publicPermissionNone: false, urlMissing: false), .keep)
+        XCTAssertNil(ContactConnectionNote.note(wakeGrantID: wake, isPending: false))
+        XCTAssertNil(ContactConnectionNote.note(wakeGrantID: nil, isPending: true))
+        XCTAssertFalse(ShareLinkLifetime.mayClosePublicLink(revoking: false))
+        XCTAssertTrue(ShareLinkLifetime.mayClosePublicLink(revoking: true))
         let gone = NSError(
             domain: CKError.errorDomain,
             code: CKError.unknownItem.rawValue,
@@ -1792,14 +1785,6 @@ final class MutualInviteTests: XCTestCase {
         )
         XCTAssertEqual(ShareFailureKind.classify(gone), .shareLinkGone)
         XCTAssertNotEqual(ShareFailureKind.classify(CKError(.unknownItem)), .shareLinkGone)
-        XCTAssertEqual(
-            ContactConnectionNote.note(wakeGrantID: wake, hostedGrantID: nil, unreachable: [], askNewLink: true),
-            .askForNewLink
-        )
-        XCTAssertEqual(
-            ContactConnectionNote.note(wakeGrantID: nil, hostedGrantID: UUID(), unreachable: [], sendNewLink: true),
-            .sendNewLink
-        )
         XCTAssertTrue(ContactActionPolicy.canWake(SharingContact(
             id: "a",
             name: "Mateusz",
@@ -1967,5 +1952,135 @@ final class WakeReportTests: XCTestCase {
         var fetched = local
         fetched.wakeReports = nil
         XCTAssertEqual(GrantRefreshMerge.merging(fetched, with: local).wakeReports?.count, 1)
+    }
+}
+
+final class HandshakeTests: XCTestCase {
+    func testOneLinkLetsBothPeopleWakeEachOtherAndTheLinkStays() throws {
+        let mateusz = Participant(id: UUID(), displayName: "Mateusz")
+        let akhi = Participant(id: UUID(), displayName: "Akhi")
+        let original = URL(string: "https://www.icloud.com/share/original#Wakito")!
+        var cloud = HandshakeCloud()
+        var mateuszGrants = [cloud.create(owner: mateusz, url: original)]
+        var akhiGrants = [try cloud.accept(url: original, grantee: akhi)]
+        for _ in 0..<8 {
+            try Self.step(&mateuszGrants, person: mateusz, cloud: &cloud)
+            try Self.step(&akhiGrants, person: akhi, cloud: &cloud)
+            mateuszGrants = cloud.ownedView(mateuszGrants, owner: mateusz.id)
+            akhiGrants = cloud.sharedView(akhiGrants, grantee: akhi.id)
+            let idle = HandshakePlanner.actions(profileID: mateusz.id, grants: mateuszGrants).isEmpty
+                && HandshakePlanner.actions(profileID: akhi.id, grants: akhiGrants).isEmpty
+            if idle { break }
+        }
+        XCTAssertEqual(cloud.url(for: mateuszGrants[0].id), original)
+        XCTAssertTrue(cloud.isOpen(mateuszGrants[0].id))
+        XCTAssertEqual(ShareRoster.phonesICanSet(profileID: mateusz.id, grants: mateuszGrants).map(\.owner.id), [akhi.id])
+        XCTAssertEqual(ShareRoster.phonesICanSet(profileID: akhi.id, grants: akhiGrants).map(\.owner.id), [mateusz.id])
+        XCTAssertTrue(HandshakePlanner.actions(profileID: mateusz.id, grants: mateuszGrants).isEmpty)
+        XCTAssertTrue(HandshakePlanner.actions(profileID: akhi.id, grants: akhiGrants).isEmpty)
+        let shares = cloud.shareCount
+        try Self.step(&mateuszGrants, person: mateusz, cloud: &cloud)
+        try Self.step(&akhiGrants, person: akhi, cloud: &cloud)
+        XCTAssertEqual(cloud.shareCount, shares)
+        XCTAssertEqual(cloud.url(for: mateuszGrants[0].id), original)
+        XCTAssertFalse(HandshakePlanner.actions(profileID: mateusz.id, grants: mateuszGrants).contains { action in
+            if case .createReturnShare = action { return true }
+            return false
+        })
+    }
+
+    private static func step(_ grants: inout [ShareGrant], person: Participant, cloud: inout HandshakeCloud) throws {
+        for action in HandshakePlanner.actions(profileID: person.id, grants: grants) {
+            switch action {
+            case let .createReturnShare(acceptedID):
+                let accepted = try XCTUnwrap(grants.first { $0.id == acceptedID })
+                grants.append(cloud.createReturn(answering: accepted, owner: person))
+            case let .publishReturnURL(url, acceptedID):
+                cloud.publish(url, on: acceptedID)
+                guard let index = grants.firstIndex(where: { $0.id == acceptedID }) else { continue }
+                grants[index].returnInviteURL = url.absoluteString
+            case let .acceptReturnURL(url):
+                grants.append(try cloud.accept(url: url, grantee: person))
+            }
+        }
+    }
+}
+
+private struct HandshakeCloud {
+    struct Share {
+        var grant: ShareGrant
+        var url: URL
+        var isOpen: Bool
+    }
+
+    private var shares: [UUID: Share] = [:]
+
+    var shareCount: Int { shares.count }
+
+    mutating func create(owner: Participant, url: URL) -> ShareGrant {
+        let grant = ShareGrant(
+            id: UUID(),
+            inviteCode: url.absoluteString,
+            secret: "s",
+            owner: owner,
+            grantee: nil,
+            state: .pending,
+            createdAt: .now,
+            cloudKitRootRecordName: "grant-\(UUID().uuidString)",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: owner.id.uuidString
+        )
+        shares[grant.id] = Share(grant: grant, url: url, isOpen: true)
+        return grant
+    }
+
+    mutating func accept(url: URL, grantee: Participant) throws -> ShareGrant {
+        guard let id = shares.first(where: { $0.value.url == url })?.key, var share = shares[id] else {
+            throw RemoteBackendError.shareLinkGone
+        }
+        share.grant.grantee = grantee
+        share.grant.state = .active
+        shares[id] = share
+        return share.grant
+    }
+
+    mutating func createReturn(answering accepted: ShareGrant, owner: Participant) -> ShareGrant {
+        let url = URL(string: "https://www.icloud.com/share/return-\(UUID().uuidString)#Wakito")!
+        var grant = create(owner: owner, url: url)
+        grant.reciprocal = true
+        grant.reciprocalForGrantID = accepted.id
+        grant.inviteeName = accepted.owner.displayName
+        if var share = shares[grant.id] {
+            share.grant = grant
+            shares[grant.id] = share
+        }
+        return grant
+    }
+
+    mutating func publish(_ url: URL, on acceptedID: UUID) {
+        guard var share = shares[acceptedID] else { return }
+        share.grant.returnInviteURL = url.absoluteString
+        shares[acceptedID] = share
+    }
+
+    func url(for grantID: UUID) -> URL? { shares[grantID]?.url }
+
+    func isOpen(_ grantID: UUID) -> Bool { shares[grantID]?.isOpen == true }
+
+    func ownedView(_ local: [ShareGrant], owner: UUID) -> [ShareGrant] {
+        local.map { grant in
+            guard grant.owner.id == owner, let stored = shares[grant.id]?.grant else { return grant }
+            var merged = stored
+            merged.reciprocal = grant.reciprocal ?? stored.reciprocal
+            merged.reciprocalForGrantID = grant.reciprocalForGrantID ?? stored.reciprocalForGrantID
+            return merged
+        }
+    }
+
+    func sharedView(_ local: [ShareGrant], grantee: UUID) -> [ShareGrant] {
+        local.map { grant in
+            guard grant.grantee?.id == grantee, let stored = shares[grant.id]?.grant else { return grant }
+            return stored
+        }
     }
 }
