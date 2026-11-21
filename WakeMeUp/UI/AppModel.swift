@@ -63,6 +63,7 @@ final class AppModel {
     var notificationAllowed = false
     var scheduleFailure: String?
     var presentedError: UserFacingError?
+    var statusNotice: String?
     /// Grants whose shared zone was missing on the last refresh or send.
     var unreachableGrantIDs: Set<UUID> = []
     var retryingContactID: String?
@@ -582,6 +583,10 @@ final class AppModel {
                         alarm.soundID = VoiceClipPolicy.soundID(installed: installed, voiceID: voiceID)
                         command.alarm = alarm
                     }
+                    if command.action == .triggerNow, var alarm = command.alarm {
+                        alarm = WakeNowSchedule.applying(to: alarm, processedAt: .now)
+                        command.alarm = alarm
+                    }
                     if (command.action == .upsert || command.action == .triggerNow), let alarm = command.alarm {
                         notices.append(RemoteAlarmNotice.text(sender: PersonName.senderName(grant: updated), schedule: alarm.schedule))
                     }
@@ -796,6 +801,8 @@ final class AppModel {
         )
         var voiceName: String?
         var installed: CustomSound?
+        var voiceWarning: String?
+        var voiceDetail = ""
         if let voiceFile {
             if alarm.soundID.hasPrefix("voice-") {
                 voiceName = alarm.soundID
@@ -806,6 +813,23 @@ final class AppModel {
                     voiceName = name
                     installed = sound
                 }
+            }
+            let attemptedVoice = voiceName
+            var uploaded = false
+            if let attemptedVoice {
+                do {
+                    try await cloudKit.saveVoice(file: voiceFile, recordName: attemptedVoice, grant: grant, asOwner: false)
+                    uploaded = true
+                } catch {
+                    voiceDetail = CloudKitErrorText.detail(for: error)
+                }
+            }
+            let payload = OutgoingVoice.payload(soundID: alarm.soundID, voiceName: attemptedVoice, uploaded: uploaded)
+            alarm.soundID = payload.soundID
+            voiceName = payload.voiceRecordName
+            if payload.warn {
+                installed = nil
+                voiceWarning = String(localized: "sharing.voice.skipped")
             }
         }
         var command = RemoteAlarmCommand(
@@ -823,15 +847,10 @@ final class AppModel {
         do {
             _ = try snapshot.permissions.authorize(sender: snapshot.profile.id, recipient: grant.owner.id)
             try await cloudKit.append(command: command, grant: grant, asOwner: false)
-            if let voiceFile, let voiceName {
-                do {
-                    try await cloudKit.saveVoice(file: voiceFile, recordName: voiceName, grant: grant, asOwner: false)
-                } catch {
-                    unreachableGrantIDs.insert(grantID)
-                    reportCloud(error)
-                    alarm.soundID = SoundCatalog.defaultID
-                    command.alarm = alarm
-                }
+            if let voiceWarning {
+                report(summary: voiceWarning, detail: voiceDetail)
+            } else if immediately {
+                statusNotice = String(localized: "sharing.wakeNow.soon")
             }
             if !immediately {
                 let sent = SentAlarm(

@@ -33,6 +33,14 @@ struct RootView: View {
         .sheet(isPresented: sharePresented) {
             ActivityShareSheet(items: shareItems)
         }
+        .background {
+            Color.clear
+                .alert("sharing.wakeNow", isPresented: noticePresented) {
+                    Button("alarms.done", role: .cancel) {}
+                } message: {
+                    Text(model.statusNotice ?? "")
+                }
+        }
         .alert("error.generic", isPresented: errorPresented) {
             if model.presentedError?.detail.isEmpty == false {
                 Button("sharing.error.details") {
@@ -81,6 +89,13 @@ struct RootView: View {
         Binding(
             get: { model.ringingAlarmID != nil },
             set: { if !$0 { model.dismissRinging() } }
+        )
+    }
+
+    private var noticePresented: Binding<Bool> {
+        Binding(
+            get: { model.statusNotice != nil },
+            set: { if !$0 { model.statusNotice = nil } }
         )
     }
 

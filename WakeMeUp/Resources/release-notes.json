@@ -5,6 +5,18 @@
       "date": "2026-11-21",
       "changes": {
         "en": [
+          "Wake now rings on their phone about 2 minutes after they receive it, full screen. If a voice message cannot be sent, the alarm still goes through without it."
+        ],
+        "pl": [
+          "Obudź teraz dzwoni u tej osoby pełnym ekranem około 2 minuty po odebraniu. Gdy wiadomości głosowej nie da się wysłać, alarm i tak dochodzi bez niej."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-21",
+      "changes": {
+        "en": [
           "Retry connection checks the iCloud share and tells you the result. If the old link is gone, you can send a new one, and the other person is asked for that link instead of seeing a raw error."
         ],
         "pl": [

@@ -822,6 +822,21 @@ final class PermissionTests: XCTestCase {
         var library = AlarmLibrary()
         try RemoteCommandApplier.apply(command: command, grant: grant, library: &library)
         XCTAssertEqual(library.alarms.count, 1)
+        let processed = Date(timeIntervalSince1970: 1_700_000_000)
+        let soon = WakeNowSchedule.applying(to: alarm, processedAt: processed)
+        if case let .oneShot(fireAt) = soon.schedule {
+            XCTAssertEqual(fireAt.timeIntervalSince(processed), WakeNowSchedule.leadTime, accuracy: 0.001)
+        } else {
+            XCTFail("Wake now has to be a one-shot alarm")
+        }
+        XCTAssertEqual(
+            OutgoingVoice.payload(soundID: "voice-1", voiceName: "voice-1", uploaded: false),
+            OutgoingVoice.Payload(soundID: SoundCatalog.defaultID, voiceRecordName: nil, warn: true)
+        )
+        XCTAssertEqual(
+            OutgoingVoice.payload(soundID: "classic", voiceName: "voice-1", uploaded: true),
+            OutgoingVoice.Payload(soundID: "voice-1", voiceRecordName: "voice-1", warn: false)
+        )
         XCTAssertTrue(library.alarms[0].origin.isOwned(by: friend.id))
         XCTAssertEqual(library.alarms[0].origin.senderName, "Ola")
         let cancel = RemoteAlarmCommand(
