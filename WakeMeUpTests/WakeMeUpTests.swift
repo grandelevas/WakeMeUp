@@ -1209,12 +1209,79 @@ final class VoiceClipPolicyTests: XCTestCase {
     }
 }
 
+final class RemoteCommandGateTests: XCTestCase {
+    func testCommandsAlreadyOnTheShareAreSealedWhenTheConnectionStarts() {
+        let old = command(action: .triggerNow)
+        let applied: Set<UUID> = []
+        let sealed = RemoteCommandGate.partition(commands: [old], applied: applied, sealExisting: true)
+        XCTAssertTrue(sealed.apply.isEmpty)
+        XCTAssertEqual(sealed.seal, [old.id])
+        let later = command(action: .upsert)
+        let next = RemoteCommandGate.partition(commands: [old, later], applied: Set(sealed.seal), sealExisting: false)
+        XCTAssertEqual(next.apply.map(\.id), [later.id])
+        XCTAssertTrue(next.seal.isEmpty)
+    }
+
+    private func command(action: RemoteAction) -> RemoteAlarmCommand {
+        RemoteAlarmCommand(
+            id: UUID(),
+            grantID: UUID(),
+            senderID: UUID(),
+            recipientID: UUID(),
+            action: action,
+            createdAt: .now,
+            alarm: nil,
+            alarmID: nil,
+            enabled: nil
+        )
+    }
+}
+
+final class ContactRosterTests: XCTestCase {
+    func testOneMutualConnectionIsASingleContact() {
+        let me = UUID()
+        let them = UUID()
+        var hosted = ShareGrant(
+            id: UUID(),
+            inviteCode: "https://www.icloud.com/share/out",
+            secret: "s",
+            owner: Participant(id: me, displayName: "Me"),
+            grantee: Participant(id: them, displayName: "Aleksandra"),
+            state: .active,
+            createdAt: .now,
+            cloudKitRootRecordName: "a",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: "_me"
+        )
+        hosted.inviteeName = "Ola"
+        let wake = ShareGrant(
+            id: UUID(),
+            inviteCode: "https://www.icloud.com/share/back",
+            secret: "s2",
+            owner: Participant(id: them, displayName: "Aleksandra"),
+            grantee: Participant(id: me, displayName: "Me"),
+            state: .active,
+            createdAt: .now,
+            cloudKitRootRecordName: "b",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: "_them"
+        )
+        let contacts = ContactRoster.contacts(profileID: me, grants: [hosted, wake])
+        XCTAssertEqual(contacts.count, 1)
+        XCTAssertEqual(contacts[0].name, "Ola")
+        XCTAssertEqual(contacts[0].wakeGrantID, wake.id)
+        XCTAssertEqual(contacts[0].hostedGrantID, hosted.id)
+        XCTAssertFalse(contacts[0].isPending)
+        XCTAssertEqual(contacts[0].memberID, them)
+    }
+}
+
 final class AlarmNoteTests: XCTestCase {
     func testANoteIsTrimmedTo140CharactersAndBlankBecomesNil() {
         XCTAssertNil(AlarmNote.cleaned("   "))
         XCTAssertEqual(AlarmNote.cleaned("  Bring the keys  "), "Bring the keys")
-        let long = String(repeating: "a", count: 180)
-        XCTAssertEqual(AlarmNote.cleaned(long)?.count, 140)
+        let long = String(repeating: "a", count: 1800)
+        XCTAssertEqual(AlarmNote.cleaned(long)?.count, 1000)
     }
 }
 

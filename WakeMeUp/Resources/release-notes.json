@@ -5,10 +5,16 @@
       "date": "2026-11-20",
       "changes": {
         "en": [
+          "Sharing shows one list of contacts. Swipe to rename or delete, and tap a contact to wake them, set an alarm, or add them to a group.",
+          "Setting an alarm for a contact uses the full alarm editor. Your own alarms can include a voice message and a note of up to 1000 characters.",
+          "Accepting an invite no longer creates an alarm by itself.",
           "Inviting someone creates the iCloud zone first, so a fresh install no longer fails with a missing-zone error.",
           "You can make a group of friends on this iPhone and set one alarm for all of them. For friends shows who is up and who is still asleep."
         ],
         "pl": [
+          "Współpraca pokazuje jedną listę kontaktów. Przesuń, żeby zmienić imię albo usunąć, a stuknij kontakt, żeby obudzić, ustawić alarm albo dodać do grupy.",
+          "Alarm dla kontaktu ustawisz w pełnym edytorze. Własne alarmy mogą mieć wiadomość głosową i notatkę do 1000 znaków.",
+          "Samo przyjęcie zaproszenia nie tworzy już alarmu.",
           "Zapraszanie najpierw tworzy strefę iCloud, więc świeża instalacja nie kończy się błędem brakującej strefy.",
           "Możesz zrobić na tym iPhonie grupę znajomych i ustawić im jeden budzik. W Dla znajomych widać, kto wstał, a kto jeszcze śpi."
         ]

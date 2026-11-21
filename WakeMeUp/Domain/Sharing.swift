@@ -417,6 +417,89 @@ enum FriendGroupRoster {
     }
 }
 
+struct SharingContact: Identifiable, Equatable {
+    var id: String
+    var name: String
+    /// The other person, once CloudKit has a participant id.
+    var memberID: UUID?
+    /// Grant where I can set alarms on their phone.
+    var wakeGrantID: UUID?
+    /// Grant I own: their invite, or the share they accepted.
+    var hostedGrantID: UUID?
+    var isPending: Bool
+}
+
+enum ContactRoster {
+    static func contacts(profileID: UUID, grants: [ShareGrant]) -> [SharingContact] {
+        var order: [String] = []
+        var byKey: [String: SharingContact] = [:]
+        for grant in grants where grant.state != .revoked {
+            let key: String
+            let memberID: UUID?
+            if grant.owner.id == profileID {
+                memberID = grant.grantee?.id
+                key = memberID?.uuidString ?? "invite-\(grant.id.uuidString)"
+            } else if grant.grantee?.id == profileID {
+                memberID = grant.owner.id
+                key = memberID?.uuidString ?? grant.id.uuidString
+            } else {
+                continue
+            }
+            let name = PersonName.listLabel(
+                for: grant,
+                profileID: profileID,
+                grants: grants,
+                generic: String(localized: "sharing.someone")
+            )
+            var contact = byKey[key] ?? SharingContact(
+                id: key,
+                name: name,
+                memberID: memberID,
+                wakeGrantID: nil,
+                hostedGrantID: nil,
+                isPending: false
+            )
+            if grant.owner.id == profileID {
+                contact.hostedGrantID = grant.id
+                if PersonName.nonempty(grant.inviteeName) != nil {
+                    contact.name = name
+                }
+            } else {
+                contact.wakeGrantID = grant.id
+                if contact.hostedGrantID == nil {
+                    contact.name = name
+                }
+            }
+            contact.memberID = contact.memberID ?? memberID
+            contact.isPending = contact.wakeGrantID == nil && grants.first { $0.id == contact.hostedGrantID }?.state == .pending
+            if byKey[key] == nil { order.append(key) }
+            byKey[key] = contact
+        }
+        return order.compactMap { byKey[$0] }
+    }
+}
+
+enum RemoteCommandGate {
+    struct Decision: Equatable {
+        var apply: [RemoteAlarmCommand]
+        var seal: [UUID]
+    }
+
+    /// Commands already stored when the connection becomes active are history.
+    /// They are marked processed and never turned into alarms.
+    static func partition(
+        commands: [RemoteAlarmCommand],
+        applied: Set<UUID>,
+        sealExisting: Bool
+    ) -> Decision {
+        let fresh = commands.filter { !applied.contains($0.id) }
+        if sealExisting {
+            return Decision(apply: [], seal: fresh.map(\.id))
+        }
+        return Decision(apply: fresh, seal: [])
+    }
+}
+
 enum RemoteAction: String, Codable, Equatable {
     case upsert
     case cancel

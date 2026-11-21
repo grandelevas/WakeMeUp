@@ -49,6 +49,8 @@ enum AppRuntime {
 final class AppModel {
     private(set) var snapshot: LibrarySnapshot
     var editor: AlarmDraft?
+    /// When set, saving the editor sends the alarm to this grant instead of storing it locally.
+    var editorRecipientGrantID: UUID?
     var ringingAlarmID: UUID?
     var showGroups = false
     var selectedTab: AppTab = .alarms
@@ -76,6 +78,8 @@ final class AppModel {
     private var started = false
     private var refreshing = false
     private var acceptingReturn = false
+    /// Grants whose commands already on the server must not become alarms.
+    private var grantsToSeal: Set<UUID> = []
     private var heldShare: CKShare.Metadata?
     private var heldURL: URL?
     private var wakeCheck: Task<Void, Never>?
@@ -185,11 +189,30 @@ final class AppModel {
     }
 
     func addAlarm() {
+        editorRecipientGrantID = nil
         editor = .makeNew()
     }
 
     func edit(_ alarm: Alarm) {
+        editorRecipientGrantID = nil
         editor = AlarmDraft(alarm: alarm)
+    }
+
+    func closeEditor() {
+        editor = nil
+        editorRecipientGrantID = nil
+    }
+
+    func editAlarm(forContactGrant grantID: UUID) {
+        editorRecipientGrantID = grantID
+        editor = .makeNew()
+    }
+
+    func installLocalVoice(_ url: URL) -> String? {
+        let name = "voice-\(UUID().uuidString)"
+        guard let sound = try? VoiceFiles.install(from: url, soundID: name) else { return nil }
+        update { $0.customSounds.append(sound) }
+        return sound.id
     }
 
     func save(draft: AlarmDraft) {
@@ -197,9 +220,21 @@ final class AppModel {
             lastError = String(localized: "song.invalid")
             return
         }
-        update { $0.library.upsert(alarm) }
+        let recipient = editorRecipientGrantID
         editor = nil
+        editorRecipientGrantID = nil
+        if let recipient {
+            let voice = voiceFile(for: alarm.soundID)
+            Task { await sendToPhone(grantID: recipient, immediately: false, voiceFile: voice, prepared: alarm) }
+            return
+        }
+        update { $0.library.upsert(alarm) }
         Task { await reschedule(requestAccess: true) }
+    }
+
+    private func voiceFile(for soundID: String) -> URL? {
+        guard soundID.hasPrefix("voice-") else { return nil }
+        return SoundFiles.previewURL(for: soundID, customSounds: snapshot.customSounds)
     }
 
     func delete(alarmID: UUID) {
@@ -458,6 +493,7 @@ final class AppModel {
         do {
             let grant = try await work()
             update { $0.permissions.replace(grant) }
+            grantsToSeal.insert(grant.id)
             do {
                 try await createReturnShareIfNeeded(for: grant)
             } catch {
@@ -498,8 +534,16 @@ final class AppModel {
             if asOwner, let joined = ShareChangeNotice.joinedName(previous: grant, updated: updated) {
                 notices.append(String(format: String(localized: "sharing.push.joined"), joined))
             }
+            let sealExisting = grantsToSeal.contains(grant.id) || (grant.state != .active && updated.state == .active)
+            grantsToSeal.remove(grant.id)
+            let decision = RemoteCommandGate.partition(
+                commands: commands,
+                applied: Set(applied),
+                sealExisting: sealExisting
+            )
+            applied.append(contentsOf: decision.seal)
             var newSounds: [CustomSound] = []
-            for command in commands where !applied.contains(command.id) {
+            for command in decision.apply {
                 var command = command
                 if updated.state == .active {
                     if var alarm = command.alarm, command.voiceRecordName != nil {
@@ -608,9 +652,24 @@ final class AppModel {
         }
     }
 
-    func sendToPhone(grantID: UUID, immediately: Bool, voiceFile: URL? = nil, friendGroup: FriendGroup? = nil) async {
+    func addMember(_ memberID: UUID, toGroup groupID: UUID) {
+        update {
+            guard let index = $0.friendGroups.firstIndex(where: { $0.id == groupID }) else { return }
+            if !$0.friendGroups[index].memberIDs.contains(memberID) {
+                $0.friendGroups[index].memberIDs.append(memberID)
+            }
+        }
+    }
+
+    func sendToPhone(
+        grantID: UUID,
+        immediately: Bool,
+        voiceFile: URL? = nil,
+        friendGroup: FriendGroup? = nil,
+        prepared: Alarm? = nil
+    ) async {
         guard let grant = snapshot.permissions.grant(id: grantID), let cloudKit else { return }
-        var alarm = Alarm(
+        var alarm = prepared ?? Alarm(
             id: UUID(),
             schedule: immediately
                 ? .oneShot(fireAt: Date().addingTimeInterval(3))
@@ -628,11 +687,15 @@ final class AppModel {
         var voiceName: String?
         var installed: CustomSound?
         if let voiceFile {
-            let name = "voice-\(UUID().uuidString)"
-            if let sound = try? VoiceFiles.install(from: voiceFile, soundID: name) {
-                alarm.soundID = sound.id
-                voiceName = name
-                installed = sound
+            if alarm.soundID.hasPrefix("voice-") {
+                voiceName = alarm.soundID
+            } else {
+                let name = "voice-\(UUID().uuidString)"
+                if let sound = try? VoiceFiles.install(from: voiceFile, soundID: name) {
+                    alarm.soundID = sound.id
+                    voiceName = name
+                    installed = sound
+                }
             }
         }
         var command = RemoteAlarmCommand(
@@ -1049,6 +1112,7 @@ final class AppModel {
                 try await cloudKit.accept(url: url, grantee: me)
             }
             update { $0.permissions.replace(grant) }
+            grantsToSeal.insert(grant.id)
         } catch is AsyncDeadlineError {
             lastError = String(localized: "sharing.timedOut")
         } catch {

@@ -27,7 +27,8 @@
 "alarm.label" = "Etykieta";
 "alarm.note" = "Notatka";
 "alarm.note.placeholder" = "Krótka notatka";
-"alarm.note.help" = "Do 140 znaków. Widać ją na budziku i na liście.";
+"alarm.note.help" = "Do 1000 znaków. Widać ją na budziku i na liście.";
+"alarm.voice.help" = "Nagraj do 20 sekund. Odtworzy się, gdy ten alarm zadzwoni.";
 "alarm.repeat" = "Powtarzanie";
 "alarm.sound" = "Dźwięk";
 "alarm.snooze" = "Drzemka";
@@ -138,6 +139,13 @@
 "sharing.revoke.message" = "Ta osoba nie będzie już mogła ustawiać alarmów na tym iPhonie.";
 "sharing.peopleWhoCanWakeMe" = "Mogą tu ustawiać alarmy";
 "sharing.phonesICanWake" = "Telefony, które mogę budzić";
+"sharing.contacts" = "Kontakty";
+"sharing.wakeNow" = "Obudź teraz";
+"sharing.setAlarm" = "Ustaw alarm";
+"sharing.addToGroup" = "Dodaj do grupy";
+"sharing.delete.title" = "Usunąć ten kontakt?";
+"sharing.delete.message" = "Ta osoba nie będzie już mogła ustawiać Ci alarmów, a Ty nie będziesz mógł ustawiać ich jej.";
+"sharing.delete.confirm" = "Usuń";
 "sharing.ringNow" = "Obudź teraz";
 "sharing.schedule" = "Zaplanuj";
 "sharing.voice.title" = "Wiadomość głosowa";

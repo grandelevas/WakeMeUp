@@ -71,7 +71,7 @@ struct Alarm: Codable, Equatable, Hashable, Identifiable {
     var isEnabled: Bool
     var groupID: UUID?
     var songLink: SongLink?
-    /// Optional short note, at most 140 characters. Empty means no note.
+    /// Optional note, at most 1000 characters. Empty means no note.
     var note: String? = nil
     var origin: AlarmOrigin
     /// Enabled state to restore when a disabled group is turned back on.
@@ -301,7 +301,7 @@ struct AlarmLibrary: Codable, Equatable {
 }
 
 enum AlarmNote {
-    static let maxCharacters = 140
+    static let maxCharacters = 1000
 
     static func cleaned(_ text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
