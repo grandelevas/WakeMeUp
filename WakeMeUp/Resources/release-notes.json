@@ -5,6 +5,18 @@
       "date": "2026-11-21",
       "changes": {
         "en": [
+          "Wake now, Set alarm, and Add to group are large tiles on a contact."
+        ],
+        "pl": [
+          "Obudź teraz, Ustaw alarm i Dodaj do grupy są dużymi kafelkami przy kontakcie."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-21",
+      "changes": {
+        "en": [
           "One invite link connects both ways. After the other person accepts, each of you can wake the other. Nothing else has to be opened or sent."
         ],
         "pl": [
