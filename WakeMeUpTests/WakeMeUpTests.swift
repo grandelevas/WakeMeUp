@@ -837,6 +837,17 @@ final class PermissionTests: XCTestCase {
             OutgoingVoice.payload(soundID: "classic", voiceName: "voice-1", uploaded: true),
             OutgoingVoice.Payload(soundID: "voice-1", voiceRecordName: "voice-1", warn: false)
         )
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(UUID().uuidString).m4a")
+        try Data([0]).write(to: file)
+        let asset = CKAsset(fileURL: file)
+        let production = CKRecord(recordType: VoiceAssetField.recordType)
+        VoiceAssetField.assign(asset, on: production)
+        XCTAssertNotNil(production[VoiceAssetField.key])
+        XCTAssertNil(production[VoiceAssetField.legacyKey])
+        XCTAssertNotNil(VoiceAssetField.asset(from: production))
+        let legacy = CKRecord(recordType: VoiceAssetField.recordType)
+        legacy[VoiceAssetField.legacyKey] = asset
+        XCTAssertNotNil(VoiceAssetField.asset(from: legacy))
         XCTAssertTrue(library.alarms[0].origin.isOwned(by: friend.id))
         XCTAssertEqual(library.alarms[0].origin.senderName, "Ola")
         let cancel = RemoteAlarmCommand(

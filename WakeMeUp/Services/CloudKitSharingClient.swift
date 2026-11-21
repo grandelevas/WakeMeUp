@@ -130,6 +130,22 @@ enum ShareRecordAddress {
     }
 }
 
+enum VoiceAssetField {
+    static let recordType = "WMVoice"
+    /// Production schema. CloudKit field names are case-sensitive.
+    static let key = "Audio"
+    static let legacyKey = "audio"
+
+    static func assign(_ asset: CKAsset, on record: CKRecord) {
+        record[key] = asset
+    }
+
+    static func asset(from record: CKRecord) -> CKAsset? {
+        if let asset = record[key] as? CKAsset { return asset }
+        return record[legacyKey] as? CKAsset
+    }
+}
+
 enum PrivateZonePolicy {
     /// Create the private zone only when CloudKit says it is not there.
     /// Never delete a zone, and never replace one that already exists. A deleted zone stays deleted
@@ -577,7 +593,7 @@ final class CloudKitSharingClient {
         }
     }
 
-    /// Saves a voice clip next to the shared root. Record type `WMVoice`, field `audio` (Asset).
+    /// Saves a voice clip next to the shared root. Record type `WMVoice`, field `Audio` (Asset).
     func saveVoice(file: URL, recordName: String, grant: ShareGrant, asOwner: Bool) async throws {
         try await requireAccount()
         let database = asOwner ? container.privateCloudDatabase : container.sharedCloudDatabase
@@ -588,8 +604,8 @@ final class CloudKitSharingClient {
         if database.databaseScope != .private {
             rootID = await resolvedSharedID(proposed: rootID)
         }
-        let voice = CKRecord(recordType: "WMVoice", recordID: CKRecord.ID(recordName: recordName, zoneID: rootID.zoneID))
-        voice["audio"] = CKAsset(fileURL: file)
+        let voice = CKRecord(recordType: VoiceAssetField.recordType, recordID: CKRecord.ID(recordName: recordName, zoneID: rootID.zoneID))
+        VoiceAssetField.assign(CKAsset(fileURL: file), on: voice)
         voice.parent = CKRecord.Reference(recordID: rootID, action: .none)
         do {
             _ = try await database.save(voice)
@@ -598,8 +614,8 @@ final class CloudKitSharingClient {
                CloudKitZoneFailure.isZoneNotFound(error),
                let url = inviteURL(for: grant) {
                 let root = try await reopenShare(url)
-                let rebuilt = CKRecord(recordType: "WMVoice", recordID: CKRecord.ID(recordName: recordName, zoneID: root.zoneID))
-                rebuilt["audio"] = CKAsset(fileURL: file)
+                let rebuilt = CKRecord(recordType: VoiceAssetField.recordType, recordID: CKRecord.ID(recordName: recordName, zoneID: root.zoneID))
+                VoiceAssetField.assign(CKAsset(fileURL: file), on: rebuilt)
                 rebuilt.parent = CKRecord.Reference(recordID: root, action: .none)
                 _ = try await database.save(rebuilt)
                 return
@@ -611,8 +627,8 @@ final class CloudKitSharingClient {
                 storedOwnerName: nil,
                 database: .privateDatabase
             )
-            let rebuilt = CKRecord(recordType: "WMVoice", recordID: CKRecord.ID(recordName: recordName, zoneID: zoneID))
-            rebuilt["audio"] = CKAsset(fileURL: file)
+            let rebuilt = CKRecord(recordType: VoiceAssetField.recordType, recordID: CKRecord.ID(recordName: recordName, zoneID: zoneID))
+            VoiceAssetField.assign(CKAsset(fileURL: file), on: rebuilt)
             rebuilt.parent = CKRecord.Reference(recordID: CKRecord.ID(recordName: rootID.recordName, zoneID: zoneID), action: .none)
             _ = try await database.save(rebuilt)
         }
@@ -627,7 +643,7 @@ final class CloudKitSharingClient {
             in: database,
             inviteURL: inviteURL(for: grant)
         )
-        guard let asset = record["audio"] as? CKAsset else { return nil }
+        guard let asset = VoiceAssetField.asset(from: record) else { return nil }
         return asset.fileURL
     }
 
