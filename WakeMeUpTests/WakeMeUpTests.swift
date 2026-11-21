@@ -1665,13 +1665,15 @@ final class MutualInviteTests: XCTestCase {
         XCTAssertTrue(CloudKitZoneFailure.isZoneNotFound(partial))
     }
 
-    func testADeletedOrMissingZoneIsCreatedAgainAndAMissingGrantIsCreated() {
+    func testOnlyAMissingZoneIsCreatedAndADeletedZoneIsLeftAlone() {
         XCTAssertTrue(CloudKitZoneFailure.shouldRecreateZone(CKError(.zoneNotFound)))
         XCTAssertTrue(CloudKitZoneFailure.shouldRecreateZone(CKError(.userDeletedZone)))
         XCTAssertFalse(CloudKitZoneFailure.shouldRecreateZone(CKError(.unknownItem)))
         XCTAssertTrue(CloudKitZoneFailure.isMissingRecord(CKError(.unknownItem)))
         XCTAssertTrue(GrantRecordRecovery.shouldCreateInstead(of: CKError(.zoneNotFound)))
-        XCTAssertTrue(GrantRecordRecovery.shouldCreateInstead(of: CKError(.userDeletedZone)))
+        XCTAssertFalse(GrantRecordRecovery.shouldCreateInstead(of: CKError(.userDeletedZone)))
+        XCTAssertFalse(PrivateZonePolicy.shouldCreate(after: CKError(.userDeletedZone)))
+        XCTAssertTrue(PrivateZonePolicy.shouldCreate(after: CKError(.zoneNotFound)))
         XCTAssertTrue(GrantRecordRecovery.shouldCreateInstead(of: CKError(.unknownItem)))
         XCTAssertFalse(GrantRecordRecovery.shouldCreateInstead(of: CKError(.networkUnavailable)))
         let wrapped = CKError(.partialFailure, userInfo: [
@@ -1752,6 +1754,24 @@ final class MutualInviteTests: XCTestCase {
             .shareMissing
         )
         XCTAssertNil(ContactConnectionNote.note(wakeGrantID: wake, hostedGrantID: nil, unreachable: []))
+        XCTAssertEqual(OwnedShareAction.decide(shareExists: false, publicPermissionNone: false, urlMissing: true), .create)
+        XCTAssertEqual(OwnedShareAction.decide(shareExists: true, publicPermissionNone: true, urlMissing: false), .reopen)
+        XCTAssertEqual(OwnedShareAction.decide(shareExists: true, publicPermissionNone: false, urlMissing: false), .keep)
+        let gone = NSError(
+            domain: CKError.errorDomain,
+            code: CKError.unknownItem.rawValue,
+            userInfo: [NSLocalizedDescriptionKey: "when fetching short token metadata for https://www.icloud.com/share/abc#Wakito: share not found"]
+        )
+        XCTAssertEqual(ShareFailureKind.classify(gone), .shareLinkGone)
+        XCTAssertNotEqual(ShareFailureKind.classify(CKError(.unknownItem)), .shareLinkGone)
+        XCTAssertEqual(
+            ContactConnectionNote.note(wakeGrantID: wake, hostedGrantID: nil, unreachable: [], askNewLink: true),
+            .askForNewLink
+        )
+        XCTAssertEqual(
+            ContactConnectionNote.note(wakeGrantID: nil, hostedGrantID: UUID(), unreachable: [], sendNewLink: true),
+            .sendNewLink
+        )
         XCTAssertTrue(ContactActionPolicy.canWake(SharingContact(
             id: "a",
             name: "Mateusz",

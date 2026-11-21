@@ -5,6 +5,18 @@
       "date": "2026-11-21",
       "changes": {
         "en": [
+          "Retry connection checks the iCloud share and tells you the result. If the old link is gone, you can send a new one, and the other person is asked for that link instead of seeing a raw error."
+        ],
+        "pl": [
+          "Spróbuj połączyć ponownie sprawdza udział iCloud i pokazuje wynik. Gdy stary link zniknął, możesz wysłać nowy, a druga osoba dostaje prośbę o ten link zamiast surowego błędu."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-21",
+      "changes": {
+        "en": [
           "Opening the app no longer reports a failed invite when a friend's iCloud share is still connecting. Retry connection finishes it, and Wake now works once that share is on this phone."
         ],
         "pl": [

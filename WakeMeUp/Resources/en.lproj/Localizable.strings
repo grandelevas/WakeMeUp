@@ -145,6 +145,15 @@
 "sharing.connection.waiting" = "Waiting for their phone to finish connecting. Wake and Set alarm turn on after that.";
 "sharing.connection.missing" = "Their iCloud share is not on this phone yet.";
 "sharing.connection.retry" = "Retry connection";
+"sharing.connection.checking" = "Checking the iCloud connection…";
+"sharing.connection.ready" = "Connection is ready.";
+"sharing.connection.sendLink" = "Send new invite link";
+"sharing.connection.newLink" = "The old link no longer works. Send a new invite link.";
+"sharing.connection.askLink" = "Ask %@ to send a new invite link.";
+"sharing.connection.linkGone" = "The saved invite link no longer works.";
+"sharing.connection.failed" = "Could not finish the connection.";
+"sharing.connection.network" = "No network connection.";
+"sharing.error.details" = "Details";
 "sharing.setAlarm" = "Set alarm";
 "sharing.addToGroup" = "Add to group";
 "sharing.delete.title" = "Delete this contact?";
