@@ -318,8 +318,16 @@ struct SentAlarm: Codable, Equatable, Identifiable {
     var commandID: UUID
     var wakeStatus: WakeStatusKind? = nil
     var wakeStatusAt: Date? = nil
+    var friendGroupID: UUID? = nil
+    var friendGroupName: String? = nil
 
     var id: UUID { commandID }
+}
+
+struct FriendGroup: Codable, Equatable, Identifiable {
+    var id: UUID
+    var name: String
+    var memberIDs: [UUID]
 }
 
 struct WakeTracking: Codable, Equatable, Identifiable {

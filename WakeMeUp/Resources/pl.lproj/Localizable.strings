@@ -157,6 +157,13 @@
 "sharing.revoked" = "Cofnięte";
 "sharing.remoteFrom" = "Od %@";
 "sharing.none" = "Nikogo jeszcze nie ma";
+"sharing.friendGroups" = "Grupy";
+"sharing.friendGroups.empty" = "Nie ma jeszcze grup. Grupa pozwala ustawić jeden budzik kilku osobom.";
+"sharing.friendGroups.add" = "Nowa grupa";
+"sharing.friendGroups.name" = "Nazwa grupy";
+"sharing.friendGroups.members" = "Osoby";
+"sharing.friendGroups.alarm" = "Ustaw budzik tej grupie";
+"sharing.friendGroups.delete" = "Usuń grupę";
 "sharing.actAs" = "Udawaj, że jesteś %@";
 "sharing.actAs.help" = "To zostaje na tym iPhonie. Obowiązują te same sprawdzenia uprawnień co przy prawdziwym zdalnym alarmie.";
 "sharing.label" = "Etykieta ich alarmu";

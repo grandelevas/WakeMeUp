@@ -5,6 +5,18 @@
       "date": "2026-11-20",
       "changes": {
         "en": [
+          "You can make a group of friends on this iPhone and set one alarm for all of them. For friends shows who is up and who is still asleep."
+        ],
+        "pl": [
+          "Możesz zrobić na tym iPhonie grupę znajomych i ustawić im jeden budzik. W Dla znajomych widać, kto wstał, a kto jeszcze śpi."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-20",
+      "changes": {
+        "en": [
           "An alarm can include a short note, up to 140 characters. It shows on the ringing screen and in the list, including alarms you set for a friend."
         ],
         "pl": [

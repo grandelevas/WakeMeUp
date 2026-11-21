@@ -157,6 +157,13 @@
 "sharing.revoked" = "Revoked";
 "sharing.remoteFrom" = "From %@";
 "sharing.none" = "Nobody yet";
+"sharing.friendGroups" = "Groups";
+"sharing.friendGroups.empty" = "No groups yet. A group lets you set one alarm for several people.";
+"sharing.friendGroups.add" = "New group";
+"sharing.friendGroups.name" = "Group name";
+"sharing.friendGroups.members" = "People";
+"sharing.friendGroups.alarm" = "Set an alarm for this group";
+"sharing.friendGroups.delete" = "Delete group";
 "sharing.actAs" = "Pretend to be %@";
 "sharing.actAs.help" = "This stays on this iPhone. It uses the same permission checks as a real remote alarm.";
 "sharing.label" = "Label for their alarm";

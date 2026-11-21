@@ -1495,6 +1495,47 @@ final class MutualInviteTests: XCTestCase {
     }
 }
 
+final class FriendGroupRosterTests: XCTestCase {
+    func testAGroupShowsEachPersonAndAnUngroupedAlarmStaysSeparate() {
+        let group = UUID()
+        let first = sent(name: "Ola", group: group, status: .up, at: Date(timeIntervalSince1970: 300))
+        let second = sent(name: "Jan", group: group, status: .asleep, at: Date(timeIntervalSince1970: 200))
+        let alone = sent(name: "Ewa", group: nil, status: nil, at: Date(timeIntervalSince1970: 100))
+        let sections = FriendGroupRoster.sections(from: [first, second, alone])
+        XCTAssertEqual(sections.count, 2)
+        XCTAssertEqual(sections[0].title, "Rodzina")
+        XCTAssertEqual(sections[0].rows.map(\.name), ["Ola", "Jan"])
+        XCTAssertEqual(sections[0].rows.map(\.status), [.up, .asleep])
+        XCTAssertNil(sections[1].title)
+        XCTAssertEqual(sections[1].rows.map(\.name), ["Ewa"])
+    }
+
+    private func sent(name: String, group: UUID?, status: WakeStatusKind?, at: Date) -> SentAlarm {
+        SentAlarm(
+            alarm: Alarm(
+                id: UUID(),
+                schedule: .wallClock(hour: 7, minute: 0, repeatDays: []),
+                label: "",
+                soundID: "classic",
+                snoozeEnabled: true,
+                snoozeMinutes: 9,
+                isEnabled: true,
+                groupID: nil,
+                songLink: nil,
+                origin: .local,
+                resumeWhenGroupEnables: nil
+            ),
+            recipientID: UUID(),
+            recipientName: name,
+            sentAt: at,
+            commandID: UUID(),
+            wakeStatus: status,
+            friendGroupID: group,
+            friendGroupName: group == nil ? nil : "Rodzina"
+        )
+    }
+}
+
 final class WakeReportTests: XCTestCase {
     private let fired = Date(timeIntervalSince1970: 1_700_000_000)
 

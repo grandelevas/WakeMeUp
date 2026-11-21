@@ -586,7 +586,29 @@ final class AppModel {
         try? await cloudKit.revoke(revoked)
     }
 
-    func sendToPhone(grantID: UUID, immediately: Bool, voiceFile: URL? = nil) async {
+    func createFriendGroup(name: String, memberIDs: [UUID]) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !memberIDs.isEmpty else { return }
+        update {
+            $0.friendGroups.append(FriendGroup(id: UUID(), name: trimmed, memberIDs: memberIDs))
+        }
+    }
+
+    func deleteFriendGroup(id: UUID) {
+        update { $0.friendGroups.removeAll { $0.id == id } }
+    }
+
+    func sendToFriendGroup(id: UUID) async {
+        guard let group = snapshot.friendGroups.first(where: { $0.id == id }) else { return }
+        let grants = snapshot.permissions.grants.filter {
+            $0.state == .active && $0.grantee?.id == snapshot.profile.id && group.memberIDs.contains($0.owner.id)
+        }
+        for grant in grants {
+            await sendToPhone(grantID: grant.id, immediately: false, friendGroup: group)
+        }
+    }
+
+    func sendToPhone(grantID: UUID, immediately: Bool, voiceFile: URL? = nil, friendGroup: FriendGroup? = nil) async {
         guard let grant = snapshot.permissions.grant(id: grantID), let cloudKit else { return }
         var alarm = Alarm(
             id: UUID(),
@@ -648,7 +670,9 @@ final class AppModel {
                         generic: grant.owner.displayName
                     ),
                     sentAt: command.createdAt,
-                    commandID: command.id
+                    commandID: command.id,
+                    friendGroupID: friendGroup?.id,
+                    friendGroupName: friendGroup?.name
                 )
                 update {
                     if let installed { $0.customSounds.append(installed) }

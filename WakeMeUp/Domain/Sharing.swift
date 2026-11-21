@@ -373,6 +373,50 @@ enum WakeStatusApply {
     }
 }
 
+enum FriendGroupRoster {
+    struct Row: Equatable, Identifiable {
+        var id: UUID { commandID }
+        var commandID: UUID
+        var name: String
+        var status: WakeStatusKind?
+        var statusAt: Date?
+    }
+
+    struct Section: Equatable, Identifiable {
+        var id: String
+        var title: String?
+        var rows: [Row]
+    }
+
+    /// Groups sent alarms that share a friend group. Ungrouped alarms stay as their own rows.
+    static func sections(from sent: [SentAlarm]) -> [Section] {
+        let sorted = sent.sorted { $0.sentAt > $1.sentAt }
+        var sections: [Section] = []
+        var seenGroups: [UUID] = []
+        for alarm in sorted {
+            guard let groupID = alarm.friendGroupID else {
+                sections.append(Section(id: alarm.commandID.uuidString, title: nil, rows: [row(alarm)]))
+                continue
+            }
+            if let index = sections.firstIndex(where: { $0.id == groupID.uuidString }) {
+                sections[index].rows.append(row(alarm))
+            } else if !seenGroups.contains(groupID) {
+                seenGroups.append(groupID)
+                sections.append(Section(
+                    id: groupID.uuidString,
+                    title: alarm.friendGroupName ?? "",
+                    rows: [row(alarm)]
+                ))
+            }
+        }
+        return sections
+    }
+
+    private static func row(_ alarm: SentAlarm) -> Row {
+        Row(commandID: alarm.commandID, name: alarm.recipientName, status: alarm.wakeStatus, statusAt: alarm.wakeStatusAt)
+    }
+}
+
 enum RemoteAction: String, Codable, Equatable {
     case upsert
     case cancel
