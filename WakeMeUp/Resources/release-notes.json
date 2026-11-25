@@ -5,6 +5,18 @@
       "date": "2026-11-25",
       "changes": {
         "en": [
+          "An alarm can carry a video message of up to 30 seconds. Record it, play it back, delete it, and send it to a contact. It plays when the alarm rings."
+        ],
+        "pl": [
+          "Alarm może mieć wiadomość wideo do 30 sekund. Nagrywasz ją, odtwarzasz, usuwasz i wysyłasz do kontaktu. Odtwarza się, gdy alarm dzwoni."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-25",
+      "changes": {
+        "en": [
           "Siri, the Shortcuts app, the Action button, and automations can set an alarm, start a nap, or wake a contact. Try “Set an alarm in Wakito for 6:30”, “Start a nap in Wakito”, or “Wake Akhi in Wakito”."
         ],
         "pl": [

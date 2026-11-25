@@ -55,6 +55,10 @@ struct AlarmEditorView: View {
 
                 voiceSection
 
+                VideoMessageSection(videoID: draft.videoFileID) { id in
+                    draft.videoFileID = id
+                }
+
                 SoundChoiceList(soundID: $draft.soundID, preview: preview, showsImport: true) {
                     importing = true
                 }

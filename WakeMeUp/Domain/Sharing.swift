@@ -672,6 +672,8 @@ struct RemoteAlarmCommand: Codable, Equatable, Identifiable {
     var enabled: Bool?
     /// Record name of the WMVoice asset in the same zone, when this alarm has a voice message.
     var voiceRecordName: String? = nil
+    /// Record name of the WMVoice record whose `Video` asset is this alarm's video message.
+    var videoRecordName: String? = nil
 }
 
 enum RemoteAlarmNotice {

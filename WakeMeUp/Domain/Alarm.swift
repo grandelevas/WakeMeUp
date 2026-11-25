@@ -75,6 +75,8 @@ struct Alarm: Codable, Equatable, Hashable, Identifiable {
     var note: String? = nil
     /// When a non-repeating wall-clock alarm should ring once. Not a CloudKit field.
     var firesOnceAt: Date? = nil
+    /// Local file id for an attached video message. The bytes travel as a WMVoice `Video` asset.
+    var videoFileID: String? = nil
     var origin: AlarmOrigin
     /// Enabled state to restore when a disabled group is turned back on.
     var resumeWhenGroupEnables: Bool?
@@ -415,6 +417,7 @@ struct AlarmDraft: Equatable, Identifiable {
     var groupID: UUID?
     var songText: String
     var note: String
+    var videoFileID: String?
     var origin: AlarmOrigin
     var isNew: Bool
 
@@ -433,6 +436,7 @@ struct AlarmDraft: Equatable, Identifiable {
             groupID: nil,
             songText: "",
             note: "",
+            videoFileID: nil,
             origin: .local,
             isNew: true
         )
@@ -458,6 +462,7 @@ struct AlarmDraft: Equatable, Identifiable {
         groupID = alarm.groupID
         songText = alarm.songLink?.url.absoluteString ?? ""
         note = alarm.note ?? ""
+        videoFileID = alarm.videoFileID
         origin = alarm.origin
         isNew = false
     }
@@ -475,6 +480,7 @@ struct AlarmDraft: Equatable, Identifiable {
         groupID: UUID?,
         songText: String,
         note: String,
+        videoFileID: String? = nil,
         origin: AlarmOrigin,
         isNew: Bool
     ) {
@@ -490,6 +496,7 @@ struct AlarmDraft: Equatable, Identifiable {
         self.groupID = groupID
         self.songText = songText
         self.note = note
+        self.videoFileID = videoFileID
         self.origin = origin
         self.isNew = isNew
     }
@@ -525,6 +532,7 @@ struct AlarmDraft: Equatable, Identifiable {
             firesOnceAt: repeatDays.isEmpty
                 ? schedule.nextFireDate(from: .now, calendar: .current)
                 : nil,
+            videoFileID: videoFileID,
             origin: origin,
             resumeWhenGroupEnables: nil
         )
