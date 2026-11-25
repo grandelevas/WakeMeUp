@@ -18,6 +18,21 @@ struct SettingsView: View {
                 }
             }
             appearanceSection
+            Section("nap.length") {
+                Stepper(
+                    value: Binding(
+                        get: { model.napMinutes },
+                        set: { model.setNapMinutes($0) }
+                    ),
+                    in: NapSettings.minimumMinutes...NapSettings.maximumMinutes,
+                    step: NapSettings.stepMinutes
+                ) {
+                    Text(String(format: String(localized: "nap.minutes"), model.napMinutes))
+                }
+                Text("nap.length.help")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
             Section("settings.alarmAccess") {
                 LabeledContent("settings.alarmAccess", value: accessText)
                 if model.authorization == .denied {

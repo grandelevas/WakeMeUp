@@ -1,6 +1,34 @@
+"tab.nap" = "Nap";
 "tab.alarms" = "Alarms";
 "tab.sharing" = "Sharing";
+"tab.calendar" = "Calendar";
 "tab.achievements" = "Achievements";
+
+"nap.title" = "Nap";
+"nap.start" = "Start a nap";
+"nap.alarmLabel" = "Nap";
+"nap.minutes" = "%lld min";
+"nap.length" = "Nap length";
+"nap.length.help" = "One tap on the Nap tab sets an alarm for this long from now. 15 minutes is the default.";
+"nap.running" = "Rings at %@";
+"nap.tips.title" = "A short nap";
+"nap.tips.length" = "About 10–20 minutes is enough to feel sharper. Past 30 minutes you can wake up groggy.";
+"nap.tips.late" = "Nap in the morning or early afternoon. A late nap makes it harder to fall asleep at night.";
+"nap.tips.place" = "A dark, quiet spot helps. Set the alarm before you lie down.";
+
+"calendar.title" = "Calendar";
+"calendar.add" = "Add alarm";
+"calendar.edit" = "Edit alarm";
+"calendar.date" = "Date";
+"calendar.repeat" = "Repeat";
+"calendar.repeat.yearly" = "Every year";
+"calendar.repeat.monthly" = "Every month";
+"calendar.repeat.weekly" = "Every week";
+"calendar.repeat.once" = "One time";
+"calendar.empty" = "No alarms on this day.";
+"calendar.past" = "That time has already passed. Pick a later time.";
+"calendar.previousMonth" = "Previous month";
+"calendar.nextMonth" = "Next month";
 
 "alarms.title" = "Alarms";
 "alarms.empty.title" = "No Alarms";

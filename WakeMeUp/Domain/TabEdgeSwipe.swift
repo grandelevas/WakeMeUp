@@ -29,7 +29,7 @@ enum TabEdgeSwipe {
 }
 
 extension AppTab {
-    static let displayOrder: [AppTab] = [.alarms, .sharing, .achievements]
+    static let displayOrder: [AppTab] = [.nap, .alarms, .sharing, .calendar, .achievements]
 
     func shifted(_ direction: TabEdgeSwipe.Direction) -> AppTab {
         let order = Self.displayOrder

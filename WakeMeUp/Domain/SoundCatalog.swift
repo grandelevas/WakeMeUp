@@ -83,6 +83,8 @@ struct LibrarySnapshot: Codable, Equatable {
     var wakeTracking: [WakeTracking] = []
     /// Friend groups on this phone. They are not synced.
     var friendGroups: [FriendGroup] = []
+    /// Alarms that show on the calendar tab only. They are not part of the Alarms list.
+    var calendarAlarms: [CalendarAlarm] = []
 
     static func empty(profile: Participant) -> LibrarySnapshot {
         LibrarySnapshot(
@@ -100,7 +102,7 @@ struct LibrarySnapshot: Codable, Equatable {
 extension LibrarySnapshot {
     private enum CodingKeys: String, CodingKey {
         case library, permissions, customSounds, profile, simulatedFriend
-        case appliedCommandIDs, pendingOutbox, sentAlarms, wakeTracking, friendGroups
+        case appliedCommandIDs, pendingOutbox, sentAlarms, wakeTracking, friendGroups, calendarAlarms
     }
 
     init(from decoder: Decoder) throws {
@@ -115,6 +117,7 @@ extension LibrarySnapshot {
         sentAlarms = try container.decodeIfPresent([SentAlarm].self, forKey: .sentAlarms) ?? []
         wakeTracking = try container.decodeIfPresent([WakeTracking].self, forKey: .wakeTracking) ?? []
         friendGroups = try container.decodeIfPresent([FriendGroup].self, forKey: .friendGroups) ?? []
+        calendarAlarms = try container.decodeIfPresent([CalendarAlarm].self, forKey: .calendarAlarms) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
@@ -129,5 +132,6 @@ extension LibrarySnapshot {
         try container.encode(sentAlarms, forKey: .sentAlarms)
         try container.encode(wakeTracking, forKey: .wakeTracking)
         try container.encode(friendGroups, forKey: .friendGroups)
+        try container.encode(calendarAlarms, forKey: .calendarAlarms)
     }
 }

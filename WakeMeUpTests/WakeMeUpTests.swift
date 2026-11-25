@@ -1969,11 +1969,15 @@ final class TabEdgeSwipeTests: XCTestCase {
         XCTAssertNil(TabEdgeSwipe.direction(startX: 180, translationX: -120, translationY: 0, width: width))
         XCTAssertNil(TabEdgeSwipe.direction(startX: 10, translationX: 20, translationY: 0, width: width))
         XCTAssertNil(TabEdgeSwipe.direction(startX: 10, translationX: 40, translationY: 80, width: width))
+        XCTAssertEqual(AppTab.nap.shifted(.next), .alarms)
         XCTAssertEqual(AppTab.alarms.shifted(.next), .sharing)
-        XCTAssertEqual(AppTab.sharing.shifted(.next), .achievements)
+        XCTAssertEqual(AppTab.sharing.shifted(.next), .calendar)
+        XCTAssertEqual(AppTab.calendar.shifted(.next), .achievements)
         XCTAssertEqual(AppTab.sharing.shifted(.previous), .alarms)
-        XCTAssertEqual(AppTab.alarms.shifted(.previous), .alarms)
+        XCTAssertEqual(AppTab.alarms.shifted(.previous), .nap)
+        XCTAssertEqual(AppTab.nap.shifted(.previous), .nap)
         XCTAssertEqual(AppTab.achievements.shifted(.next), .achievements)
+        XCTAssertEqual(AppTab.displayOrder, [.nap, .alarms, .sharing, .calendar, .achievements])
     }
 }
 
@@ -2437,6 +2441,124 @@ final class EditingUXTests: XCTestCase {
             songLink: nil,
             origin: origin,
             resumeWhenGroupEnables: nil
+        )
+    }
+}
+
+final class NapCalendarTests: XCTestCase {
+    func testNapIsAOneShotAtTheChosenLength() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let alarm = NapAlarm.make(minutes: 15, now: now, id: UUID())
+        guard case let .oneShot(fireAt) = alarm.schedule else {
+            return XCTFail("A nap is a one-time alarm")
+        }
+        XCTAssertEqual(fireAt.timeIntervalSince(now), 15 * 60, accuracy: 0.1)
+        XCTAssertFalse(alarm.snoozeEnabled)
+        XCTAssertEqual(NapSettings.clamped(7), 5)
+        XCTAssertEqual(NapSettings.clamped(15), 15)
+        XCTAssertEqual(NapSettings.clamped(121), 120)
+        let defaults = UserDefaults(suiteName: "nap-\(UUID().uuidString)")!
+        XCTAssertEqual(NapSettings.minutes(in: defaults), NapSettings.defaultMinutes)
+        NapSettings.setMinutes(30, in: defaults)
+        XCTAssertEqual(NapSettings.minutes(in: defaults), 30)
+    }
+
+    func testOneTimeCalendarAlarmsLeaveAndStayOutOfTheAlarmList() {
+        let calendar = gregorian()
+        let now = moment(2026, 11, 25, 8, 0, calendar)
+        let future = sample(year: 2026, month: 11, day: 25, hour: 9, minute: 30, rule: .once, label: "Dentist")
+        let past = sample(year: 2026, month: 11, day: 24, hour: 9, minute: 0, rule: .once, label: "Gone")
+        XCTAssertEqual(future.nextFire(from: now, calendar: calendar), moment(2026, 11, 25, 9, 30, calendar))
+        XCTAssertNil(past.nextFire(from: now, calendar: calendar))
+        XCTAssertTrue(CalendarFire.shouldRemove(past, now: now, calendar: calendar, hasRung: false))
+        XCTAssertFalse(CalendarFire.shouldRemove(future, now: now, calendar: calendar, hasRung: false))
+        XCTAssertTrue(CalendarFire.shouldRemove(future, now: now, calendar: calendar, hasRung: true))
+        let kept = CalendarFire.keeping([future, past], now: now, calendar: calendar, rungIDs: [])
+        XCTAssertEqual(kept.map(\.label), ["Dentist"])
+        let scheduled = CalendarFire.scheduled(kept, now: now, calendar: calendar)
+        XCTAssertEqual(scheduled.map(\.id), [future.id])
+        XCTAssertTrue(AlarmLibrary().alarms.isEmpty)
+    }
+
+    func testRepeatingCalendarAlarmsStayAndFindTheNextDate() {
+        let calendar = gregorian()
+        let morning = moment(2026, 11, 25, 6, 0, calendar)
+        let weekly = sample(year: 2026, month: 11, day: 25, hour: 7, minute: 0, rule: .weekly, label: "Weekly")
+        XCTAssertEqual(weekly.nextFire(from: morning, calendar: calendar), moment(2026, 11, 25, 7, 0, calendar))
+        XCTAssertEqual(
+            weekly.nextFire(from: moment(2026, 11, 25, 8, 0, calendar), calendar: calendar),
+            moment(2026, 12, 2, 7, 0, calendar)
+        )
+        XCTAssertFalse(CalendarFire.shouldRemove(weekly, now: morning, calendar: calendar, hasRung: true))
+        XCTAssertTrue(weekly.occurs(on: moment(2026, 12, 2, 12, 0, calendar), calendar: calendar))
+        XCTAssertFalse(weekly.occurs(on: moment(2026, 11, 24, 12, 0, calendar), calendar: calendar))
+
+        let monthly = sample(year: 2026, month: 1, day: 31, hour: 9, minute: 0, rule: .monthly, label: "Month")
+        XCTAssertEqual(
+            monthly.nextFire(from: moment(2026, 2, 1, 0, 0, calendar), calendar: calendar),
+            moment(2026, 2, 28, 9, 0, calendar)
+        )
+        XCTAssertFalse(CalendarFire.shouldRemove(monthly, now: morning, calendar: calendar, hasRung: true))
+
+        let yearly = sample(year: 2024, month: 2, day: 29, hour: 8, minute: 15, rule: .yearly, label: "Year")
+        XCTAssertEqual(
+            yearly.nextFire(from: moment(2025, 3, 1, 0, 0, calendar), calendar: calendar),
+            moment(2026, 2, 28, 8, 15, calendar)
+        )
+    }
+
+    func testMonthGridFollowsTheFirstWeekday() {
+        var calendar = gregorian()
+        calendar.firstWeekday = 2
+        let cells = CalendarGrid.cells(monthContaining: moment(2026, 11, 15, 0, 0, calendar), calendar: calendar)
+        XCTAssertEqual(cells.count % 7, 0)
+        XCTAssertFalse(cells[0].inMonth)
+        XCTAssertTrue(cells[6].inMonth)
+        XCTAssertEqual(calendar.component(.day, from: cells[6].date), 1)
+    }
+
+    func testSavedLibraryWithoutCalendarAlarmsDecodes() throws {
+        let profile = Participant(id: UUID(), displayName: "Maja")
+        let snapshot = LibrarySnapshot.empty(profile: profile)
+        let encoder = JSONEncoder()
+        var object = try JSONSerialization.jsonObject(with: encoder.encode(snapshot)) as! [String: Any]
+        object.removeValue(forKey: "calendarAlarms")
+        let decoded = try JSONDecoder().decode(LibrarySnapshot.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertTrue(decoded.calendarAlarms.isEmpty)
+    }
+
+    private func gregorian() -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
+
+    private func moment(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int, _ calendar: Calendar) -> Date {
+        calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute))!
+    }
+
+    private func sample(
+        year: Int,
+        month: Int,
+        day: Int,
+        hour: Int,
+        minute: Int,
+        rule: CalendarRepeat,
+        label: String
+    ) -> CalendarAlarm {
+        CalendarAlarm(
+            id: UUID(),
+            year: year,
+            month: month,
+            day: day,
+            hour: hour,
+            minute: minute,
+            repeatRule: rule,
+            label: label,
+            soundID: "classic",
+            snoozeEnabled: false,
+            snoozeMinutes: 9,
+            isEnabled: true
         )
     }
 }
