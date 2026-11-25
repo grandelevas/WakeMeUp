@@ -5,6 +5,18 @@
       "date": "2026-11-25",
       "changes": {
         "en": [
+          "A nap stays on the Nap tab. The countdown shows the remaining time there, with Cancel, and it comes back if you reopen the app. It no longer appears in the Alarms list. The alarm still rings when the time is up."
+        ],
+        "pl": [
+          "Drzemka zostaje na karcie Drzemka. Odliczanie z pozostałym czasem i Anuluj jest tam, i wraca po ponownym otwarciu aplikacji. Nie pojawia się już na liście Alarmów. Budzik i tak dzwoni, gdy czas minie."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-25",
+      "changes": {
+        "en": [
           "A nap keeps its countdown on the Nap tab, with the time left and Cancel. The length is chosen there and remembered, including for Siri. Settings now sets only the default snooze used when you create an alarm."
         ],
         "pl": [

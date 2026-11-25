@@ -46,6 +46,86 @@ enum NapSettings {
     }
 }
 
+struct NapSession: Codable, Equatable {
+    var id: UUID
+    var startedAt: Date
+    var minutes: Int
+    var fireAt: Date
+    var soundID: String
+
+    static func make(minutes: Int, soundID: String, now: Date, id: UUID = UUID()) -> NapSession {
+        let length = NapSettings.clamped(minutes)
+        return NapSession(
+            id: id,
+            startedAt: now,
+            minutes: length,
+            fireAt: now.addingTimeInterval(TimeInterval(length * 60)),
+            soundID: soundID
+        )
+    }
+
+    func isRunning(at now: Date) -> Bool {
+        fireAt > now
+    }
+
+    func alarm() -> Alarm {
+        var alarm = NapAlarm.make(minutes: minutes, soundID: soundID, now: startedAt, id: id)
+        alarm.schedule = .oneShot(fireAt: fireAt)
+        return alarm
+    }
+}
+
+enum NapSessionStore {
+    static let key = "wakito.napSession"
+
+    static func load(from defaults: UserDefaults, now: Date) -> NapSession? {
+        guard let data = defaults.data(forKey: key),
+              let session = try? JSONDecoder().decode(NapSession.self, from: data),
+              session.isRunning(at: now) else {
+            defaults.removeObject(forKey: key)
+            return nil
+        }
+        return session
+    }
+
+    static func save(_ session: NapSession?, to defaults: UserDefaults) {
+        guard let session else {
+            defaults.removeObject(forKey: key)
+            return
+        }
+        if let data = try? JSONEncoder().encode(session) {
+            defaults.set(data, forKey: key)
+        }
+    }
+}
+
+enum NapListCleanup {
+    /// Labels written by earlier builds, in both app languages.
+    static let labels: Set<String> = ["Nap", "Drzemka"]
+
+    static func isNap(_ alarm: Alarm, sessionID: UUID?) -> Bool {
+        if alarm.id == sessionID { return true }
+        if alarm.countdownLead != nil { return true }
+        guard !alarm.origin.isFromSomeoneElse, case .oneShot = alarm.schedule else { return false }
+        return labels.contains(alarm.label)
+    }
+
+    static func removing(from alarms: [Alarm], sessionID: UUID?) -> [Alarm] {
+        alarms.filter { !isNap($0, sessionID: sessionID) }
+    }
+
+    static func idsToCancel(in alarms: [Alarm], sessionID: UUID?, legacyID: UUID?) -> [UUID] {
+        var ids = alarms.filter { isNap($0, sessionID: sessionID) }.map(\.id)
+        if let legacyID, !ids.contains(legacyID) {
+            ids.append(legacyID)
+        }
+        if let sessionID {
+            ids.removeAll { $0 == sessionID }
+        }
+        return ids
+    }
+}
+
 enum DefaultSnooze {
     static let minimumMinutes = 1
     static let maximumMinutes = 30

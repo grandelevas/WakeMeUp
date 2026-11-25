@@ -122,6 +122,8 @@ final class AppModel {
     var napMinutes: Int = NapSettings.defaultMinutes
     var napSoundID: String = SoundCatalog.defaultID
     var defaultSnoozeMinutes: Int = DefaultSnooze.fallback
+    /// Local nap timer. The Nap tab reads this directly. It is not an entry in the alarm list.
+    var napSession: NapSession?
 
     var ringingAlarm: Alarm? {
         guard let ringingAlarmID else { return nil }
@@ -139,6 +141,7 @@ final class AppModel {
         napMinutes = NapSettings.minutes(in: .standard)
         napSoundID = NapSettings.soundID(in: .standard)
         defaultSnoozeMinutes = DefaultSnooze.minutes(in: .standard)
+        napSession = NapSessionStore.load(from: .standard, now: .now)
         let screenshot = screenshot ?? LaunchConfiguration.seedDemo
         suppressPermissionBanner = screenshot
         let loaded = store.load() ?? LibrarySnapshot.empty(
@@ -190,11 +193,13 @@ final class AppModel {
         guard !suppressPermissionBanner else { return }
         update { $0.permissions.removeUnsharedInvites() }
         dropSelfAuthoredAlarms()
+        await removeNapsFromAlarmList()
         retireOneTimeAlarms()
         retireCalendarAlarms()
         authorization = coordinator.accessState()
         notificationAllowed = await coordinator.notificationStatus() == .authorized
         await reschedule(requestAccess: false)
+        await restoreNapAlarm()
         if let handoff = LaunchHandoff.consume() {
             ringingAlarmID = handoff.alarmID
             await UIApplication.shared.open(handoff.songURL)
@@ -289,8 +294,8 @@ final class AppModel {
     }
 
     func delete(alarmID: UUID) {
-        if NapSettings.activeAlarmID(in: .standard) == alarmID {
-            NapSettings.setActiveAlarmID(nil, in: .standard)
+        if napSession?.id == alarmID || NapSettings.activeAlarmID(in: .standard) == alarmID {
+            clearNapSession()
         }
         update { $0.library.delete(id: alarmID) }
         Task { await reschedule(requestAccess: false) }
@@ -308,13 +313,6 @@ final class AppModel {
         DefaultSnooze.setMinutes(clamped, in: .standard)
     }
 
-    func cancelNap() async {
-        guard let id = NapSettings.activeAlarmID(in: .standard) else { return }
-        NapSettings.setActiveAlarmID(nil, in: .standard)
-        update { $0.library.delete(id: id) }
-        await reschedule(requestAccess: false)
-    }
-
     func setNapSoundID(_ id: String) {
         let sound = id.isEmpty ? SoundCatalog.defaultID : id
         napSoundID = sound
@@ -322,11 +320,71 @@ final class AppModel {
     }
 
     var activeNapFireDate: Date? {
-        guard let id = NapSettings.activeAlarmID(in: .standard),
-              let alarm = snapshot.library.alarm(id),
-              case let .oneShot(fireAt) = alarm.schedule,
-              fireAt > .now else { return nil }
-        return fireAt
+        guard let napSession, napSession.isRunning(at: .now) else { return nil }
+        return napSession.fireAt
+    }
+
+    @discardableResult
+    func startNap(now: Date = .now) async -> String? {
+        if let previous = napSession {
+            await coordinator.cancelStandalone(id: previous.id)
+        }
+        let session = NapSession.make(minutes: napMinutes, soundID: napSoundID, now: now)
+        napSession = session
+        NapSessionStore.save(session, to: .standard)
+        NapSettings.setActiveAlarmID(nil, in: .standard)
+        await removeNapsFromAlarmList()
+        await reschedule(requestAccess: true)
+        if let failure = await coordinator.scheduleStandalone(session.alarm(), customSounds: snapshot.customSounds) {
+            scheduleFailure = failure
+            return NapFailure.message(authorization: authorization, scheduleFailure: failure) ?? failure
+        }
+        if let message = NapFailure.message(authorization: authorization, scheduleFailure: nil) {
+            scheduleFailure = message
+            return message
+        }
+        scheduleFailure = nil
+        return nil
+    }
+
+    func cancelNap() async {
+        let id = napSession?.id
+        clearNapSession()
+        if let id {
+            await coordinator.cancelStandalone(id: id)
+        }
+    }
+
+    private func clearNapSession() {
+        napSession = nil
+        NapSessionStore.save(nil, to: .standard)
+        NapSettings.setActiveAlarmID(nil, in: .standard)
+    }
+
+    private func removeNapsFromAlarmList() async {
+        let legacyID = NapSettings.activeAlarmID(in: .standard)
+        let cancelIDs = NapListCleanup.idsToCancel(
+            in: snapshot.library.alarms,
+            sessionID: napSession?.id,
+            legacyID: legacyID
+        )
+        let cleaned = NapListCleanup.removing(from: snapshot.library.alarms, sessionID: napSession?.id)
+        if cleaned != snapshot.library.alarms {
+            update { $0.library.alarms = cleaned }
+        }
+        for id in cancelIDs {
+            await coordinator.cancelStandalone(id: id)
+        }
+    }
+
+    private func restoreNapAlarm() async {
+        guard let napSession, napSession.isRunning(at: .now) else {
+            if napSession != nil { clearNapSession() }
+            return
+        }
+        if let failure = await coordinator.scheduleStandalone(napSession.alarm(), customSounds: snapshot.customSounds) {
+            scheduleFailure = failure
+        }
     }
 
     func addSpokenAlarm(at date: Date) async {
@@ -342,25 +400,6 @@ final class AppModel {
               let grantID = contact.wakeGrantID else { return false }
         await sendToPhone(grantID: grantID, immediately: true)
         return true
-    }
-
-    @discardableResult
-    func startNap(now: Date = .now) async -> String? {
-        let previous = NapSettings.activeAlarmID(in: .standard)
-        let alarm = NapAlarm.make(minutes: napMinutes, soundID: napSoundID, now: now)
-        NapSettings.setActiveAlarmID(alarm.id, in: .standard)
-        update {
-            if let previous {
-                $0.library.delete(id: previous)
-            }
-            $0.library.upsert(alarm)
-        }
-        await reschedule(requestAccess: true)
-        if let message = NapFailure.message(authorization: authorization, scheduleFailure: scheduleFailure) {
-            scheduleFailure = message
-            return message
-        }
-        return nil
     }
 
     func saveCalendarAlarm(_ alarm: CalendarAlarm) {
@@ -1205,6 +1244,9 @@ final class AppModel {
     }
 
     private func beginRinging(_ id: UUID) {
+        if napSession?.id == id {
+            clearNapSession()
+        }
         if let alarm = snapshot.library.alarm(id) {
             heldRingingAlarm = alarm
         } else if let calendar = snapshot.calendarAlarms.first(where: { $0.id == id }) {
