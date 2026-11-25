@@ -323,6 +323,7 @@ struct AlarmListView: View {
                     .padding(.leading, 8)
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("group-row-\(group.id.uuidString)")
         .accessibilityValue(Text(alarms.count, format: .number))
     }
@@ -572,6 +573,7 @@ struct AlarmRow: View {
                     Text(alarm.label)
                 }
                 .labelsHidden()
+                .accessibilityIdentifier("alarm-toggle-\(alarm.id.uuidString)")
                 .disabled(groupDisabled)
             }
         }
