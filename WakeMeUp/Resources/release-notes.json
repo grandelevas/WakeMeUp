@@ -5,6 +5,18 @@
       "date": "2026-11-25",
       "changes": {
         "en": [
+          "A Nap tab sits to the left of Alarms. One tap starts an alarm for the length set in Settings, 15 minutes by default, with a few short sleep tips. Calendar is its own tab: alarms you put on a date stay out of the Alarms list and can repeat every year, month, or week, or just once."
+        ],
+        "pl": [
+          "Karta Drzemka jest na lewo od Alarmów. Jedno stuknięcie włącza budzik na czas z Ustawień, domyślnie 15 minut, i są krótkie wskazówki o śnie. Kalendarz to osobna karta: alarmy na datę nie wchodzą na listę Alarmów i mogą powtarzać się co roku, co miesiąc, co tydzień albo tylko raz."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-25",
+      "changes": {
+        "en": [
           "You can rename and delete your voice recordings, imported sounds, and alarms you added. Select now edits the time and settings of the chosen alarms. Add to a group lists only alarms that are not already in a group. Pause next to a contact stops their alarms until you resume, and they see the pause too."
         ],
         "pl": [

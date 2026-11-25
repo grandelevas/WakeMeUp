@@ -49,7 +49,8 @@ final class GroupReorderUITests: XCTestCase {
     /// A drag preview can leave a second element with the same identifier. Use the topmost one.
     private func row(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         let query = app.descendants(matching: .any).matching(identifier: identifier)
-        let matches = query.allElementsBoundByIndex.filter(\.exists)
+        let visible = query.allElementsBoundByIndex.filter { $0.exists && $0.isHittable }
+        let matches = visible.isEmpty ? query.allElementsBoundByIndex.filter(\.exists) : visible
         guard matches.count > 1 else { return query.firstMatch }
         return matches.min { lhs, rhs in
             if abs(lhs.frame.minY - rhs.frame.minY) > 1 { return lhs.frame.minY < rhs.frame.minY }

@@ -144,9 +144,12 @@ private struct MainTabPager: View {
                 let width = geo.size.width.isFinite && geo.size.width > 1 ? geo.size.width : 0
                 let height = geo.size.height.isFinite && geo.size.height > 1 ? geo.size.height : 0
                 HStack(spacing: 0) {
-                    AlarmListView().frame(width: width, height: height)
-                    SharingView().frame(width: width, height: height)
-                    AchievementsView().frame(width: width, height: height)
+                    ForEach(AppTab.displayOrder, id: \.self) { tab in
+                        page(tab)
+                            .frame(width: width, height: height)
+                            .accessibilityHidden(tab != selection)
+                            .allowsHitTesting(tab == selection)
+                    }
                 }
                 .offset(x: width > 0 ? -CGFloat(selection.tabIndex) * width + edgeDrag : 0)
                 .frame(width: width, height: height, alignment: .leading)
@@ -166,10 +169,11 @@ private struct MainTabPager: View {
                     }
                 } label: {
                     VStack(spacing: 4) {
-                        Image(systemName: symbol(tab))
-                            .font(.system(size: 22))
+                        tabIcon(tab)
                         Text(title(tab))
                             .font(.caption2)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                     }
                     .foregroundStyle(selection == tab ? appAccent : Color.secondary)
                     .frame(maxWidth: .infinity)
@@ -226,18 +230,44 @@ private struct MainTabPager: View {
         return min(max(translation, -limit), limit)
     }
 
+    @ViewBuilder
+    private func page(_ tab: AppTab) -> some View {
+        switch tab {
+        case .nap: NapView()
+        case .alarms: AlarmListView()
+        case .sharing: SharingView()
+        case .calendar: CalendarView()
+        case .achievements: AchievementsView()
+        }
+    }
+
+    @ViewBuilder
+    private func tabIcon(_ tab: AppTab) -> some View {
+        if tab == .nap {
+            Text("😴")
+                .font(.system(size: 22))
+        } else {
+            Image(systemName: symbol(tab))
+                .font(.system(size: 22))
+        }
+    }
+
     private func symbol(_ tab: AppTab) -> String {
         switch tab {
+        case .nap: "moon.zzz.fill"
         case .alarms: "alarm.fill"
         case .sharing: "person.2.fill"
+        case .calendar: "calendar"
         case .achievements: "trophy.fill"
         }
     }
 
     private func title(_ tab: AppTab) -> LocalizedStringKey {
         switch tab {
+        case .nap: "tab.nap"
         case .alarms: "tab.alarms"
         case .sharing: "tab.sharing"
+        case .calendar: "tab.calendar"
         case .achievements: "tab.achievements"
         }
     }

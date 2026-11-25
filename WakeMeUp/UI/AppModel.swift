@@ -10,8 +10,10 @@ struct UserFacingError: Equatable {
 }
 
 enum AppTab: Hashable {
+    case nap
     case alarms
     case sharing
+    case calendar
     case achievements
 }
 
@@ -116,10 +118,15 @@ final class AppModel {
     var simulatedFriend: Participant? { snapshot.simulatedFriend }
     var grants: [ShareGrant] { snapshot.permissions.grants }
     var customSounds: [CustomSound] { snapshot.customSounds }
+    var calendarAlarms: [CalendarAlarm] { snapshot.calendarAlarms }
+    var napMinutes: Int = NapSettings.defaultMinutes
 
     var ringingAlarm: Alarm? {
         guard let ringingAlarmID else { return nil }
         if let alarm = snapshot.library.alarm(ringingAlarmID) { return alarm }
+        if let calendar = snapshot.calendarAlarms.first(where: { $0.id == ringingAlarmID }) {
+            return calendar.alarmForScheduling(now: .now, calendar: .current)
+        }
         if heldRingingAlarm?.id == ringingAlarmID { return heldRingingAlarm }
         return nil
     }
@@ -127,6 +134,7 @@ final class AppModel {
     init(store: LibraryStore? = nil, cloudKit explicitCloudKit: CloudKitSharingClient? = nil, screenshot: Bool? = nil) {
         let store = store ?? LibraryStore(url: LibraryStore.applicationSupportURL())
         self.store = store
+        napMinutes = NapSettings.minutes(in: .standard)
         let screenshot = screenshot ?? LaunchConfiguration.seedDemo
         suppressPermissionBanner = screenshot
         let loaded = store.load() ?? LibrarySnapshot.empty(
@@ -179,6 +187,7 @@ final class AppModel {
         update { $0.permissions.removeUnsharedInvites() }
         dropSelfAuthoredAlarms()
         retireOneTimeAlarms()
+        retireCalendarAlarms()
         authorization = coordinator.accessState()
         notificationAllowed = await coordinator.notificationStatus() == .authorized
         await reschedule(requestAccess: false)
@@ -262,7 +271,53 @@ final class AppModel {
     }
 
     func delete(alarmID: UUID) {
+        if NapSettings.activeAlarmID(in: .standard) == alarmID {
+            NapSettings.setActiveAlarmID(nil, in: .standard)
+        }
         update { $0.library.delete(id: alarmID) }
+        Task { await reschedule(requestAccess: false) }
+    }
+
+    func setNapMinutes(_ minutes: Int) {
+        let clamped = NapSettings.clamped(minutes)
+        napMinutes = clamped
+        NapSettings.setMinutes(clamped, in: .standard)
+    }
+
+    var activeNapFireDate: Date? {
+        guard let id = NapSettings.activeAlarmID(in: .standard),
+              let alarm = snapshot.library.alarm(id),
+              case let .oneShot(fireAt) = alarm.schedule,
+              fireAt > .now else { return nil }
+        return fireAt
+    }
+
+    func startNap(now: Date = .now) async {
+        let previous = NapSettings.activeAlarmID(in: .standard)
+        let alarm = NapAlarm.make(minutes: napMinutes, now: now)
+        NapSettings.setActiveAlarmID(alarm.id, in: .standard)
+        update {
+            if let previous {
+                $0.library.delete(id: previous)
+            }
+            $0.library.upsert(alarm)
+        }
+        await reschedule(requestAccess: true)
+    }
+
+    func saveCalendarAlarm(_ alarm: CalendarAlarm) {
+        update {
+            if let index = $0.calendarAlarms.firstIndex(where: { $0.id == alarm.id }) {
+                $0.calendarAlarms[index] = alarm
+            } else {
+                $0.calendarAlarms.append(alarm)
+            }
+        }
+        Task { await reschedule(requestAccess: true) }
+    }
+
+    func deleteCalendarAlarm(_ id: UUID) {
+        update { $0.calendarAlarms.removeAll { $0.id == id } }
         Task { await reschedule(requestAccess: false) }
     }
 
@@ -592,6 +647,7 @@ final class AppModel {
         defer { refreshing = false }
         dropSelfAuthoredAlarms()
         retireOneTimeAlarms()
+        retireCalendarAlarms()
         await cloudKit.prepareForRefresh()
         await createMissingReturnShares()
         await publishMissingReturnLinks()
@@ -1013,6 +1069,7 @@ final class AppModel {
         if let id = ringingAlarmID {
             noteRemoteAlarmDismissed(id)
             retireOneTimeAlarms(rungIDs: [id])
+            retireCalendarAlarms(rungIDs: [id])
         }
         ringingAlarmID = nil
         heldRingingAlarm = nil
@@ -1062,10 +1119,19 @@ final class AppModel {
     private func beginRinging(_ id: UUID) {
         if let alarm = snapshot.library.alarm(id) {
             heldRingingAlarm = alarm
+        } else if let calendar = snapshot.calendarAlarms.first(where: { $0.id == id }) {
+            heldRingingAlarm = calendar.alarmForScheduling(now: .now, calendar: .current)
         }
         ringingAlarmID = id
         noteRemoteAlarmFired(id)
         retireOneTimeAlarms(rungIDs: [id])
+        retireCalendarAlarms(rungIDs: [id])
+    }
+
+    private func retireCalendarAlarms(rungIDs: Set<UUID> = []) {
+        let kept = CalendarFire.keeping(snapshot.calendarAlarms, now: .now, calendar: .current, rungIDs: rungIDs)
+        guard kept != snapshot.calendarAlarms else { return }
+        update { $0.calendarAlarms = kept }
     }
 
     private func reschedule(requestAccess: Bool) async {
@@ -1075,12 +1141,14 @@ final class AppModel {
         } else {
             authorization = coordinator.accessState()
         }
+        let listed = CollaborationPause.alarmsForSync(
+            snapshot.library.alarms,
+            profileID: snapshot.profile.id,
+            grants: snapshot.permissions.grants
+        )
+        let calendar = CalendarFire.scheduled(snapshot.calendarAlarms, now: .now, calendar: .current)
         if let failure = await coordinator.sync(
-            alarms: CollaborationPause.alarmsForSync(
-                snapshot.library.alarms,
-                profileID: snapshot.profile.id,
-                grants: snapshot.permissions.grants
-            ),
+            alarms: listed + calendar,
             customSounds: snapshot.customSounds
         ) {
             scheduleFailure = String(format: String(localized: "settings.systemAlarm.failed"), failure)

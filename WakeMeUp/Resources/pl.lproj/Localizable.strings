@@ -1,6 +1,34 @@
+"tab.nap" = "Drzemka";
 "tab.alarms" = "Alarmy";
 "tab.sharing" = "Współpraca";
+"tab.calendar" = "Kalendarz";
 "tab.achievements" = "Achievements";
+
+"nap.title" = "Drzemka";
+"nap.start" = "Włącz drzemkę";
+"nap.alarmLabel" = "Drzemka";
+"nap.minutes" = "%lld min";
+"nap.length" = "Długość drzemki";
+"nap.length.help" = "Jedno stuknięcie na karcie Drzemka ustawia budzik za tyle czasu. Domyślnie 15 minut.";
+"nap.running" = "Zadzwoni o %@";
+"nap.tips.title" = "Krótka drzemka";
+"nap.tips.length" = "Wystarczy około 10–20 minut, żeby poczuć się rześko. Po 30 minutach łatwo wstać ociężale.";
+"nap.tips.late" = "Drzemka rano albo wczesnym popołudniem. Późna utrudnia zaśnięcie w nocy.";
+"nap.tips.place" = "Ciemno i cicho pomaga. Ustaw budzik, zanim się położysz.";
+
+"calendar.title" = "Kalendarz";
+"calendar.add" = "Dodaj alarm";
+"calendar.edit" = "Edytuj alarm";
+"calendar.date" = "Data";
+"calendar.repeat" = "Powtarzanie";
+"calendar.repeat.yearly" = "Co roku";
+"calendar.repeat.monthly" = "Co miesiąc";
+"calendar.repeat.weekly" = "Co tydzień";
+"calendar.repeat.once" = "Jednorazowy";
+"calendar.empty" = "Tego dnia nie ma alarmów.";
+"calendar.past" = "Ta godzina już minęła. Wybierz późniejszą.";
+"calendar.previousMonth" = "Poprzedni miesiąc";
+"calendar.nextMonth" = "Następny miesiąc";
 
 "alarms.title" = "Alarmy";
 "alarms.empty.title" = "Brak alarmów";
