@@ -2446,6 +2446,23 @@ final class EditingUXTests: XCTestCase {
 }
 
 final class NapCalendarTests: XCTestCase {
+    func testSpokenAlarmUsesTheClockTimeAndAContactMatchPrefersSomeoneYouCanWake() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let spoken = calendar.date(from: DateComponents(year: 2026, month: 11, day: 25, hour: 6, minute: 30))!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 11, day: 25, hour: 5, minute: 0))!
+        let alarm = SpokenAlarm.make(at: spoken, now: now, calendar: calendar)
+        XCTAssertEqual(alarm.schedule.hour, 6)
+        XCTAssertEqual(alarm.schedule.minute, 30)
+        XCTAssertEqual(alarm.schedule.repeatDays, [])
+        XCTAssertNotNil(alarm.firesOnceAt)
+        let akhi = SharingContact(id: "akhi", name: "Akhi", memberID: UUID(), wakeGrantID: UUID(), hostedGrantID: nil, isPending: false)
+        let other = SharingContact(id: "ola", name: "Ola", memberID: UUID(), wakeGrantID: nil, hostedGrantID: UUID(), isPending: false)
+        XCTAssertEqual(SpokenContactMatch.match(name: "akhi", contacts: [other, akhi])?.id, "akhi")
+        XCTAssertEqual(SpokenContactMatch.match(name: "  AKHI ", contacts: [akhi])?.wakeGrantID, akhi.wakeGrantID)
+        XCTAssertNil(SpokenContactMatch.match(name: "   ", contacts: [akhi]))
+    }
+
     func testNapIsAOneShotAtTheChosenLength() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let alarm = NapAlarm.make(minutes: 15, now: now, id: UUID())

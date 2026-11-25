@@ -1,4 +1,12 @@
 "tab.nap" = "Drzemka";
+"siri.setAlarm.short" = "Ustaw alarm";
+"siri.nap.short" = "Włącz drzemkę";
+"siri.wake.short" = "Obudź kontakt";
+"siri.unavailable" = "Otwórz Wakito i spróbuj ponownie.";
+"siri.alarmSet" = "Alarm ustawiony na %@.";
+"siri.napStarted" = "Drzemka włączona na %lld minut.";
+"siri.woke" = "Budzę %@.";
+"siri.wakeMissing" = "Nie ma %@ w Wakito.";
 "tab.alarms" = "Alarmy";
 "tab.sharing" = "Współpraca";
 "tab.calendar" = "Kalendarz";

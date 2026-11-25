@@ -292,6 +292,21 @@ final class AppModel {
         return fireAt
     }
 
+    func addSpokenAlarm(at date: Date) async {
+        let alarm = SpokenAlarm.make(at: date)
+        update { $0.library.upsert(alarm) }
+        await reschedule(requestAccess: true)
+    }
+
+    @discardableResult
+    func wakeContact(named name: String) async -> Bool {
+        let contacts = ContactRoster.contacts(profileID: snapshot.profile.id, grants: snapshot.permissions.grants)
+        guard let contact = SpokenContactMatch.match(name: name, contacts: contacts),
+              let grantID = contact.wakeGrantID else { return false }
+        await sendToPhone(grantID: grantID, immediately: true)
+        return true
+    }
+
     func startNap(now: Date = .now) async {
         let previous = NapSettings.activeAlarmID(in: .standard)
         let alarm = NapAlarm.make(minutes: napMinutes, now: now)
