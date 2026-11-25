@@ -120,6 +120,7 @@ final class AppModel {
     var customSounds: [CustomSound] { snapshot.customSounds }
     var calendarAlarms: [CalendarAlarm] { snapshot.calendarAlarms }
     var napMinutes: Int = NapSettings.defaultMinutes
+    var napSoundID: String = SoundCatalog.defaultID
 
     var ringingAlarm: Alarm? {
         guard let ringingAlarmID else { return nil }
@@ -135,6 +136,7 @@ final class AppModel {
         let store = store ?? LibraryStore(url: LibraryStore.applicationSupportURL())
         self.store = store
         napMinutes = NapSettings.minutes(in: .standard)
+        napSoundID = NapSettings.soundID(in: .standard)
         let screenshot = screenshot ?? LaunchConfiguration.seedDemo
         suppressPermissionBanner = screenshot
         let loaded = store.load() ?? LibrarySnapshot.empty(
@@ -298,6 +300,12 @@ final class AppModel {
         NapSettings.setMinutes(clamped, in: .standard)
     }
 
+    func setNapSoundID(_ id: String) {
+        let sound = id.isEmpty ? SoundCatalog.defaultID : id
+        napSoundID = sound
+        NapSettings.setSoundID(sound, in: .standard)
+    }
+
     var activeNapFireDate: Date? {
         guard let id = NapSettings.activeAlarmID(in: .standard),
               let alarm = snapshot.library.alarm(id),
@@ -321,9 +329,10 @@ final class AppModel {
         return true
     }
 
-    func startNap(now: Date = .now) async {
+    @discardableResult
+    func startNap(now: Date = .now) async -> String? {
         let previous = NapSettings.activeAlarmID(in: .standard)
-        let alarm = NapAlarm.make(minutes: napMinutes, now: now)
+        let alarm = NapAlarm.make(minutes: napMinutes, soundID: napSoundID, now: now)
         NapSettings.setActiveAlarmID(alarm.id, in: .standard)
         update {
             if let previous {
@@ -332,6 +341,11 @@ final class AppModel {
             $0.library.upsert(alarm)
         }
         await reschedule(requestAccess: true)
+        if let message = NapFailure.message(authorization: authorization, scheduleFailure: scheduleFailure) {
+            scheduleFailure = message
+            return message
+        }
+        return nil
     }
 
     func saveCalendarAlarm(_ alarm: CalendarAlarm) {

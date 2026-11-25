@@ -19,6 +19,7 @@
 "nap.minutes" = "%lld min";
 "nap.length" = "Nap length";
 "nap.length.help" = "One tap on the Nap tab sets an alarm for this long from now. 15 minutes is the default.";
+"nap.needsPermission" = "Wakito needs alarm permission before a nap can ring.";
 "nap.running" = "Rings at %@";
 "nap.tips.title" = "A short nap";
 "nap.tips.length" = "About 10–20 minutes is enough to feel sharper. Past 30 minutes you can wake up groggy.";
@@ -29,6 +30,8 @@
 "calendar.add" = "Add alarm";
 "calendar.edit" = "Edit alarm";
 "calendar.date" = "Date";
+"calendar.time" = "Time";
+"calendar.name" = "Name";
 "calendar.repeat" = "Repeat";
 "calendar.repeat.yearly" = "Every year";
 "calendar.repeat.monthly" = "Every month";

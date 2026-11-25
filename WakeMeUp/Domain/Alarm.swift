@@ -77,6 +77,8 @@ struct Alarm: Codable, Equatable, Hashable, Identifiable {
     var firesOnceAt: Date? = nil
     /// Local file id for an attached video message. The bytes travel as a WMVoice `Video` asset.
     var videoFileID: String? = nil
+    /// When set, AlarmKit shows a countdown for this many seconds and then rings. Not a CloudKit field.
+    var countdownLead: TimeInterval? = nil
     var origin: AlarmOrigin
     /// Enabled state to restore when a disabled group is turned back on.
     var resumeWhenGroupEnables: Bool?
@@ -418,6 +420,7 @@ struct AlarmDraft: Equatable, Identifiable {
     var songText: String
     var note: String
     var videoFileID: String?
+    var countdownLead: TimeInterval?
     var origin: AlarmOrigin
     var isNew: Bool
 
@@ -437,6 +440,7 @@ struct AlarmDraft: Equatable, Identifiable {
             songText: "",
             note: "",
             videoFileID: nil,
+            countdownLead: nil,
             origin: .local,
             isNew: true
         )
@@ -463,6 +467,7 @@ struct AlarmDraft: Equatable, Identifiable {
         songText = alarm.songLink?.url.absoluteString ?? ""
         note = alarm.note ?? ""
         videoFileID = alarm.videoFileID
+        countdownLead = alarm.countdownLead
         origin = alarm.origin
         isNew = false
     }
@@ -481,6 +486,7 @@ struct AlarmDraft: Equatable, Identifiable {
         songText: String,
         note: String,
         videoFileID: String? = nil,
+        countdownLead: TimeInterval? = nil,
         origin: AlarmOrigin,
         isNew: Bool
     ) {
@@ -497,6 +503,7 @@ struct AlarmDraft: Equatable, Identifiable {
         self.songText = songText
         self.note = note
         self.videoFileID = videoFileID
+        self.countdownLead = countdownLead
         self.origin = origin
         self.isNew = isNew
     }
@@ -533,6 +540,7 @@ struct AlarmDraft: Equatable, Identifiable {
                 ? schedule.nextFireDate(from: .now, calendar: .current)
                 : nil,
             videoFileID: videoFileID,
+            countdownLead: countdownLead,
             origin: origin,
             resumeWhenGroupEnables: nil
         )
