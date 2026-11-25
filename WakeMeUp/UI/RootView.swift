@@ -145,7 +145,10 @@ private struct MainTabPager: View {
                 let height = geo.size.height.isFinite && geo.size.height > 1 ? geo.size.height : 0
                 HStack(spacing: 0) {
                     ForEach(AppTab.displayOrder, id: \.self) { tab in
-                        page(tab).frame(width: width, height: height)
+                        page(tab)
+                            .frame(width: width, height: height)
+                            .accessibilityHidden(tab != selection)
+                            .allowsHitTesting(tab == selection)
                     }
                 }
                 .offset(x: width > 0 ? -CGFloat(selection.tabIndex) * width + edgeDrag : 0)
