@@ -16,6 +16,7 @@ struct CalendarView: View {
                     monthHeader
                     weekdayRow
                     monthGrid
+                        .simultaneousGesture(monthSwipe)
                     dayAlarms
                 }
                 .padding(.horizontal, 16)
@@ -34,9 +35,11 @@ struct CalendarView: View {
                 }
             }
             .sheet(item: $draft) { draft in
-                CalendarAlarmEditor(draft: draft) { alarm in
+                CalendarAlarmEditor(draft: draft, onSave: { alarm in
                     model.saveCalendarAlarm(alarm)
-                }
+                }, onDelete: draft.isNew ? nil : {
+                    model.deleteCalendarAlarm(draft.id)
+                })
             }
         }
         .accessibilityIdentifier("calendar-screen")
@@ -128,8 +131,14 @@ struct CalendarView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(clock(alarm))
                                 .font(.title3.monospacedDigit())
-                            Text(alarm.label.isEmpty ? String(localized: "alarm.defaultLabel") : alarm.label)
+                            Text(alarm.label.isEmpty ? String(localized: "calendar.name") : alarm.label)
                                 .font(.subheadline)
+                            if let note = alarm.note, !note.isEmpty {
+                                Text(note)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
                             Text(LocalizedStringKey(alarm.repeatRule.localizationKey))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -143,6 +152,7 @@ struct CalendarView: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .contentShape(Rectangle())
                 .contextMenu {
                     Button("alarm.delete", systemImage: "trash", role: .destructive) {
                         model.deleteCalendarAlarm(alarm.id)
@@ -163,6 +173,17 @@ struct CalendarView: View {
         guard let next = calendar.date(byAdding: .month, value: delta, to: visibleMonth) else { return }
         visibleMonth = next
     }
+
+    private var monthSwipe: some Gesture {
+        DragGesture(minimumDistance: 24)
+            .onEnded { value in
+                let travel = value.translation.width
+                guard abs(travel) > abs(value.translation.height), abs(travel) > 48 else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    shiftMonth(travel < 0 ? 1 : -1)
+                }
+            }
+    }
 }
 
 struct CalendarAlarmDraft: Equatable, Identifiable {
@@ -171,6 +192,7 @@ struct CalendarAlarmDraft: Equatable, Identifiable {
     var time: Date
     var repeatRule: CalendarRepeat
     var label: String
+    var note: String
     var soundID: String
     var snoozeEnabled: Bool
     var snoozeMinutes: Int
@@ -186,6 +208,7 @@ struct CalendarAlarmDraft: Equatable, Identifiable {
         time = calendar.date(from: parts) ?? day
         repeatRule = .once
         label = ""
+        note = ""
         soundID = SoundCatalog.defaultID
         snoozeEnabled = true
         snoozeMinutes = 9
@@ -205,6 +228,7 @@ struct CalendarAlarmDraft: Equatable, Identifiable {
         time = calendar.date(from: parts) ?? day
         repeatRule = alarm.repeatRule
         label = alarm.label
+        note = alarm.note ?? ""
         soundID = alarm.soundID
         snoozeEnabled = alarm.snoozeEnabled
         snoozeMinutes = alarm.snoozeMinutes
@@ -230,7 +254,7 @@ struct CalendarAlarmDraft: Equatable, Identifiable {
             snoozeEnabled: snoozeEnabled,
             snoozeMinutes: min(30, max(1, snoozeMinutes)),
             isEnabled: isEnabled,
-            note: nil
+            note: AlarmNote.cleaned(note)
         )
     }
 }
@@ -240,23 +264,32 @@ struct CalendarAlarmEditor: View {
     @State private var draft: CalendarAlarmDraft
     @State private var preview = SoundPreviewPlayer()
     var onSave: (CalendarAlarm) -> Void
+    var onDelete: (() -> Void)?
 
-    init(draft: CalendarAlarmDraft, onSave: @escaping (CalendarAlarm) -> Void) {
+    init(draft: CalendarAlarmDraft, onSave: @escaping (CalendarAlarm) -> Void, onDelete: (() -> Void)? = nil) {
         _draft = State(initialValue: draft)
         self.onSave = onSave
+        self.onDelete = onDelete
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 DatePicker("calendar.date", selection: $draft.day, displayedComponents: .date)
-                DatePicker("alarm.label", selection: $draft.time, displayedComponents: .hourAndMinute)
+                DatePicker("calendar.time", selection: $draft.time, displayedComponents: .hourAndMinute)
                 Picker("calendar.repeat", selection: $draft.repeatRule) {
                     ForEach(CalendarRepeat.allCases) { rule in
                         Text(LocalizedStringKey(rule.localizationKey)).tag(rule)
                     }
                 }
-                TextField("alarm.defaultLabel", text: $draft.label)
+                TextField("calendar.name", text: $draft.label)
+                TextField("alarm.note.placeholder", text: $draft.note, axis: .vertical)
+                    .lineLimit(3...6)
+                    .onChange(of: draft.note) { _, newValue in
+                        if newValue.count > AlarmNote.maxCharacters {
+                            draft.note = String(newValue.prefix(AlarmNote.maxCharacters))
+                        }
+                    }
                 Toggle("alarm.snooze", isOn: $draft.snoozeEnabled)
                 if draft.snoozeEnabled {
                     Stepper(value: $draft.snoozeMinutes, in: 1...30) {
@@ -270,6 +303,13 @@ struct CalendarAlarmEditor: View {
                     Text("calendar.past")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                }
+                if onDelete != nil {
+                    Button("alarm.delete", role: .destructive) {
+                        preview.stop()
+                        onDelete?()
+                        dismiss()
+                    }
                 }
             }
             .navigationTitle(draft.isNew ? "calendar.add" : "calendar.edit")

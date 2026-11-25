@@ -2524,6 +2524,7 @@ final class NapCalendarTests: XCTestCase {
             return XCTFail("A nap is a one-time alarm")
         }
         XCTAssertEqual(fireAt.timeIntervalSince(now), 15 * 60, accuracy: 0.1)
+        XCTAssertEqual(alarm.countdownLead, 15 * 60)
         XCTAssertFalse(alarm.snoozeEnabled)
         XCTAssertEqual(NapSettings.clamped(7), 5)
         XCTAssertEqual(NapSettings.clamped(15), 15)
@@ -2532,6 +2533,9 @@ final class NapCalendarTests: XCTestCase {
         XCTAssertEqual(NapSettings.minutes(in: defaults), NapSettings.defaultMinutes)
         NapSettings.setMinutes(30, in: defaults)
         XCTAssertEqual(NapSettings.minutes(in: defaults), 30)
+        XCTAssertEqual(NapFailure.message(authorization: .authorized, scheduleFailure: nil), nil)
+        XCTAssertEqual(NapFailure.message(authorization: .authorized, scheduleFailure: "AlarmKit"), "AlarmKit")
+        XCTAssertNotNil(NapFailure.message(authorization: .denied, scheduleFailure: nil))
     }
 
     func testOneTimeCalendarAlarmsLeaveAndStayOutOfTheAlarmList() {

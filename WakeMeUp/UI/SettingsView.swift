@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(AppearanceSettings.self) private var appearance
     @Environment(\.appAccent) private var appAccent
+    @State private var napPreview = SoundPreviewPlayer()
 
     var body: some View {
         Form {
@@ -33,6 +34,13 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            SoundChoiceList(
+                soundID: Binding(
+                    get: { model.napSoundID },
+                    set: { model.setNapSoundID($0) }
+                ),
+                preview: napPreview
+            )
             Section("settings.alarmAccess") {
                 LabeledContent("settings.alarmAccess", value: accessText)
                 if model.authorization == .denied {
@@ -78,6 +86,7 @@ struct SettingsView: View {
         }
         .navigationTitle("settings.title")
         .accessibilityIdentifier("settings-screen")
+        .onDisappear { napPreview.stop() }
     }
 
     @ViewBuilder

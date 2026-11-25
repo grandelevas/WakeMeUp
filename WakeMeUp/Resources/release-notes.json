@@ -5,6 +5,18 @@
       "date": "2026-11-25",
       "changes": {
         "en": [
+          "Nap now starts a full-screen alarm and shows the time left. If it cannot be scheduled, the reason is shown. Calendar months swipe sideways, existing alarms open for editing, and a note can ride along. Ringtone choices are a single menu."
+        ],
+        "pl": [
+          "Drzemka włącza pełnoekranowy alarm i pokazuje, ile czasu zostało. Jeśli nie da się go ustawić, widać powód. Miesiące w kalendarzu zmienia się gestem, istniejące alarmy otwierają się do edycji i można dodać notatkę. Dzwonek wybiera się z jednej listy."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-25",
+      "changes": {
+        "en": [
           "An alarm can carry a video message of up to 30 seconds. Record it, play it back, delete it, and send it to a contact. It plays when the alarm rings."
         ],
         "pl": [

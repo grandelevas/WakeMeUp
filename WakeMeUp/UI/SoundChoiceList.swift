@@ -2,7 +2,6 @@ import SwiftUI
 
 struct SoundChoiceList: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.appAccent) private var appAccent
     @Binding var soundID: String
     var preview: SoundPreviewPlayer
     var showsImport: Bool = false
@@ -12,8 +11,40 @@ struct SoundChoiceList: View {
 
     var body: some View {
         Section("alarm.sound") {
-            ForEach(SoundCatalog.bundled) { sound in
-                row(id: sound.id, title: Text(LocalizedStringKey(sound.localizationKey)), custom: nil)
+            Picker("alarm.sound", selection: $soundID) {
+                ForEach(SoundCatalog.bundled) { sound in
+                    Text(LocalizedStringKey(sound.localizationKey)).tag(sound.id)
+                }
+                if !voiceRecordings.isEmpty {
+                    Section("sound.voice.mine") {
+                        ForEach(voiceRecordings) { sound in
+                            Text(sound.displayName).tag(sound.id)
+                        }
+                    }
+                }
+                if !importedSounds.isEmpty {
+                    Section("sound.mine") {
+                        ForEach(importedSounds) { sound in
+                            Text(sound.displayName).tag(sound.id)
+                        }
+                    }
+                }
+            }
+            .pickerStyle(.menu)
+            .onChange(of: soundID) { _, id in
+                choose(id)
+            }
+            if showsImport {
+                Button("sound.import", action: onImport)
+            }
+            if let custom = selectedCustom {
+                Button("sound.rename") {
+                    renameText = custom.displayName
+                    renaming = custom
+                }
+                Button("sound.delete", role: .destructive) {
+                    delete(custom)
+                }
             }
         }
         .alert("sound.rename", isPresented: renamePresented) {
@@ -26,23 +57,6 @@ struct SoundChoiceList: View {
             }
             .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             Button("alarm.cancel", role: .cancel) { renaming = nil }
-        }
-        if !voiceRecordings.isEmpty {
-            Section("sound.voice.mine") {
-                ForEach(voiceRecordings) { sound in
-                    row(id: sound.id, title: Text(sound.displayName), custom: sound)
-                }
-            }
-        }
-        if showsImport || !importedSounds.isEmpty {
-            Section("sound.mine") {
-                ForEach(importedSounds) { sound in
-                    row(id: sound.id, title: Text(sound.displayName), custom: sound)
-                }
-                if showsImport {
-                    Button("sound.import", action: onImport)
-                }
-            }
         }
     }
 
@@ -58,47 +72,8 @@ struct SoundChoiceList: View {
         Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
     }
 
-    private func row(id: String, title: Text, custom: CustomSound?) -> some View {
-        Button {
-            choose(id)
-        } label: {
-            HStack {
-                title
-                Spacer()
-                if soundID == id {
-                    Image(systemName: "checkmark")
-                        .foregroundStyle(appAccent)
-                }
-            }
-        }
-        .foregroundStyle(.primary)
-        .contextMenu {
-            if let custom {
-                Button("sound.rename", systemImage: "pencil") {
-                    renameText = custom.displayName
-                    renaming = custom
-                }
-                Button("sound.delete", systemImage: "trash", role: .destructive) {
-                    delete(custom)
-                }
-            }
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if let custom {
-                Button("sound.delete", role: .destructive) {
-                    delete(custom)
-                }
-            }
-        }
-        .swipeActions(edge: .leading, allowsFullSwipe: false) {
-            if let custom {
-                Button("sound.rename") {
-                    renameText = custom.displayName
-                    renaming = custom
-                }
-                .tint(.indigo)
-            }
-        }
+    private var selectedCustom: CustomSound? {
+        model.customSounds.first { $0.id == soundID }
     }
 
     private func delete(_ sound: CustomSound) {

@@ -19,6 +19,7 @@
 "nap.minutes" = "%lld min";
 "nap.length" = "Długość drzemki";
 "nap.length.help" = "Jedno stuknięcie na karcie Drzemka ustawia budzik za tyle czasu. Domyślnie 15 minut.";
+"nap.needsPermission" = "Wakito potrzebuje zgody na alarmy, żeby drzemka mogła zadzwonić.";
 "nap.running" = "Zadzwoni o %@";
 "nap.tips.title" = "Krótka drzemka";
 "nap.tips.length" = "Wystarczy około 10–20 minut, żeby poczuć się rześko. Po 30 minutach łatwo wstać ociężale.";
@@ -29,6 +30,8 @@
 "calendar.add" = "Dodaj alarm";
 "calendar.edit" = "Edytuj alarm";
 "calendar.date" = "Data";
+"calendar.time" = "Godzina";
+"calendar.name" = "Nazwa";
 "calendar.repeat" = "Powtarzanie";
 "calendar.repeat.yearly" = "Co roku";
 "calendar.repeat.monthly" = "Co miesiąc";

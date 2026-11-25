@@ -90,7 +90,9 @@ struct StartWakitoNapIntent: AppIntent {
         guard let model = await WakitoIntentRuntime.model() else {
             return .result(dialog: IntentDialog(LocalizedStringResource("siri.unavailable")))
         }
-        await model.startNap()
+        if let failure = await model.startNap() {
+            return .result(dialog: IntentDialog(stringLiteral: failure))
+        }
         let minutes = await model.napMinutes
         let text = String(format: String(localized: "siri.napStarted"), minutes)
         return .result(dialog: IntentDialog(stringLiteral: text))

@@ -34,9 +34,21 @@ struct NapView: View {
                         Text("nap.start")
                             .font(.headline)
                         if let fire = model.activeNapFireDate {
+                            TimelineView(.periodic(from: .now, by: 1)) { context in
+                                let left = NapCountdown.remaining(until: fire, now: context.date)
+                                Text(NapCountdown.clock(left))
+                                    .font(.system(size: 56, weight: .thin, design: .rounded))
+                                    .monospacedDigit()
+                            }
                             Text(String(format: String(localized: "nap.running"), fire.formatted(date: .omitted, time: .shortened)))
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                        }
+                        if let failure = model.scheduleFailure, !failure.isEmpty {
+                            Text(failure)
+                                .font(.subheadline)
+                                .foregroundStyle(.red)
+                                .multilineTextAlignment(.center)
                         }
                     }
 

@@ -186,11 +186,18 @@ final class AlarmKitEngine {
             secondaryButtonBehavior: secondaryBehavior
         )
         let presentation: AlarmPresentation
-        if alarm.snoozeEnabled {
-            let countdown = AlarmPresentation.Countdown(title: localizedTitle, pauseButton: nil)
-            presentation = AlarmPresentation(alert: alert, countdown: countdown)
+        let countdown: SystemAlarm.CountdownDuration?
+        if let lead = alarm.countdownLead, lead > 0 {
+            let countdownUI = AlarmPresentation.Countdown(title: localizedTitle, pauseButton: nil)
+            presentation = AlarmPresentation(alert: alert, countdown: countdownUI)
+            countdown = SystemAlarm.CountdownDuration(preAlert: lead, postAlert: nil)
+        } else if alarm.snoozeEnabled {
+            let countdownUI = AlarmPresentation.Countdown(title: localizedTitle, pauseButton: nil)
+            presentation = AlarmPresentation(alert: alert, countdown: countdownUI)
+            countdown = SystemAlarm.CountdownDuration(preAlert: nil, postAlert: TimeInterval(alarm.snoozeMinutes * 60))
         } else {
             presentation = AlarmPresentation(alert: alert)
+            countdown = nil
         }
         let attributes = AlarmAttributes<WakeMeUpAlarmMetadata>(
             presentation: presentation,
@@ -201,9 +208,6 @@ final class AlarmKitEngine {
             ),
             tintColor: AppearanceSettings.storedAccent.color
         )
-        let countdown: SystemAlarm.CountdownDuration? = alarm.snoozeEnabled
-            ? SystemAlarm.CountdownDuration(preAlert: nil, postAlert: TimeInterval(alarm.snoozeMinutes * 60))
-            : nil
         let intent: (any LiveActivityIntent)? = {
             guard let link = alarm.songLink else { return nil }
             return PlaySongIntent(alarmID: alarm.id.uuidString, songURL: link.url.absoluteString)
