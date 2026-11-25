@@ -1,19 +1,17 @@
 import Foundation
 
 enum NapSettings {
-    static let minimumMinutes = 5
-    static let maximumMinutes = 120
-    static let stepMinutes = 5
+    static let minimumMinutes = 1
+    static let maximumMinutes = 180
+    static let stepMinutes = 1
     static let defaultMinutes = 15
+    static let presets = [10, 15, 20, 30, 45, 60]
     static let minutesKey = "wakito.napMinutes"
     static let soundKey = "wakito.napSound"
     static let activeAlarmKey = "wakito.napAlarmID"
 
     static func clamped(_ minutes: Int) -> Int {
-        let bounded = min(maximumMinutes, max(minimumMinutes, minutes))
-        let steps = bounded / stepMinutes
-        let snapped = steps * stepMinutes
-        return min(maximumMinutes, max(minimumMinutes, snapped == 0 ? minimumMinutes : snapped))
+        min(maximumMinutes, max(minimumMinutes, minutes))
     }
 
     static func minutes(in defaults: UserDefaults) -> Int {
@@ -48,6 +46,26 @@ enum NapSettings {
     }
 }
 
+enum DefaultSnooze {
+    static let minimumMinutes = 1
+    static let maximumMinutes = 30
+    static let fallback = 9
+    static let key = "wakito.defaultSnoozeMinutes"
+
+    static func clamped(_ minutes: Int) -> Int {
+        min(maximumMinutes, max(minimumMinutes, minutes))
+    }
+
+    static func minutes(in defaults: UserDefaults) -> Int {
+        guard defaults.object(forKey: key) != nil else { return fallback }
+        return clamped(defaults.integer(forKey: key))
+    }
+
+    static func setMinutes(_ minutes: Int, in defaults: UserDefaults) {
+        defaults.set(clamped(minutes), forKey: key)
+    }
+}
+
 enum NapCountdown {
     static func remaining(until fire: Date, now: Date) -> TimeInterval {
         max(0, fire.timeIntervalSince(now))
@@ -55,7 +73,7 @@ enum NapCountdown {
 
     static func clock(_ seconds: TimeInterval) -> String {
         let whole = Int(max(0, seconds).rounded(.down))
-        return String(format: "%d:%02d", whole / 60, whole % 60)
+        return String(format: "%02d:%02d", whole / 60, whole % 60)
     }
 }
 
@@ -87,7 +105,6 @@ enum NapAlarm {
             groupID: nil,
             songLink: nil,
             note: nil,
-            countdownLead: lead,
             origin: .local,
             resumeWhenGroupEnables: nil
         )

@@ -18,6 +18,9 @@
 "nap.alarmLabel" = "Drzemka";
 "nap.minutes" = "%lld min";
 "nap.length" = "Długość drzemki";
+"nap.customMinutes" = "Własna, %lld min";
+"nap.cancel" = "Anuluj";
+"nap.sound" = "Dzwonek drzemki";
 "nap.length.help" = "Jedno stuknięcie na karcie Drzemka ustawia budzik za tyle czasu. Domyślnie 15 minut.";
 "nap.needsPermission" = "Wakito potrzebuje zgody na alarmy, żeby drzemka mogła zadzwonić.";
 "nap.running" = "Zadzwoni o %@";
@@ -264,6 +267,8 @@
 "sharing.queued" = "Czeka na ich telefon";
 "sharing.signIn" = "Zaloguj się do iCloud, aby udostępniać alarmy.";
 
+"settings.defaultSnooze" = "Domyślny czas drzemki alarmu";
+"settings.defaultSnooze.help" = "Tyle trwa drzemka po alarmie, gdy włączysz ją przy nowym budziku. Nie zmienia karty Drzemka.";
 "settings.title" = "Ustawienia";
 "settings.appearance" = "Wygląd";
 "settings.appearance.theme" = "Motyw";

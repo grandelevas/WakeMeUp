@@ -121,6 +121,7 @@ final class AppModel {
     var calendarAlarms: [CalendarAlarm] { snapshot.calendarAlarms }
     var napMinutes: Int = NapSettings.defaultMinutes
     var napSoundID: String = SoundCatalog.defaultID
+    var defaultSnoozeMinutes: Int = DefaultSnooze.fallback
 
     var ringingAlarm: Alarm? {
         guard let ringingAlarmID else { return nil }
@@ -137,6 +138,7 @@ final class AppModel {
         self.store = store
         napMinutes = NapSettings.minutes(in: .standard)
         napSoundID = NapSettings.soundID(in: .standard)
+        defaultSnoozeMinutes = DefaultSnooze.minutes(in: .standard)
         let screenshot = screenshot ?? LaunchConfiguration.seedDemo
         suppressPermissionBanner = screenshot
         let loaded = store.load() ?? LibrarySnapshot.empty(
@@ -213,7 +215,7 @@ final class AppModel {
 
     func addAlarm() {
         editorRecipientGrantID = nil
-        editor = .makeNew()
+        editor = .makeNew(snoozeMinutes: defaultSnoozeMinutes)
     }
 
     func edit(_ alarm: Alarm) {
@@ -228,7 +230,7 @@ final class AppModel {
 
     func editAlarm(forContactGrant grantID: UUID) {
         editorRecipientGrantID = grantID
-        editor = .makeNew()
+        editor = .makeNew(snoozeMinutes: defaultSnoozeMinutes)
     }
 
     func installLocalVoice(_ url: URL) -> String? {
@@ -300,6 +302,19 @@ final class AppModel {
         NapSettings.setMinutes(clamped, in: .standard)
     }
 
+    func setDefaultSnoozeMinutes(_ minutes: Int) {
+        let clamped = DefaultSnooze.clamped(minutes)
+        defaultSnoozeMinutes = clamped
+        DefaultSnooze.setMinutes(clamped, in: .standard)
+    }
+
+    func cancelNap() async {
+        guard let id = NapSettings.activeAlarmID(in: .standard) else { return }
+        NapSettings.setActiveAlarmID(nil, in: .standard)
+        update { $0.library.delete(id: id) }
+        await reschedule(requestAccess: false)
+    }
+
     func setNapSoundID(_ id: String) {
         let sound = id.isEmpty ? SoundCatalog.defaultID : id
         napSoundID = sound
@@ -315,7 +330,7 @@ final class AppModel {
     }
 
     func addSpokenAlarm(at date: Date) async {
-        let alarm = SpokenAlarm.make(at: date)
+        let alarm = SpokenAlarm.make(at: date, snoozeMinutes: defaultSnoozeMinutes)
         update { $0.library.upsert(alarm) }
         await reschedule(requestAccess: true)
     }
@@ -545,7 +560,7 @@ final class AppModel {
                 label: remoteLabel.trimmingCharacters(in: .whitespacesAndNewlines),
                 soundID: SoundCatalog.defaultID,
                 snoozeEnabled: true,
-                snoozeMinutes: 9,
+                snoozeMinutes: defaultSnoozeMinutes,
                 isEnabled: true,
                 groupID: nil,
                 songLink: nil,
@@ -924,7 +939,7 @@ final class AppModel {
             label: remoteLabel,
             soundID: SoundCatalog.defaultID,
             snoozeEnabled: true,
-            snoozeMinutes: 9,
+            snoozeMinutes: defaultSnoozeMinutes,
             isEnabled: true,
             groupID: nil,
             songLink: nil,

@@ -26,7 +26,11 @@ struct CalendarView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        draft = CalendarAlarmDraft(day: selectedDay, calendar: calendar)
+                        draft = CalendarAlarmDraft(
+                            day: selectedDay,
+                            calendar: calendar,
+                            snoozeMinutes: model.defaultSnoozeMinutes
+                        )
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -199,7 +203,7 @@ struct CalendarAlarmDraft: Equatable, Identifiable {
     var isEnabled: Bool
     var isNew: Bool
 
-    init(day: Date, calendar: Calendar) {
+    init(day: Date, calendar: Calendar, snoozeMinutes: Int = 9) {
         id = UUID()
         self.day = calendar.startOfDay(for: day)
         var parts = calendar.dateComponents([.year, .month, .day], from: day)
@@ -211,7 +215,7 @@ struct CalendarAlarmDraft: Equatable, Identifiable {
         note = ""
         soundID = SoundCatalog.defaultID
         snoozeEnabled = true
-        snoozeMinutes = 9
+        self.snoozeMinutes = min(30, max(1, snoozeMinutes))
         isEnabled = true
         isNew = true
     }

@@ -424,7 +424,7 @@ struct AlarmDraft: Equatable, Identifiable {
     var origin: AlarmOrigin
     var isNew: Bool
 
-    static func makeNew(now: Date = .now, calendar: Calendar = .current) -> AlarmDraft {
+    static func makeNew(now: Date = .now, calendar: Calendar = .current, snoozeMinutes: Int = 9) -> AlarmDraft {
         let hour = (calendar.component(.hour, from: now) + 1) % 24
         return AlarmDraft(
             id: UUID(),
@@ -434,7 +434,7 @@ struct AlarmDraft: Equatable, Identifiable {
             repeatDays: [],
             soundID: SoundCatalog.defaultID,
             snoozeEnabled: true,
-            snoozeMinutes: 9,
+            snoozeMinutes: snoozeMinutes,
             isEnabled: true,
             groupID: nil,
             songText: "",

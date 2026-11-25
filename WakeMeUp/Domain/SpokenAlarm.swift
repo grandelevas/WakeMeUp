@@ -6,7 +6,7 @@ enum SpokenAlarm {
     }
 
     /// A spoken time is the next one-time alarm at that clock time.
-    static func make(at date: Date, now: Date = .now, calendar: Calendar = .current, id: UUID = UUID()) -> Alarm {
+    static func make(at date: Date, now: Date = .now, calendar: Calendar = .current, snoozeMinutes: Int = 9, id: UUID = UUID()) -> Alarm {
         let parts = hourAndMinute(from: date, calendar: calendar)
         let schedule = AlarmSchedule.wallClock(hour: parts.hour, minute: parts.minute, repeatDays: [])
         return Alarm(
@@ -15,7 +15,7 @@ enum SpokenAlarm {
             label: "",
             soundID: SoundCatalog.defaultID,
             snoozeEnabled: true,
-            snoozeMinutes: 9,
+            snoozeMinutes: snoozeMinutes,
             isEnabled: true,
             groupID: nil,
             songLink: nil,
