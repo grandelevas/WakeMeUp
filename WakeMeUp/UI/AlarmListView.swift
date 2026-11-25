@@ -1,13 +1,21 @@
 import SwiftUI
 import UIKit
 
+private struct AlarmSectionCollapse {
+    var groups: Set<UUID>
+    var fromOthers: Bool
+    var toOthers: Bool
+    var other: Bool
+}
+
 struct AlarmListView: View {
     @Environment(AppModel.self) private var model
     @State private var reorderMode = EditMode.inactive
     @State private var collapsedGroups: Set<UUID> = GroupExpansionStore.collapsedIDs()
     @State private var fromOthersExpanded = SectionExpansionStore.isExpanded(SectionExpansionStore.fromOthers)
     @State private var toOthersExpanded = SectionExpansionStore.isExpanded(SectionExpansionStore.toOthers)
-    @State private var collapseBeforeSelection: Set<UUID>?
+    @State private var collapseBeforeSelection: AlarmSectionCollapse?
+    @State private var otherExpanded = true
     @State private var collapseBeforeReorder: Set<UUID>?
     @State private var editingGroupID: UUID?
     @State private var showSettings = false
@@ -34,42 +42,42 @@ struct AlarmListView: View {
             }
             .navigationTitle("alarms.title")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(isReordering ? "alarms.done" : "alarms.edit") {
-                        toggleReorder()
-                    }
-                    .accessibilityIdentifier("alarms.edit")
-                }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        model.addAlarm()
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .accessibilityIdentifier("add-alarm")
-                    .accessibilityLabel("alarms.add")
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button(selecting ? "alarms.done" : "alarms.select", systemImage: "checkmark.circle") {
-                            toggleSelecting()
-                        }
-                        .accessibilityIdentifier("alarms.select")
-                        Button(isReordering ? "groups.reorder.done" : "groups.reorder", systemImage: "arrow.up.arrow.down") {
+                    HStack(spacing: 16) {
+                        Button(isReordering ? "alarms.done" : "alarms.edit") {
                             toggleReorder()
                         }
-                        .accessibilityIdentifier("groups.reorder")
-                        Button("groups.add", systemImage: "folder.badge.plus") {
+                        .accessibilityIdentifier("alarms.edit")
+                        Button {
                             model.showGroups = true
+                        } label: {
+                            Image(systemName: "folder.badge.plus")
                         }
-                        Button("settings.title", systemImage: "gearshape") {
+                        .accessibilityIdentifier("groups.add")
+                        .accessibilityLabel("groups.add")
+                        Button {
+                            toggleSelecting()
+                        } label: {
+                            Image(systemName: selecting ? "checkmark.circle.fill" : "checkmark.circle")
+                        }
+                        .accessibilityIdentifier("alarms.select")
+                        .accessibilityLabel(Text(LocalizedStringKey(selecting ? "alarms.done" : "alarms.select")))
+                        Button {
                             showSettings = true
+                        } label: {
+                            Image(systemName: "gearshape")
                         }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
+                        .accessibilityIdentifier("open-settings")
+                        .accessibilityLabel("settings.title")
+                        Button {
+                            model.addAlarm()
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .accessibilityIdentifier("add-alarm")
+                        .accessibilityLabel("alarms.add")
                     }
-                    .accessibilityIdentifier("alarms.more")
-                    .accessibilityLabel("groups.more")
+                    .buttonStyle(.borderless)
                 }
             }
             .navigationDestination(isPresented: groupsPresented) {
@@ -134,18 +142,37 @@ struct AlarmListView: View {
 
     private func toggleSelecting() {
         if selecting {
-            if let collapseBeforeSelection {
-                collapsedGroups = collapseBeforeSelection
-            }
-            collapseBeforeSelection = nil
+            restoreSectionsAfterSelection()
             selecting = false
             selectedAlarmIDs.removeAll()
         } else {
             if isReordering { toggleReorder() }
-            collapseBeforeSelection = collapsedGroups
-            collapsedGroups = []
+            collapseSectionsForSelection()
             selecting = true
         }
+    }
+
+    private func collapseSectionsForSelection() {
+        collapseBeforeSelection = AlarmSectionCollapse(
+            groups: collapsedGroups,
+            fromOthers: fromOthersExpanded,
+            toOthers: toOthersExpanded,
+            other: otherExpanded
+        )
+        collapsedGroups = Set(model.library.groups.map(\.id))
+        fromOthersExpanded = false
+        toOthersExpanded = false
+        otherExpanded = false
+    }
+
+    private func restoreSectionsAfterSelection() {
+        if let collapseBeforeSelection {
+            collapsedGroups = collapseBeforeSelection.groups
+            fromOthersExpanded = collapseBeforeSelection.fromOthers
+            toOthersExpanded = collapseBeforeSelection.toOthers
+            otherExpanded = collapseBeforeSelection.other
+        }
+        self.collapseBeforeSelection = nil
     }
 
     private func toggleReorder() {
@@ -166,10 +193,7 @@ struct AlarmListView: View {
     private func finishBulkEdit() {
         guard appliedBulkEdit else { return }
         appliedBulkEdit = false
-        if let collapseBeforeSelection {
-            collapsedGroups = collapseBeforeSelection
-        }
-        collapseBeforeSelection = nil
+        restoreSectionsAfterSelection()
         selecting = false
         selectedAlarmIDs.removeAll()
     }
@@ -241,7 +265,19 @@ struct AlarmListView: View {
             } : nil)
             let ungrouped = model.library.ownAlarms(in: nil)
             if !ungrouped.isEmpty {
-                section(groupID: nil, title: String(localized: "alarms.otherGroup"), symbol: "alarm", group: nil, alarms: ungrouped)
+                Section {
+                    if !selecting || otherExpanded {
+                        alarmRows(ungrouped, emptyKey: "alarms.empty.group")
+                    }
+                } header: {
+                    if selecting {
+                        collapsibleHeader("alarms.otherGroup", expanded: otherExpanded) {
+                            otherExpanded.toggle()
+                        }
+                    } else {
+                        Label(String(localized: "alarms.otherGroup"), systemImage: "alarm")
+                    }
+                }
             }
             let received = model.library.receivedFromOthers
             if !received.isEmpty {
@@ -252,7 +288,9 @@ struct AlarmListView: View {
                 } header: {
                     collapsibleHeader("alarms.fromOthers", expanded: fromOthersExpanded) {
                         fromOthersExpanded.toggle()
-                        SectionExpansionStore.setExpanded(fromOthersExpanded, id: SectionExpansionStore.fromOthers)
+                        if !selecting {
+                            SectionExpansionStore.setExpanded(fromOthersExpanded, id: SectionExpansionStore.fromOthers)
+                        }
                     }
                 }
             }
@@ -281,7 +319,9 @@ struct AlarmListView: View {
                 } header: {
                     collapsibleHeader("alarms.toOthers", expanded: toOthersExpanded) {
                         toOthersExpanded.toggle()
-                        SectionExpansionStore.setExpanded(toOthersExpanded, id: SectionExpansionStore.toOthers)
+                        if !selecting {
+                            SectionExpansionStore.setExpanded(toOthersExpanded, id: SectionExpansionStore.toOthers)
+                        }
                     }
                 }
             }

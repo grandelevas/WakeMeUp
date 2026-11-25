@@ -3,6 +3,8 @@ import SwiftUI
 struct NapView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.appAccent) private var appAccent
+    @State private var guideExpanded = false
+    @State private var factsExpanded = false
 
     var body: some View {
         NavigationStack {
@@ -24,12 +26,17 @@ struct NapView: View {
                             .multilineTextAlignment(.center)
                     }
 
-                    tips
+                    education
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
             }
             .navigationTitle("nap.title")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    OpenSettingsLink()
+                }
+            }
         }
         .accessibilityIdentifier("nap-screen")
     }
@@ -112,26 +119,64 @@ struct NapView: View {
         }
     }
 
-    private var tips: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("nap.tips.title")
+    private var education: some View {
+        VStack(spacing: 12) {
+            educationSection(
+                title: "nap.guide.title",
+                intro: "nap.guide.intro",
+                items: [
+                    "nap.guide.short",
+                    "nap.guide.early",
+                    "nap.guide.quiet",
+                    "nap.guide.alarm",
+                    "nap.guide.after"
+                ],
+                isExpanded: $guideExpanded
+            )
+            educationSection(
+                title: "nap.facts.title",
+                intro: "nap.facts.intro",
+                items: [
+                    "nap.facts.coffee",
+                    "nap.facts.legs",
+                    "nap.facts.famous",
+                    "nap.facts.rest"
+                ],
+                isExpanded: $factsExpanded
+            )
+        }
+    }
+
+    private func educationSection(
+        title: LocalizedStringKey,
+        intro: LocalizedStringKey,
+        items: [String],
+        isExpanded: Binding<Bool>
+    ) -> some View {
+        DisclosureGroup(isExpanded: isExpanded) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(intro)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(items, id: \.self) { item in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("•")
+                        Text(LocalizedStringKey(item))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .padding(.top, 8)
+        } label: {
+            Text(title)
                 .font(.headline)
-            tip("nap.tips.length")
-            tip("nap.tips.late")
-            tip("nap.tips.place")
+                .foregroundStyle(.primary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(.bar, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private func tip(_ key: LocalizedStringKey) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text("•")
-            Text(key)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
     }
 }

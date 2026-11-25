@@ -190,6 +190,18 @@ struct SettingsView: View {
     }
 }
 
+struct OpenSettingsLink: View {
+    var body: some View {
+        NavigationLink {
+            SettingsView()
+        } label: {
+            Image(systemName: "gearshape")
+        }
+        .accessibilityLabel("settings.title")
+        .accessibilityIdentifier("open-settings")
+    }
+}
+
 struct ActivityShareSheet: UIViewControllerRepresentable {
     let items: [Any]
 

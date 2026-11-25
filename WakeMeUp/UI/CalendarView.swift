@@ -37,6 +37,9 @@ struct CalendarView: View {
                     .accessibilityLabel("calendar.add")
                     .accessibilityIdentifier("add-calendar-alarm")
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    OpenSettingsLink()
+                }
             }
             .sheet(item: $draft) { draft in
                 CalendarAlarmEditor(draft: draft, onSave: { alarm in

@@ -24,10 +24,19 @@
 "nap.length.help" = "One tap on the Nap tab sets an alarm for this long from now. 15 minutes is the default.";
 "nap.needsPermission" = "Wakito needs alarm permission before a nap can ring.";
 "nap.running" = "Rings at %@";
-"nap.tips.title" = "A short nap";
-"nap.tips.length" = "About 10–20 minutes is enough to feel sharper. Past 30 minutes you can wake up groggy.";
-"nap.tips.late" = "Nap in the morning or early afternoon. A late nap makes it harder to fall asleep at night.";
-"nap.tips.place" = "A dark, quiet spot helps. Set the alarm before you lie down.";
+"nap.guide.title" = "Rules for a good nap";
+"nap.guide.intro" = "Stick to these rules so a nap helps you, instead of getting in the way of sleep at night:";
+"nap.guide.short" = "**Keep it short:** Aim for 20 to 30 minutes. The longer the nap, the greater the chance you wake up groggy.";
+"nap.guide.early" = "**Nap early:** Nap in the early afternoon, ideally before 3 p.m. A later nap can make it harder to fall asleep in the evening.";
+"nap.guide.quiet" = "**Dark and quiet:** Choose a cool, dark, and quiet place. Limit your phone, TV, and other distractions.";
+"nap.guide.alarm" = "**Set an alarm:** Set an alarm for the length of the nap and put your phone out of reach, so you don't keep lying there.";
+"nap.guide.after" = "**Ease back in:** Give yourself a moment to wake up before returning to tasks. Grogginess after a nap usually passes in about 35 minutes.";
+"nap.facts.title" = "Tidbits";
+"nap.facts.intro" = "A few popular ideas about napping:";
+"nap.facts.coffee" = "**Coffee nap:** The idea is to drink coffee just before lying down, so you wake up as the caffeine starts to work.";
+"nap.facts.legs" = "**Legs-up nap:** A short rest of 8 to 10 minutes, with your legs raised above your heart, is popular online.";
+"nap.facts.famous" = "**Famous nappers:** Well-known people who liked naps include Winston Churchill, Albert Einstein, and Leonardo da Vinci.";
+"nap.facts.rest" = "**You don't have to fall asleep:** Even if you don't sleep, lying quietly with your eyes closed can still give you a moment of rest.";
 
 "calendar.title" = "Calendar";
 "calendar.add" = "Add alarm";
@@ -60,8 +69,6 @@
 "alarms.bulk.applyLabel" = "Also change the label";
 "alarm.rename" = "Rename";
 "groups.more" = "More";
-"groups.reorder" = "Reorder groups";
-"groups.reorder.done" = "Done reordering";
 "alarms.add" = "Add Alarm";
 "alarms.next" = "Next alarm";
 "alarms.otherGroup" = "Other";

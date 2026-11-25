@@ -24,10 +24,19 @@
 "nap.length.help" = "Jedno stuknięcie na karcie Drzemka ustawia budzik za tyle czasu. Domyślnie 15 minut.";
 "nap.needsPermission" = "Wakito potrzebuje zgody na alarmy, żeby drzemka mogła zadzwonić.";
 "nap.running" = "Zadzwoni o %@";
-"nap.tips.title" = "Krótka drzemka";
-"nap.tips.length" = "Wystarczy około 10–20 minut, żeby poczuć się rześko. Po 30 minutach łatwo wstać ociężale.";
-"nap.tips.late" = "Drzemka rano albo wczesnym popołudniem. Późna utrudnia zaśnięcie w nocy.";
-"nap.tips.place" = "Ciemno i cicho pomaga. Ustaw budzik, zanim się położysz.";
+"nap.guide.title" = "Zasady dobrej drzemki";
+"nap.guide.intro" = "Trzymaj się tych zasad, żeby drzemka pomagała, a nie przeszkadzała w nocnym śnie:";
+"nap.guide.short" = "**Krótko:** Celuj w 20 do 30 minut. Im dłuższa drzemka, tym większe ryzyko, że obudzisz się rozbity.";
+"nap.guide.early" = "**Wcześnie:** Drzemaj wczesnym popołudniem, najlepiej przed godziną 15. Późniejsza drzemka może utrudnić zaśnięcie wieczorem.";
+"nap.guide.quiet" = "**Ciemno i cicho:** Wybierz chłodne, ciemne i ciche miejsce. Ogranicz telefon, telewizor i inne rozpraszacze.";
+"nap.guide.alarm" = "**Z budzikiem:** Ustaw budzik na czas drzemki i odłóż telefon poza zasięg ręki, żeby nie przedłużać leżenia.";
+"nap.guide.after" = "**Na spokojnie po pobudce:** Daj sobie chwilę na rozbudzenie przed powrotem do zadań. Rozbicie po drzemce zwykle mija w około 35 minut.";
+"nap.facts.title" = "Ciekawostki";
+"nap.facts.intro" = "Kilka popularnych pomysłów wokół drzemki:";
+"nap.facts.coffee" = "**Drzemka kawowa:** Pomysł polega na wypiciu kawy tuż przed położeniem się, tak żeby obudzić się, gdy kofeina zacznie działać.";
+"nap.facts.legs" = "**Drzemka z nogami w górze:** W sieci popularny jest krótki odpoczynek trwający 8 do 10 minut, z nogami uniesionymi powyżej serca.";
+"nap.facts.famous" = "**Sławni drzemkowicze:** Wśród znanych osób lubiących drzemki wymienia się Winstona Churchilla, Alberta Einsteina i Leonarda da Vinci.";
+"nap.facts.rest" = "**Nie musisz zasnąć:** Nawet jeśli nie zaśniesz, ciche leżenie z zamkniętymi oczami też może dać chwilę odpoczynku.";
 
 "calendar.title" = "Kalendarz";
 "calendar.add" = "Dodaj alarm";
@@ -60,8 +69,6 @@
 "alarms.bulk.applyLabel" = "Zmień też etykietę";
 "alarm.rename" = "Zmień nazwę";
 "groups.more" = "Więcej";
-"groups.reorder" = "Edytuj kolejność grup";
-"groups.reorder.done" = "Gotowe";
 "alarms.add" = "Dodaj alarm";
 "alarms.next" = "Następny alarm";
 "alarms.otherGroup" = "Inne";
