@@ -5,6 +5,18 @@
       "date": "2026-11-25",
       "changes": {
         "en": [
+          "Siri, the Shortcuts app, the Action button, and automations can set an alarm, start a nap, or wake a contact. Try “Set an alarm in Wakito for 6:30”, “Start a nap in Wakito”, or “Wake Akhi in Wakito”."
+        ],
+        "pl": [
+          "Siri, aplikacja Skróty, przycisk czynności i automatyzacje mogą ustawić alarm, włączyć drzemkę albo obudzić kontakt. Powiedz „Ustaw alarm w Wakito na 6:30”, „Włącz drzemkę w Wakito” albo „Obudź Akhi w Wakito”."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-25",
+      "changes": {
+        "en": [
           "A Nap tab sits to the left of Alarms. One tap starts an alarm for the length set in Settings, 15 minutes by default, with a few short sleep tips. Calendar is its own tab: alarms you put on a date stay out of the Alarms list and can repeat every year, month, or week, or just once."
         ],
         "pl": [

@@ -1,4 +1,13 @@
 "tab.nap" = "Nap";
+"siri.contact" = "Contact";
+"siri.setAlarm.short" = "Set alarm";
+"siri.nap.short" = "Start a nap";
+"siri.wake.short" = "Wake a contact";
+"siri.unavailable" = "Open Wakito and try again.";
+"siri.alarmSet" = "Alarm set for %@.";
+"siri.napStarted" = "Nap started for %lld minutes.";
+"siri.woke" = "Waking %@.";
+"siri.wakeMissing" = "Couldn't find %@ in Wakito.";
 "tab.alarms" = "Alarms";
 "tab.sharing" = "Sharing";
 "tab.calendar" = "Calendar";
