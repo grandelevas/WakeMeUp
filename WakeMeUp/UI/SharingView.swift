@@ -48,12 +48,7 @@ struct SharingView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        SettingsView()
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .accessibilityLabel("settings.title")
+                    OpenSettingsLink()
                 }
             }
             .sheet(isPresented: $inviting) { inviteSheet }

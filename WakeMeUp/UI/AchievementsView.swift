@@ -28,6 +28,11 @@ struct AchievementsView: View {
                 .padding(16)
             }
             .navigationTitle("tab.achievements")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    OpenSettingsLink()
+                }
+            }
             .navigationDestination(isPresented: $readingCampaign) {
                 if let campaign = document?.campaign {
                     CampaignDetailView(campaign: campaign)

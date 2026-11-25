@@ -69,8 +69,6 @@
 "alarms.bulk.applyLabel" = "Zmień też etykietę";
 "alarm.rename" = "Zmień nazwę";
 "groups.more" = "Więcej";
-"groups.reorder" = "Edytuj kolejność grup";
-"groups.reorder.done" = "Gotowe";
 "alarms.add" = "Dodaj alarm";
 "alarms.next" = "Następny alarm";
 "alarms.otherGroup" = "Inne";

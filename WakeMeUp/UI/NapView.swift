@@ -32,6 +32,11 @@ struct NapView: View {
                 .padding(.bottom, 24)
             }
             .navigationTitle("nap.title")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    OpenSettingsLink()
+                }
+            }
         }
         .accessibilityIdentifier("nap-screen")
     }
