@@ -24,7 +24,7 @@ struct NapView: View {
                             .multilineTextAlignment(.center)
                     }
 
-                    tips
+                    education
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
@@ -112,26 +112,52 @@ struct NapView: View {
         }
     }
 
-    private var tips: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("nap.tips.title")
+    private var education: some View {
+        VStack(spacing: 16) {
+            educationSection(
+                title: "nap.guide.title",
+                intro: "nap.guide.intro",
+                items: [
+                    "nap.guide.short",
+                    "nap.guide.early",
+                    "nap.guide.quiet",
+                    "nap.guide.alarm",
+                    "nap.guide.after"
+                ]
+            )
+            educationSection(
+                title: "nap.facts.title",
+                intro: "nap.facts.intro",
+                items: [
+                    "nap.facts.coffee",
+                    "nap.facts.legs",
+                    "nap.facts.famous",
+                    "nap.facts.rest"
+                ]
+            )
+        }
+    }
+
+    private func educationSection(title: LocalizedStringKey, intro: LocalizedStringKey, items: [LocalizedStringKey]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
                 .font(.headline)
-            tip("nap.tips.length")
-            tip("nap.tips.late")
-            tip("nap.tips.place")
+            Text(intro)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(items, id: \.self) { item in
+                HStack(alignment: .top, spacing: 8) {
+                    Text("•")
+                    Text(item)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(.bar, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private func tip(_ key: LocalizedStringKey) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text("•")
-            Text(key)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
     }
 }
