@@ -145,7 +145,7 @@ struct NapView: View {
     private func educationSection(
         title: LocalizedStringKey,
         intro: LocalizedStringKey,
-        items: [LocalizedStringKey],
+        items: [String],
         isExpanded: Binding<Bool>
     ) -> some View {
         DisclosureGroup(isExpanded: isExpanded) {
@@ -157,7 +157,7 @@ struct NapView: View {
                 ForEach(items, id: \.self) { item in
                     HStack(alignment: .top, spacing: 8) {
                         Text("•")
-                        Text(item)
+                        Text(LocalizedStringKey(item))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
