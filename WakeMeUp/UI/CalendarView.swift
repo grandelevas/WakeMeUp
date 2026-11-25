@@ -215,7 +215,7 @@ struct CalendarAlarmDraft: Equatable, Identifiable {
         note = ""
         soundID = SoundCatalog.defaultID
         snoozeEnabled = true
-        snoozeMinutes = min(30, max(1, snoozeMinutes))
+        self.snoozeMinutes = min(30, max(1, snoozeMinutes))
         isEnabled = true
         isNew = true
     }
