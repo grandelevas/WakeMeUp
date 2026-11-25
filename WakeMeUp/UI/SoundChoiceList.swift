@@ -7,22 +7,58 @@ struct SoundChoiceList: View {
     var preview: SoundPreviewPlayer
     var showsImport: Bool = false
     var onImport: () -> Void = {}
+    @State private var renaming: CustomSound?
+    @State private var renameText = ""
 
     var body: some View {
         Section("alarm.sound") {
             ForEach(SoundCatalog.bundled) { sound in
-                row(id: sound.id, title: Text(LocalizedStringKey(sound.localizationKey)))
+                row(id: sound.id, title: Text(LocalizedStringKey(sound.localizationKey)), custom: nil)
             }
-            ForEach(model.customSounds) { sound in
-                row(id: sound.id, title: Text(sound.displayName))
+        }
+        .alert("sound.rename", isPresented: renamePresented) {
+            TextField("sound.rename.placeholder", text: $renameText)
+            Button("alarm.save") {
+                if let renaming {
+                    model.renameCustomSound(renaming.id, to: renameText)
+                }
+                self.renaming = nil
             }
-            if showsImport {
-                Button("sound.import", action: onImport)
+            .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button("alarm.cancel", role: .cancel) { renaming = nil }
+        }
+        if !voiceRecordings.isEmpty {
+            Section("sound.voice.mine") {
+                ForEach(voiceRecordings) { sound in
+                    row(id: sound.id, title: Text(sound.displayName), custom: sound)
+                }
+            }
+        }
+        if showsImport || !importedSounds.isEmpty {
+            Section("sound.mine") {
+                ForEach(importedSounds) { sound in
+                    row(id: sound.id, title: Text(sound.displayName), custom: sound)
+                }
+                if showsImport {
+                    Button("sound.import", action: onImport)
+                }
             }
         }
     }
 
-    private func row(id: String, title: Text) -> some View {
+    private var voiceRecordings: [CustomSound] {
+        model.customSounds.filter { SoundLibraryEdit.isVoiceRecording($0.id) }
+    }
+
+    private var importedSounds: [CustomSound] {
+        model.customSounds.filter { !SoundLibraryEdit.isVoiceRecording($0.id) }
+    }
+
+    private var renamePresented: Binding<Bool> {
+        Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
+    }
+
+    private func row(id: String, title: Text, custom: CustomSound?) -> some View {
         Button {
             choose(id)
         } label: {
@@ -36,6 +72,43 @@ struct SoundChoiceList: View {
             }
         }
         .foregroundStyle(.primary)
+        .contextMenu {
+            if let custom {
+                Button("sound.rename", systemImage: "pencil") {
+                    renameText = custom.displayName
+                    renaming = custom
+                }
+                Button("sound.delete", systemImage: "trash", role: .destructive) {
+                    delete(custom)
+                }
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            if let custom {
+                Button("sound.delete", role: .destructive) {
+                    delete(custom)
+                }
+            }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            if let custom {
+                Button("sound.rename") {
+                    renameText = custom.displayName
+                    renaming = custom
+                }
+                .tint(.indigo)
+            }
+        }
+    }
+
+    private func delete(_ sound: CustomSound) {
+        if soundID == sound.id {
+            soundID = SoundCatalog.defaultID
+        }
+        if preview.isPlaying(sound.id) {
+            preview.stop()
+        }
+        model.deleteCustomSound(sound.id)
     }
 
     private func choose(_ id: String) {

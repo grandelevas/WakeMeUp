@@ -2253,3 +2253,190 @@ private struct HandshakeCloud {
         }
     }
 }
+
+final class EditingUXTests: XCTestCase {
+    func testAddToGroupHidesAlarmsThatAlreadyHaveAGroup() {
+        let morning = UUID()
+        let loose = alarm(hour: 6, group: nil, label: "Loose")
+        let placed = alarm(hour: 7, group: morning, label: "Placed")
+        let later = alarm(hour: 9, group: nil, label: "Later")
+        let candidates = GroupAlarmCandidates.unassigned([placed, later, loose])
+        XCTAssertEqual(candidates.map(\.label), ["Loose", "Later"])
+    }
+
+    func testBulkEditChangesTimeAndSettingsOnlyForTheSelection() {
+        var library = AlarmLibrary()
+        let chosen = alarm(hour: 6, group: nil, label: "Chosen")
+        let other = alarm(hour: 8, group: nil, label: "Other")
+        library.upsert(chosen)
+        library.upsert(other)
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        library.apply(
+            BulkAlarmPatch(
+                hour: 5,
+                minute: 30,
+                repeatDays: [.monday, .tuesday],
+                soundID: "bell",
+                snoozeEnabled: false,
+                snoozeMinutes: 4,
+                label: "Shared",
+                applyLabel: true
+            ),
+            to: [chosen.id],
+            now: now,
+            calendar: calendar
+        )
+        let updated = library.alarm(chosen.id)
+        XCTAssertEqual(updated?.schedule, .wallClock(hour: 5, minute: 30, repeatDays: [.monday, .tuesday]))
+        XCTAssertEqual(updated?.soundID, "bell")
+        XCTAssertEqual(updated?.snoozeEnabled, false)
+        XCTAssertEqual(updated?.snoozeMinutes, 4)
+        XCTAssertEqual(updated?.label, "Shared")
+        XCTAssertNil(updated?.firesOnceAt)
+        XCTAssertEqual(library.alarm(other.id)?.label, "Other")
+        XCTAssertEqual(library.alarm(other.id)?.schedule.hour, 8)
+    }
+
+    func testBulkEditWithoutARepeatStampsOneFireAndLeavesTheLabel() {
+        let original = alarm(hour: 6, group: nil, label: "Keep")
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let updated = BulkAlarmEdit.applying(
+            BulkAlarmPatch(
+                hour: 22,
+                minute: 15,
+                repeatDays: [],
+                soundID: "classic",
+                snoozeEnabled: true,
+                snoozeMinutes: 9,
+                label: "Ignored",
+                applyLabel: false
+            ),
+            to: original,
+            now: now,
+            calendar: calendar
+        )
+        XCTAssertEqual(updated.label, "Keep")
+        XCTAssertEqual(updated.schedule.hour, 22)
+        XCTAssertEqual(updated.schedule.minute, 15)
+        XCTAssertNotNil(updated.firesOnceAt)
+    }
+
+    func testOwnAlarmsAndSoundsCanBeRenamedAndDeleted() {
+        var library = AlarmLibrary()
+        let mine = alarm(hour: 6, group: nil, label: "Old")
+        let remote = alarm(
+            hour: 7,
+            group: nil,
+            label: "Theirs",
+            origin: .remote(senderID: UUID(), senderName: "Akhi", commandID: UUID())
+        )
+        library.upsert(mine)
+        library.upsert(remote)
+        XCTAssertTrue(library.rename(alarmID: mine.id, to: "  Morning  "))
+        XCTAssertEqual(library.alarm(mine.id)?.label, "Morning")
+        XCTAssertFalse(library.rename(alarmID: remote.id, to: "Nope"))
+        XCTAssertEqual(library.alarm(remote.id)?.label, "Theirs")
+
+        let voice = CustomSound(id: "voice-1", displayName: "Wiadomość głosowa", filename: "voice-1.m4a")
+        let imported = CustomSound(id: "file-1", displayName: "Song", filename: "file-1.caf")
+        XCTAssertTrue(SoundLibraryEdit.isVoiceRecording(voice.id))
+        XCTAssertFalse(SoundLibraryEdit.isVoiceRecording(imported.id))
+        XCTAssertEqual(SoundLibraryEdit.renamed([voice], id: voice.id, to: "  Wakacje ")?.first?.displayName, "Wakacje")
+        XCTAssertNil(SoundLibraryEdit.renamed([voice], id: voice.id, to: "   "))
+        var using = mine
+        using.soundID = voice.id
+        XCTAssertEqual(SoundLibraryEdit.clearing(voice.id, in: [using]).first?.soundID, SoundCatalog.defaultID)
+        XCTAssertTrue(SoundLibraryEdit.removed([voice, imported], id: voice.id).allSatisfy { $0.id != voice.id })
+    }
+
+    func testPausedContactDoesNotRingOrAcceptTheirAlarms() {
+        let me = Participant(id: UUID(), displayName: "Mateusz")
+        let friend = Participant(id: UUID(), displayName: "Akhi")
+        var grant = share(owner: friend, grantee: me)
+        grant.collaborationPaused = true
+        grant.collaborationPausedAt = Date(timeIntervalSince1970: 20)
+        grant.collaborationPausedBy = me.id
+        let incoming = alarm(
+            hour: 6,
+            group: nil,
+            label: "From Akhi",
+            origin: .remote(senderID: friend.id, senderName: "Akhi", commandID: UUID())
+        )
+        let own = alarm(hour: 7, group: nil, label: "Mine")
+        XCTAssertTrue(CollaborationPause.isPaused(profileID: me.id, otherID: friend.id, grants: [grant]))
+        XCTAssertTrue(CollaborationPause.suppressesRinging(incoming, profileID: me.id, grants: [grant]))
+        XCTAssertFalse(CollaborationPause.suppressesRinging(own, profileID: me.id, grants: [grant]))
+        let scheduled = CollaborationPause.alarmsForSync([incoming, own], profileID: me.id, grants: [grant])
+        XCTAssertEqual(scheduled.first?.isEnabled, false)
+        XCTAssertEqual(scheduled.last?.isEnabled, true)
+        let contact = SharingContact(
+            id: friend.id.uuidString,
+            name: "Akhi",
+            memberID: friend.id,
+            wakeGrantID: grant.id,
+            hostedGrantID: nil,
+            isPending: false
+        )
+        XCTAssertTrue(CollaborationPause.isPaused(contact: contact, profileID: me.id, grants: [grant]))
+
+        var older = grant
+        older.collaborationPaused = false
+        older.collaborationPausedAt = Date(timeIntervalSince1970: 10)
+        let kept = GrantRefreshMerge.merging(older, with: grant)
+        XCTAssertEqual(kept.collaborationPaused, true)
+        var newer = grant
+        newer.collaborationPaused = false
+        newer.collaborationPausedAt = Date(timeIntervalSince1970: 30)
+        newer.collaborationPausedBy = friend.id
+        let resumed = GrantRefreshMerge.merging(newer, with: grant)
+        XCTAssertEqual(resumed.collaborationPaused, false)
+        XCTAssertEqual(resumed.collaborationPausedBy, friend.id)
+    }
+
+    func testGrantWithoutPauseFieldsStillDecodes() throws {
+        let me = Participant(id: UUID(), displayName: "Mateusz")
+        let grant = share(owner: me, grantee: nil)
+        let data = try JSONEncoder().encode(grant)
+        var object = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        object.removeValue(forKey: "collaborationPaused")
+        object.removeValue(forKey: "collaborationPausedAt")
+        object.removeValue(forKey: "collaborationPausedBy")
+        let stripped = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try JSONDecoder().decode(ShareGrant.self, from: stripped)
+        XCTAssertNil(decoded.collaborationPaused)
+        XCTAssertEqual(decoded.owner.displayName, "Mateusz")
+    }
+
+    private func share(owner: Participant, grantee: Participant?) -> ShareGrant {
+        ShareGrant(
+            id: UUID(),
+            inviteCode: "https://www.icloud.com/share/abc",
+            secret: "s",
+            owner: owner,
+            grantee: grantee,
+            state: grantee == nil ? .pending : .active,
+            createdAt: Date(timeIntervalSince1970: 1),
+            cloudKitRootRecordName: "root",
+            cloudKitZoneName: "WakeMeUp",
+            cloudKitOwnerName: "__defaultOwner__"
+        )
+    }
+
+    private func alarm(hour: Int, group: UUID?, label: String, origin: AlarmOrigin = .local) -> Alarm {
+        Alarm(
+            id: UUID(),
+            schedule: .wallClock(hour: hour, minute: 0, repeatDays: [.monday]),
+            label: label,
+            soundID: "classic",
+            snoozeEnabled: true,
+            snoozeMinutes: 9,
+            isEnabled: true,
+            groupID: group,
+            songLink: nil,
+            origin: origin,
+            resumeWhenGroupEnables: nil
+        )
+    }
+}

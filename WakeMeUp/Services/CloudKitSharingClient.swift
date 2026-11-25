@@ -462,6 +462,18 @@ final class CloudKitSharingClient {
         }, change: { $0 })
     }
 
+    /// Writes the pause into the existing grantJSON string. The owner uses the private database; the other person uses the shared one.
+    func setCollaborationPause(_ paused: Bool, at: Date, by actor: UUID, on grant: ShareGrant, asOwner: Bool) async throws {
+        try await requireAccount()
+        let database = asOwner ? container.privateCloudDatabase : container.sharedCloudDatabase
+        try await mutate(grant: grant, database: database, alter: { stored in
+            if let remoteAt = stored.collaborationPausedAt, remoteAt > at { return }
+            stored.collaborationPaused = paused
+            stored.collaborationPausedAt = at
+            stored.collaborationPausedBy = actor
+        }, change: { $0 })
+    }
+
     func appendWakeReport(_ report: WakeReport, on grant: ShareGrant) async throws {
         try await requireAccount()
         try await mutate(grant: grant, database: container.sharedCloudDatabase, alter: { stored in

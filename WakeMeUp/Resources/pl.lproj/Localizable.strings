@@ -11,6 +11,11 @@
 "alarms.select" = "Zaznacz";
 "alarms.changeSound" = "Zmień dzwonek";
 "alarms.changeSoundCount" = "Zmień dzwonek (%lld)";
+"alarms.changeSelectionCount" = "Zmień alarm (%lld)";
+"alarms.bulk.title" = "Zmień zaznaczone";
+"alarms.bulk.help" = "Godzina, powtarzanie, dzwonek i drzemka trafiają do wszystkich zaznaczonych alarmów.";
+"alarms.bulk.applyLabel" = "Zmień też etykietę";
+"alarm.rename" = "Zmień nazwę";
 "groups.more" = "Więcej";
 "groups.reorder" = "Edytuj kolejność grup";
 "groups.reorder.done" = "Gotowe";
@@ -73,6 +78,10 @@
 "sound.use" = "Użyj zaznaczenia";
 "sound.bundled" = "Wbudowane";
 "sound.mine" = "Moje dźwięki";
+"sound.voice.mine" = "Moje nagrania";
+"sound.rename" = "Zmień nazwę";
+"sound.delete" = "Usuń";
+"sound.rename.placeholder" = "Nazwa";
 "sound.empty" = "Nie ma jeszcze własnych dźwięków";
 "sound.importTitle" = "Importuj dźwięk";
 "sound.importing" = "Wczytywanie dźwięku…";
@@ -97,7 +106,7 @@
 "groups.alarms" = "Alarmy";
 "groups.alarms.empty" = "W tej grupie nie ma jeszcze alarmów.";
 "groups.addAlarm" = "Dodaj alarm";
-"groups.addAlarm.none" = "Wszystkie alarmy są już w tej grupie.";
+"groups.addAlarm.none" = "Nie ma alarmów bez grupy.";
 "groups.delete.confirm" = "Usunąć tę grupę? Jej alarmy zostaną na telefonie, poza grupą.";
 
 "sharing.title" = "Współpraca";
@@ -141,6 +150,9 @@
 "sharing.phonesICanWake" = "Telefony, które mogę budzić";
 "sharing.contacts" = "Kontakty";
 "sharing.wakeNow" = "Obudź teraz";
+"sharing.pause" = "Pauza";
+"sharing.resume" = "Wznów";
+"sharing.paused" = "Współpraca wstrzymana";
 "sharing.wakeNow.soon" = "Budzik zadzwoni za około 2 minuty.";
 "sharing.voice.skipped" = "Alarm został wysłany bez wiadomości głosowej.";
 "sharing.reachError" = "Nie udało się połączyć z telefonem tej osoby.";

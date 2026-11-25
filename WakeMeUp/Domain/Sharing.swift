@@ -33,6 +33,10 @@ struct ShareGrant: Codable, Equatable, Hashable, Identifiable {
     var reciprocalForGrantID: UUID? = nil
     /// Wake-up reports the invited person wrote back onto this phone's share.
     var wakeReports: [WakeReport]? = nil
+    /// Either person can pause the contact. Stored inside grantJSON, so it needs no new CloudKit field.
+    var collaborationPaused: Bool? = nil
+    var collaborationPausedAt: Date? = nil
+    var collaborationPausedBy: UUID? = nil
 
     func allows(sender: UUID, recipient: UUID) -> Bool {
         state == .active && grantee?.id == sender && owner.id == recipient
@@ -315,7 +319,23 @@ enum GrantRefreshMerge {
         if merged.reciprocal == nil { merged.reciprocal = local.reciprocal }
         if merged.reciprocalForGrantID == nil { merged.reciprocalForGrantID = local.reciprocalForGrantID }
         if merged.wakeReports == nil { merged.wakeReports = local.wakeReports }
+        let pause = mergedPause(remote: updated, local: local)
+        merged.collaborationPaused = pause.paused
+        merged.collaborationPausedAt = pause.at
+        merged.collaborationPausedBy = pause.by
         return merged
+    }
+
+    /// A pause or resume made on this phone wins until a newer one arrives from CloudKit.
+    static func mergedPause(remote: ShareGrant, local: ShareGrant) -> (paused: Bool?, at: Date?, by: UUID?) {
+        switch (remote.collaborationPausedAt, local.collaborationPausedAt) {
+        case let (remoteAt?, localAt?) where localAt > remoteAt:
+            return (local.collaborationPaused, localAt, local.collaborationPausedBy)
+        case (nil, let localAt?):
+            return (local.collaborationPaused, localAt, local.collaborationPausedBy)
+        default:
+            return (remote.collaborationPaused, remote.collaborationPausedAt, remote.collaborationPausedBy)
+        }
     }
 
     /// Applies the saved own name. An empty value leaves the grant unchanged.
@@ -541,6 +561,40 @@ enum ContactRoster {
             byKey[key] = contact
         }
         return order.compactMap { byKey[$0] }
+    }
+}
+
+enum CollaborationPause {
+    static func isPaused(profileID: UUID, otherID: UUID, grants: [ShareGrant]) -> Bool {
+        grants.contains { grant in
+            guard grant.collaborationPaused == true, grant.state != .revoked else { return false }
+            let people = [grant.owner.id, grant.grantee?.id].compactMap { $0 }
+            return people.contains(profileID) && people.contains(otherID)
+        }
+    }
+
+    static func isPaused(contact: SharingContact, profileID: UUID, grants: [ShareGrant]) -> Bool {
+        if let memberID = contact.memberID {
+            return isPaused(profileID: profileID, otherID: memberID, grants: grants)
+        }
+        guard let hosted = contact.hostedGrantID,
+              let grant = grants.first(where: { $0.id == hosted }) else { return false }
+        return grant.collaborationPaused == true
+    }
+
+    /// A friend's alarm stays in the list, but AlarmKit does not ring it while the contact is paused.
+    static func suppressesRinging(_ alarm: Alarm, profileID: UUID, grants: [ShareGrant]) -> Bool {
+        guard case let .remote(senderID, _, _) = alarm.origin else { return false }
+        return isPaused(profileID: profileID, otherID: senderID, grants: grants)
+    }
+
+    static func alarmsForSync(_ alarms: [Alarm], profileID: UUID, grants: [ShareGrant]) -> [Alarm] {
+        alarms.map { alarm in
+            guard suppressesRinging(alarm, profileID: profileID, grants: grants) else { return alarm }
+            var copy = alarm
+            copy.isEnabled = false
+            return copy
+        }
     }
 }
 

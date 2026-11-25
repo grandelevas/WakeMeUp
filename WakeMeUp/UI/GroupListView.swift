@@ -141,7 +141,7 @@ struct GroupEditorView: View {
                     }
                 }
                 Section("groups.addAlarm") {
-                    let others = model.library.alarms.filter { $0.groupID != groupID }
+                    let others = GroupAlarmCandidates.unassigned(model.library.alarms)
                     if others.isEmpty {
                         Text("groups.addAlarm.none").foregroundStyle(.secondary)
                     }

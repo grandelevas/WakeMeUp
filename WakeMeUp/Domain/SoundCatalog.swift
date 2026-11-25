@@ -34,6 +34,34 @@ enum SoundCatalog {
     }
 }
 
+enum SoundLibraryEdit {
+    static func isVoiceRecording(_ id: String) -> Bool {
+        id.hasPrefix("voice-")
+    }
+
+    static func renamed(_ sounds: [CustomSound], id: String, to name: String) -> [CustomSound]? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let index = sounds.firstIndex(where: { $0.id == id }) else { return nil }
+        var copy = sounds
+        copy[index].displayName = trimmed
+        return copy
+    }
+
+    static func removed(_ sounds: [CustomSound], id: String) -> [CustomSound] {
+        sounds.filter { $0.id != id }
+    }
+
+    /// Alarms that used a deleted recording fall back to the built-in sound.
+    static func clearing(_ soundID: String, in alarms: [Alarm]) -> [Alarm] {
+        alarms.map { alarm in
+            guard alarm.soundID == soundID else { return alarm }
+            var copy = alarm
+            copy.soundID = SoundCatalog.defaultID
+            return copy
+        }
+    }
+}
+
 struct CustomSound: Codable, Equatable, Hashable, Identifiable {
     var id: String
     var displayName: String

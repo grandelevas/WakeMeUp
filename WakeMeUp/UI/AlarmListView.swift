@@ -13,7 +13,10 @@ struct AlarmListView: View {
     @State private var showSettings = false
     @State private var selecting = false
     @State private var selectedAlarmIDs: Set<UUID> = []
-    @State private var changingSelectionSound = false
+    @State private var bulkEditing = false
+    @State private var appliedBulkEdit = false
+    @State private var renamingAlarm: Alarm?
+    @State private var alarmRenameText = ""
     @State private var soundGroupID: UUID?
 
     var body: some View {
@@ -78,16 +81,23 @@ struct AlarmListView: View {
             .navigationDestination(item: $editingGroupID) { id in
                 GroupEditorView(groupID: id)
             }
-            .sheet(isPresented: $changingSelectionSound) {
-                SoundPickerSheet { soundID in
-                    model.setSound(soundID, for: selectedAlarmIDs)
-                    if let collapseBeforeSelection {
-                        collapsedGroups = collapseBeforeSelection
+            .sheet(isPresented: $bulkEditing, onDismiss: finishBulkEdit) {
+                if let seed = selectedSeed {
+                    BulkAlarmEditor(seed: seed) { patch in
+                        model.applyBulk(patch, to: selectedAlarmIDs)
+                        appliedBulkEdit = true
                     }
-                    collapseBeforeSelection = nil
-                    selecting = false
-                    selectedAlarmIDs.removeAll()
                 }
+            }
+            .alert("alarm.rename", isPresented: alarmRenamePresented) {
+                TextField("alarm.label", text: $alarmRenameText)
+                Button("alarm.save") {
+                    if let renamingAlarm {
+                        model.renameAlarm(renamingAlarm.id, to: alarmRenameText)
+                    }
+                    self.renamingAlarm = nil
+                }
+                Button("alarm.cancel", role: .cancel) { renamingAlarm = nil }
             }
             .sheet(isPresented: groupSoundPresented) {
                 if let soundGroupID {
@@ -99,9 +109,9 @@ struct AlarmListView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if selecting {
                     Button {
-                        changingSelectionSound = true
+                        bulkEditing = true
                     } label: {
-                        Text(String(format: String(localized: "alarms.changeSoundCount"), selectedAlarmIDs.count))
+                        Text(String(format: String(localized: "alarms.changeSelectionCount"), selectedAlarmIDs.count))
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                     }
@@ -111,7 +121,7 @@ struct AlarmListView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 8)
                     .background(.bar)
-                    .accessibilityIdentifier("change-sound")
+                    .accessibilityIdentifier("change-alarms")
                 }
             }
         }
@@ -151,6 +161,25 @@ struct AlarmListView: View {
             collapsedGroups = Set(model.library.groups.map(\.id))
             reorderMode = .active
         }
+    }
+
+    private func finishBulkEdit() {
+        guard appliedBulkEdit else { return }
+        appliedBulkEdit = false
+        if let collapseBeforeSelection {
+            collapsedGroups = collapseBeforeSelection
+        }
+        collapseBeforeSelection = nil
+        selecting = false
+        selectedAlarmIDs.removeAll()
+    }
+
+    private var selectedSeed: Alarm? {
+        model.library.alarms.first { selectedAlarmIDs.contains($0.id) }
+    }
+
+    private var alarmRenamePresented: Binding<Bool> {
+        Binding(get: { renamingAlarm != nil }, set: { if !$0 { renamingAlarm = nil } })
     }
 
     private var groupSoundPresented: Binding<Bool> {
@@ -294,6 +323,7 @@ struct AlarmListView: View {
                     .padding(.leading, 8)
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("group-row-\(group.id.uuidString)")
         .accessibilityValue(Text(alarms.count, format: .number))
     }
@@ -420,11 +450,31 @@ struct AlarmListView: View {
                             Image(systemName: selectedAlarmIDs.contains(alarm.id) ? "checkmark.circle.fill" : "circle")
                                 .foregroundStyle(selectedAlarmIDs.contains(alarm.id) ? Color.accentColor : Color.secondary)
                         }
-                        AlarmRow(alarm: alarm, enabled: alarm.isEnabled, showsToggle: !selecting)
+                        AlarmRow(
+                            alarm: alarm,
+                            enabled: alarm.isEnabled,
+                            showsToggle: !selecting,
+                            collaborationPaused: CollaborationPause.suppressesRinging(
+                                alarm,
+                                profileID: model.profile.id,
+                                grants: model.grants
+                            )
+                        )
                     }
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("alarm-row-\(alarm.id.uuidString)")
+                .contextMenu {
+                    if !selecting, !alarm.origin.isFromSomeoneElse {
+                        Button("alarm.rename", systemImage: "pencil") {
+                            alarmRenameText = alarm.label
+                            renamingAlarm = alarm
+                        }
+                        Button("alarm.delete", systemImage: "trash", role: .destructive) {
+                            model.delete(alarmID: alarm.id)
+                        }
+                    }
+                }
                 .swipeActions {
                     Button(role: .destructive) {
                         model.delete(alarmID: alarm.id)
@@ -446,6 +496,7 @@ struct AlarmListView: View {
         let now = Date()
         let next = model.library.alarms
             .filter(\.isEnabled)
+            .filter { !CollaborationPause.suppressesRinging($0, profileID: model.profile.id, grants: model.grants) }
             .compactMap { alarm -> (Alarm, Date)? in
                 guard let date = alarm.schedule.nextFireDate(from: now, calendar: calendar) else { return nil }
                 return (alarm, date)
@@ -464,6 +515,7 @@ struct AlarmRow: View {
     let alarm: Alarm
     let enabled: Bool
     var showsToggle: Bool = true
+    var collaborationPaused: Bool = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -492,6 +544,11 @@ struct AlarmRow: View {
                         .font(.caption)
                         .foregroundStyle(appAccent)
                 }
+                if collaborationPaused {
+                    Text("sharing.paused")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             if alarm.soundID.hasPrefix("voice-"),
                let url = SoundFiles.previewURL(for: alarm.soundID, customSounds: model.customSounds) {
@@ -516,6 +573,7 @@ struct AlarmRow: View {
                     Text(alarm.label)
                 }
                 .labelsHidden()
+                .accessibilityIdentifier("alarm-toggle-\(alarm.id.uuidString)")
                 .disabled(groupDisabled)
             }
         }

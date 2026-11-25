@@ -11,6 +11,11 @@
 "alarms.select" = "Select";
 "alarms.changeSound" = "Change sound";
 "alarms.changeSoundCount" = "Change sound (%lld)";
+"alarms.changeSelectionCount" = "Change alarm (%lld)";
+"alarms.bulk.title" = "Change selected";
+"alarms.bulk.help" = "Time, repeat, sound, and snooze apply to every selected alarm.";
+"alarms.bulk.applyLabel" = "Also change the label";
+"alarm.rename" = "Rename";
 "groups.more" = "More";
 "groups.reorder" = "Reorder groups";
 "groups.reorder.done" = "Done reordering";
@@ -73,6 +78,10 @@
 "sound.use" = "Use selection";
 "sound.bundled" = "Bundled";
 "sound.mine" = "My sounds";
+"sound.voice.mine" = "My recordings";
+"sound.rename" = "Rename";
+"sound.delete" = "Delete";
+"sound.rename.placeholder" = "Name";
 "sound.empty" = "No custom sounds yet";
 "sound.importTitle" = "Import a sound";
 "sound.importing" = "Loading sound…";
@@ -97,7 +106,7 @@
 "groups.alarms" = "Alarms";
 "groups.alarms.empty" = "No alarms in this group yet.";
 "groups.addAlarm" = "Add an alarm";
-"groups.addAlarm.none" = "Every alarm is already in this group.";
+"groups.addAlarm.none" = "No alarms without a group.";
 "groups.delete.confirm" = "Delete this group? Its alarms stay on the phone, outside the group.";
 
 "sharing.title" = "Sharing";
@@ -141,6 +150,9 @@
 "sharing.phonesICanWake" = "Phones I can set";
 "sharing.contacts" = "Contacts";
 "sharing.wakeNow" = "Wake now";
+"sharing.pause" = "Pause";
+"sharing.resume" = "Resume";
+"sharing.paused" = "Collaboration paused";
 "sharing.wakeNow.soon" = "Alarm will ring in about 2 minutes.";
 "sharing.voice.skipped" = "The alarm was sent without the voice message.";
 "sharing.reachError" = "Could not reach their phone.";

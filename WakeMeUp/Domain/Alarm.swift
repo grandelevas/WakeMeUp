@@ -196,6 +196,22 @@ struct AlarmLibrary: Codable, Equatable {
         }
     }
 
+    /// Renames an alarm this phone created. A friend's alarm keeps the name they sent.
+    @discardableResult
+    mutating func rename(alarmID: UUID, to label: String) -> Bool {
+        guard let index = alarms.firstIndex(where: { $0.id == alarmID }) else { return false }
+        guard !alarms[index].origin.isFromSomeoneElse else { return false }
+        alarms[index].label = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        return true
+    }
+
+    mutating func apply(_ patch: BulkAlarmPatch, to alarmIDs: some Sequence<UUID>, now: Date = .now, calendar: Calendar = .current) {
+        let ids = Set(alarmIDs)
+        for index in alarms.indices where ids.contains(alarms[index].id) {
+            alarms[index] = BulkAlarmEdit.applying(patch, to: alarms[index], now: now, calendar: calendar)
+        }
+    }
+
     mutating func updateGroup(id: UUID, name: String, symbol: String) {
         guard let index = groups.firstIndex(where: { $0.id == id }) else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -299,6 +315,48 @@ struct AlarmLibrary: Codable, Equatable {
     private static func byTime(_ lhs: Alarm, _ rhs: Alarm) -> Bool {
         if lhs.sortMinute != rhs.sortMinute { return lhs.sortMinute < rhs.sortMinute }
         return lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
+    }
+}
+
+enum GroupAlarmCandidates {
+    /// Alarms that can be added to a group. Anything already in a group stays hidden.
+    static func unassigned(_ alarms: [Alarm]) -> [Alarm] {
+        alarms
+            .filter { $0.groupID == nil }
+            .sorted { lhs, rhs in
+                if lhs.sortMinute != rhs.sortMinute { return lhs.sortMinute < rhs.sortMinute }
+                return lhs.label.localizedCaseInsensitiveCompare(rhs.label) == .orderedAscending
+            }
+    }
+}
+
+struct BulkAlarmPatch: Equatable {
+    var hour: Int
+    var minute: Int
+    var repeatDays: Set<Weekday>
+    var soundID: String
+    var snoozeEnabled: Bool
+    var snoozeMinutes: Int
+    var label: String
+    var applyLabel: Bool
+}
+
+enum BulkAlarmEdit {
+    static func applying(_ patch: BulkAlarmPatch, to alarm: Alarm, now: Date = .now, calendar: Calendar = .current) -> Alarm {
+        var copy = alarm
+        let hour = min(23, max(0, patch.hour))
+        let minute = min(59, max(0, patch.minute))
+        let days = Array(patch.repeatDays).normalized()
+        let schedule = AlarmSchedule.wallClock(hour: hour, minute: minute, repeatDays: days)
+        copy.schedule = schedule
+        copy.soundID = patch.soundID
+        copy.snoozeEnabled = patch.snoozeEnabled
+        copy.snoozeMinutes = min(30, max(1, patch.snoozeMinutes))
+        if patch.applyLabel {
+            copy.label = patch.label.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        copy.firesOnceAt = days.isEmpty ? schedule.nextFireDate(from: now, calendar: calendar) : nil
+        return copy
     }
 }
 
