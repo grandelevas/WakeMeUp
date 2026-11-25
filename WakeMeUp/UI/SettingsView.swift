@@ -19,18 +19,17 @@ struct SettingsView: View {
                 }
             }
             appearanceSection
-            Section("nap.length") {
+            Section("settings.defaultSnooze") {
                 Stepper(
                     value: Binding(
-                        get: { model.napMinutes },
-                        set: { model.setNapMinutes($0) }
+                        get: { model.defaultSnoozeMinutes },
+                        set: { model.setDefaultSnoozeMinutes($0) }
                     ),
-                    in: NapSettings.minimumMinutes...NapSettings.maximumMinutes,
-                    step: NapSettings.stepMinutes
+                    in: DefaultSnooze.minimumMinutes...DefaultSnooze.maximumMinutes
                 ) {
-                    Text(String(format: String(localized: "nap.minutes"), model.napMinutes))
+                    Text(String(format: String(localized: "alarm.snooze.minutes"), model.defaultSnoozeMinutes))
                 }
-                Text("nap.length.help")
+                Text("settings.defaultSnooze.help")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -39,7 +38,8 @@ struct SettingsView: View {
                     get: { model.napSoundID },
                     set: { model.setNapSoundID($0) }
                 ),
-                preview: napPreview
+                preview: napPreview,
+                title: "nap.sound"
             )
             Section("settings.alarmAccess") {
                 LabeledContent("settings.alarmAccess", value: accessText)

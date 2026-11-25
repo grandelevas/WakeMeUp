@@ -2524,11 +2524,14 @@ final class NapCalendarTests: XCTestCase {
             return XCTFail("A nap is a one-time alarm")
         }
         XCTAssertEqual(fireAt.timeIntervalSince(now), 15 * 60, accuracy: 0.1)
-        XCTAssertEqual(alarm.countdownLead, 15 * 60)
+        XCTAssertEqual(alarm.countdownLead, nil)
         XCTAssertFalse(alarm.snoozeEnabled)
-        XCTAssertEqual(NapSettings.clamped(7), 5)
+        XCTAssertEqual(NapSettings.presets, [10, 15, 20, 30, 45, 60])
+        XCTAssertEqual(NapSettings.clamped(7), 7)
         XCTAssertEqual(NapSettings.clamped(15), 15)
-        XCTAssertEqual(NapSettings.clamped(121), 120)
+        XCTAssertEqual(NapSettings.clamped(200), 180)
+        XCTAssertEqual(NapCountdown.clock(75), "01:15")
+        XCTAssertEqual(NapCountdown.clock(15 * 60), "15:00")
         let defaults = UserDefaults(suiteName: "nap-\(UUID().uuidString)")!
         XCTAssertEqual(NapSettings.minutes(in: defaults), NapSettings.defaultMinutes)
         NapSettings.setMinutes(30, in: defaults)
@@ -2536,6 +2539,11 @@ final class NapCalendarTests: XCTestCase {
         XCTAssertEqual(NapFailure.message(authorization: .authorized, scheduleFailure: nil), nil)
         XCTAssertEqual(NapFailure.message(authorization: .authorized, scheduleFailure: "AlarmKit"), "AlarmKit")
         XCTAssertNotNil(NapFailure.message(authorization: .denied, scheduleFailure: nil))
+        let snoozeDefaults = UserDefaults(suiteName: "snooze-\(UUID().uuidString)")!
+        XCTAssertEqual(DefaultSnooze.minutes(in: snoozeDefaults), DefaultSnooze.fallback)
+        DefaultSnooze.setMinutes(12, in: snoozeDefaults)
+        XCTAssertEqual(DefaultSnooze.minutes(in: snoozeDefaults), 12)
+        XCTAssertEqual(NapSettings.minutes(in: snoozeDefaults), NapSettings.defaultMinutes)
     }
 
     func testOneTimeCalendarAlarmsLeaveAndStayOutOfTheAlarmList() {

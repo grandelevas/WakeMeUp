@@ -18,6 +18,9 @@
 "nap.alarmLabel" = "Nap";
 "nap.minutes" = "%lld min";
 "nap.length" = "Nap length";
+"nap.customMinutes" = "Custom, %lld min";
+"nap.cancel" = "Cancel";
+"nap.sound" = "Nap sound";
 "nap.length.help" = "One tap on the Nap tab sets an alarm for this long from now. 15 minutes is the default.";
 "nap.needsPermission" = "Wakito needs alarm permission before a nap can ring.";
 "nap.running" = "Rings at %@";
@@ -264,6 +267,8 @@
 "sharing.queued" = "Waiting for their phone";
 "sharing.signIn" = "Sign in to iCloud to share alarms.";
 
+"settings.defaultSnooze" = "Default alarm snooze";
+"settings.defaultSnooze.help" = "Used as the snooze length when you create an alarm. It does not change the Nap tab.";
 "settings.title" = "Settings";
 "settings.appearance" = "Appearance";
 "settings.appearance.theme" = "Theme";

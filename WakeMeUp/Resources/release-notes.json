@@ -5,6 +5,18 @@
       "date": "2026-11-25",
       "changes": {
         "en": [
+          "A nap keeps its countdown on the Nap tab, with the time left and Cancel. The length is chosen there and remembered, including for Siri. Settings now sets only the default snooze used when you create an alarm."
+        ],
+        "pl": [
+          "Drzemka pokazuje odliczanie na karcie Drzemka, z pozostałym czasem i Anuluj. Długość wybierasz tam i jest zapamiętywana, także dla Siri. Ustawienia określają już tylko domyślny czas drzemki alarmu."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-25",
+      "changes": {
+        "en": [
           "Nap now starts a full-screen alarm and shows the time left. If it cannot be scheduled, the reason is shown. Calendar months swipe sideways, existing alarms open for editing, and a note can ride along. Ringtone choices are a single menu."
         ],
         "pl": [

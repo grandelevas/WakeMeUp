@@ -5,12 +5,13 @@ struct SoundChoiceList: View {
     @Binding var soundID: String
     var preview: SoundPreviewPlayer
     var showsImport: Bool = false
+    var title: LocalizedStringKey = "alarm.sound"
     var onImport: () -> Void = {}
     @State private var renaming: CustomSound?
     @State private var renameText = ""
 
     var body: some View {
-        Section("alarm.sound") {
+        Section(title) {
             Picker("alarm.sound", selection: $soundID) {
                 ForEach(SoundCatalog.bundled) { sound in
                     Text(LocalizedStringKey(sound.localizationKey)).tag(sound.id)
