@@ -313,14 +313,6 @@ final class AppModel {
         DefaultSnooze.setMinutes(clamped, in: .standard)
     }
 
-    func cancelNap() async {
-        let id = napSession?.id
-        clearNapSession()
-        if let id {
-            await coordinator.cancelStandalone(id: id)
-        }
-    }
-
     func setNapSoundID(_ id: String) {
         let sound = id.isEmpty ? SoundCatalog.defaultID : id
         napSoundID = sound
