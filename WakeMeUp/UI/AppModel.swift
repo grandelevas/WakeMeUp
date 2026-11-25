@@ -57,6 +57,7 @@ final class AppModel {
     /// When set, saving the editor sends the alarm to this grant instead of storing it locally.
     var editorRecipientGrantID: UUID?
     var ringingAlarmID: UUID?
+    private var heldRingingAlarm: Alarm?
     var showGroups = false
     var selectedTab: AppTab = .alarms
     var authorization: AlarmAccessState = .unknown
@@ -118,7 +119,9 @@ final class AppModel {
 
     var ringingAlarm: Alarm? {
         guard let ringingAlarmID else { return nil }
-        return snapshot.library.alarm(ringingAlarmID)
+        if let alarm = snapshot.library.alarm(ringingAlarmID) { return alarm }
+        if heldRingingAlarm?.id == ringingAlarmID { return heldRingingAlarm }
+        return nil
     }
 
     init(store: LibraryStore? = nil, cloudKit explicitCloudKit: CloudKitSharingClient? = nil, screenshot: Bool? = nil) {
@@ -174,6 +177,8 @@ final class AppModel {
         started = true
         guard !suppressPermissionBanner else { return }
         update { $0.permissions.removeUnsharedInvites() }
+        dropSelfAuthoredAlarms()
+        retireOneTimeAlarms()
         authorization = coordinator.accessState()
         notificationAllowed = await coordinator.notificationStatus() == .authorized
         await reschedule(requestAccess: false)
@@ -185,8 +190,7 @@ final class AppModel {
         Task { await cloudKit?.ensureSilentSubscription() }
         Task { await publishDueWakeReports() }
         await coordinator.observeAlerting { [weak self] id in
-            self?.ringingAlarmID = id
-            self?.noteRemoteAlarmFired(id)
+            self?.beginRinging(id)
         }
     }
 
@@ -528,6 +532,8 @@ final class AppModel {
         guard let cloudKit, !refreshing else { return }
         refreshing = true
         defer { refreshing = false }
+        dropSelfAuthoredAlarms()
+        retireOneTimeAlarms()
         await cloudKit.prepareForRefresh()
         await createMissingReturnShares()
         await publishMissingReturnLinks()
@@ -566,6 +572,11 @@ final class AppModel {
             var newSounds: [CustomSound] = []
             for command in decision.apply {
                 var command = command
+                let mine = snapshot.profile.id
+                guard IncomingCommandPolicy.shouldApply(command: command, profileID: mine) else {
+                    applied.append(command.id)
+                    continue
+                }
                 if updated.state == .active {
                     if var alarm = command.alarm, command.voiceRecordName != nil {
                         let voiceID = command.voiceRecordName ?? ""
@@ -580,6 +591,10 @@ final class AppModel {
                     }
                     if command.action == .triggerNow, var alarm = command.alarm {
                         alarm = WakeNowSchedule.applying(to: alarm, processedAt: .now)
+                        command.alarm = alarm
+                    }
+                    if var alarm = command.alarm {
+                        alarm = OneTimeAlarmExpiry.stamped(alarm, now: .now, calendar: .current)
                         command.alarm = alarm
                     }
                     if (command.action == .upsert || command.action == .triggerNow), let alarm = command.alarm {
@@ -924,8 +939,11 @@ final class AppModel {
     func dismissRinging() {
         if let id = ringingAlarmID {
             noteRemoteAlarmDismissed(id)
+            retireOneTimeAlarms(rungIDs: [id])
         }
         ringingAlarmID = nil
+        heldRingingAlarm = nil
+        Task { await reschedule(requestAccess: false) }
     }
 
     private func postRemoteNotices(_ notices: [String]) async {
@@ -943,6 +961,38 @@ final class AppModel {
             )
             try? await center.add(request)
         }
+    }
+
+    private func dropSelfAuthoredAlarms() {
+        let profileID = snapshot.profile.id
+        let cleaned = SelfAlarmCleanup.removingSelfAuthored(from: snapshot.library.alarms, profileID: profileID)
+        guard cleaned.count != snapshot.library.alarms.count else { return }
+        update { $0.library.alarms = cleaned }
+    }
+
+    private func retireOneTimeAlarms(rungIDs: Set<UUID> = []) {
+        let result = OneTimeAlarmExpiry.partition(
+            alarms: snapshot.library.alarms,
+            sent: snapshot.sentAlarms,
+            now: .now,
+            calendar: .current,
+            rungIDs: rungIDs
+        )
+        let changed = result.alarms != snapshot.library.alarms || result.sent != snapshot.sentAlarms
+        guard changed else { return }
+        update {
+            $0.library.alarms = result.alarms
+            $0.sentAlarms = result.sent
+        }
+    }
+
+    private func beginRinging(_ id: UUID) {
+        if let alarm = snapshot.library.alarm(id) {
+            heldRingingAlarm = alarm
+        }
+        ringingAlarmID = id
+        noteRemoteAlarmFired(id)
+        retireOneTimeAlarms(rungIDs: [id])
     }
 
     private func reschedule(requestAccess: Bool) async {

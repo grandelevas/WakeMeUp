@@ -139,20 +139,20 @@ private struct MainTabPager: View {
     @State private var trackingEdge = false
 
     var body: some View {
-        GeometryReader { geo in
-            let width = geo.size.width.isFinite ? geo.size.width : 0
-            let height = geo.size.height.isFinite ? geo.size.height : 0
-            HStack(spacing: 0) {
-                AlarmListView().frame(width: width, height: height)
-                SharingView().frame(width: width, height: height)
-                AchievementsView().frame(width: width, height: height)
+        VStack(spacing: 0) {
+            GeometryReader { geo in
+                let width = geo.size.width.isFinite && geo.size.width > 1 ? geo.size.width : 0
+                let height = geo.size.height.isFinite && geo.size.height > 1 ? geo.size.height : 0
+                HStack(spacing: 0) {
+                    AlarmListView().frame(width: width, height: height)
+                    SharingView().frame(width: width, height: height)
+                    AchievementsView().frame(width: width, height: height)
+                }
+                .offset(x: width > 0 ? -CGFloat(selection.tabIndex) * width + edgeDrag : 0)
+                .frame(width: width, height: height, alignment: .leading)
+                .clipped()
+                .simultaneousGesture(edgeSwipe(width: width))
             }
-            .offset(x: -CGFloat(selection.tabIndex) * width + edgeDrag)
-            .frame(width: width, height: height, alignment: .leading)
-            .clipped()
-            .simultaneousGesture(edgeSwipe(width: width))
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
             tabBar
         }
     }
@@ -181,6 +181,11 @@ private struct MainTabPager: View {
             }
         }
         .background(.bar)
+        .background {
+            Rectangle()
+                .fill(.bar)
+                .ignoresSafeArea(edges: .bottom)
+        }
     }
 
     private func edgeSwipe(width: CGFloat) -> some Gesture {

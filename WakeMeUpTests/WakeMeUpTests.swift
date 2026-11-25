@@ -1977,6 +1977,153 @@ final class TabEdgeSwipeTests: XCTestCase {
     }
 }
 
+final class ListHygieneTests: XCTestCase {
+    func testCommandsYouSentAreNotAlarmsForYou() {
+        let me = UUID()
+        let them = UUID()
+        let outgoing = RemoteAlarmCommand(
+            id: UUID(),
+            grantID: UUID(),
+            senderID: me,
+            recipientID: them,
+            action: .upsert,
+            createdAt: .now,
+            alarm: nil,
+            alarmID: nil,
+            enabled: nil
+        )
+        let incoming = RemoteAlarmCommand(
+            id: UUID(),
+            grantID: UUID(),
+            senderID: them,
+            recipientID: me,
+            action: .upsert,
+            createdAt: .now,
+            alarm: nil,
+            alarmID: nil,
+            enabled: nil
+        )
+        XCTAssertFalse(IncomingCommandPolicy.shouldApply(command: outgoing, profileID: me))
+        XCTAssertTrue(IncomingCommandPolicy.shouldApply(command: incoming, profileID: me))
+        let echo = Alarm(
+            id: UUID(),
+            schedule: .oneShot(fireAt: .now),
+            label: "Echo",
+            soundID: "classic",
+            snoozeEnabled: false,
+            snoozeMinutes: 9,
+            isEnabled: true,
+            groupID: nil,
+            songLink: nil,
+            origin: .remote(senderID: me, senderName: "Mateusz", commandID: UUID()),
+            resumeWhenGroupEnables: nil
+        )
+        let kept = Alarm(
+            id: UUID(),
+            schedule: .wallClock(hour: 7, minute: 0, repeatDays: [.monday]),
+            label: "Mine",
+            soundID: "classic",
+            snoozeEnabled: false,
+            snoozeMinutes: 9,
+            isEnabled: true,
+            groupID: nil,
+            songLink: nil,
+            origin: .local,
+            resumeWhenGroupEnables: nil
+        )
+        XCTAssertEqual(SelfAlarmCleanup.removingSelfAuthored(from: [echo, kept], profileID: me).map(\.id), [kept.id])
+    }
+
+    func testOneTimeAlarmsLeaveAfterTheyRingOrTheirTimePasses() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let past = Alarm(
+            id: UUID(),
+            schedule: .oneShot(fireAt: now.addingTimeInterval(-30)),
+            label: "Past",
+            soundID: "classic",
+            snoozeEnabled: false,
+            snoozeMinutes: 9,
+            isEnabled: true,
+            groupID: nil,
+            songLink: nil,
+            origin: .local,
+            resumeWhenGroupEnables: nil
+        )
+        let soon = Alarm(
+            id: UUID(),
+            schedule: .oneShot(fireAt: now.addingTimeInterval(120)),
+            label: "Soon",
+            soundID: "classic",
+            snoozeEnabled: false,
+            snoozeMinutes: 9,
+            isEnabled: true,
+            groupID: nil,
+            songLink: nil,
+            origin: .local,
+            resumeWhenGroupEnables: nil
+        )
+        let daily = Alarm(
+            id: UUID(),
+            schedule: .wallClock(hour: 7, minute: 0, repeatDays: [.monday, .tuesday, .wednesday, .thursday, .friday]),
+            label: "Daily",
+            soundID: "classic",
+            snoozeEnabled: false,
+            snoozeMinutes: 9,
+            isEnabled: true,
+            groupID: nil,
+            songLink: nil,
+            origin: .local,
+            resumeWhenGroupEnables: nil
+        )
+        var once = Alarm(
+            id: UUID(),
+            schedule: .wallClock(hour: 6, minute: 30, repeatDays: []),
+            label: "Once",
+            soundID: "classic",
+            snoozeEnabled: false,
+            snoozeMinutes: 9,
+            isEnabled: true,
+            groupID: nil,
+            songLink: nil,
+            origin: .local,
+            resumeWhenGroupEnables: nil
+        )
+        once.firesOnceAt = now.addingTimeInterval(-5)
+        let sent = SentAlarm(
+            alarm: past,
+            recipientID: UUID(),
+            recipientName: "Akhi",
+            sentAt: now.addingTimeInterval(-60),
+            commandID: UUID()
+        )
+        let result = OneTimeAlarmExpiry.partition(
+            alarms: [past, soon, daily, once],
+            sent: [sent],
+            now: now,
+            calendar: Calendar(identifier: .gregorian),
+            rungIDs: []
+        )
+        XCTAssertEqual(Set(result.alarms.map(\.label)), Set(["Soon", "Daily"]))
+        XCTAssertTrue(result.sent.isEmpty)
+        XCTAssertTrue(OneTimeAlarmExpiry.shouldRemove(
+            schedule: soon.schedule,
+            firesOnceAt: nil,
+            now: now,
+            hasRung: true
+        ))
+    }
+
+    func testFriendSectionsRememberWhenTheyAreCollapsed() {
+        let name = "wakito.tests.sections.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        XCTAssertTrue(SectionExpansionStore.isExpanded(SectionExpansionStore.fromOthers, defaults: defaults))
+        SectionExpansionStore.setExpanded(false, id: SectionExpansionStore.toOthers, defaults: defaults)
+        XCTAssertFalse(SectionExpansionStore.isExpanded(SectionExpansionStore.toOthers, defaults: defaults))
+        XCTAssertTrue(SectionExpansionStore.isExpanded(SectionExpansionStore.fromOthers, defaults: defaults))
+    }
+}
+
 final class HandshakeTests: XCTestCase {
     func testOneLinkLetsBothPeopleWakeEachOtherAndTheLinkStays() throws {
         let mateusz = Participant(id: UUID(), displayName: "Mateusz")
