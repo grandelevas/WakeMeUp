@@ -5,6 +5,18 @@
       "date": "2026-11-25",
       "changes": {
         "en": [
+          "You can rename and delete your voice recordings, imported sounds, and alarms you added. Select now edits the time and settings of the chosen alarms. Add to a group lists only alarms that are not already in a group. Pause next to a contact stops their alarms until you resume, and they see the pause too."
+        ],
+        "pl": [
+          "Możesz zmienić nazwę i usunąć swoje nagrania, dodane dźwięki i alarmy. Zaznacz zmienia godzinę i ustawienia wybranych alarmów. Dodawanie do grupy pokazuje tylko alarmy, które nie są jeszcze w żadnej grupie. Pauza przy kontakcie wstrzymuje jego alarmy, dopóki nie wznowisz, i ta osoba też widzi pauzę."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-25",
+      "changes": {
+        "en": [
           "Lists scroll all the way above the tab bar. From friends and For friends can be collapsed. Alarms you send no longer show up as if a friend sent them to you, and one-time alarms disappear after they ring."
         ],
         "pl": [

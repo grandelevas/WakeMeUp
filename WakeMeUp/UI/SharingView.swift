@@ -330,32 +330,42 @@ struct SharingView: View {
                 Text("sharing.none").foregroundStyle(.secondary)
             }
             ForEach(contacts) { contact in
+                let paused = CollaborationPause.isPaused(contact: contact, profileID: model.profile.id, grants: model.grants)
                 VStack(alignment: .leading, spacing: 8) {
-                    Button {
-                        expandedContactID = expandedContactID == contact.id ? nil : contact.id
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(contact.name)
-                                if contact.isPending {
-                                    Text("sharing.pending")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                    HStack(alignment: .center, spacing: 8) {
+                        Button {
+                            expandedContactID = expandedContactID == contact.id ? nil : contact.id
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(contact.name)
+                                    if paused {
+                                        Text("sharing.paused")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    } else if contact.isPending {
+                                        Text("sharing.pending")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
+                                Spacer()
+                                Image(systemName: expandedContactID == contact.id ? "chevron.up" : "chevron.down")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
-                            Spacer()
-                            Image(systemName: expandedContactID == contact.id ? "chevron.up" : "chevron.down")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.borderless)
+                        ContactPauseTile(paused: paused) {
+                            Task { await model.setCollaborationPaused(!paused, for: contact) }
                         }
                     }
-                    .buttonStyle(.borderless)
                     if expandedContactID == contact.id {
                         HStack(alignment: .top, spacing: 8) {
                             ContactActionTile(
                                 title: "sharing.wakeNow",
                                 systemImage: "sun.max.fill",
-                                disabled: !ContactActionPolicy.canWake(contact)
+                                disabled: paused || !ContactActionPolicy.canWake(contact)
                             ) {
                                 guard let id = contact.wakeGrantID else { return }
                                 Task { await model.sendToPhone(grantID: id, immediately: true) }
@@ -363,7 +373,7 @@ struct SharingView: View {
                             ContactActionTile(
                                 title: "sharing.setAlarm",
                                 systemImage: "alarm.fill",
-                                disabled: !ContactActionPolicy.canWake(contact)
+                                disabled: paused || !ContactActionPolicy.canWake(contact)
                             ) {
                                 guard let id = contact.wakeGrantID else { return }
                                 model.editAlarm(forContactGrant: id)
@@ -439,6 +449,39 @@ struct SharingView: View {
         case .active: String(localized: "sharing.active")
         case .revoked: String(localized: "sharing.revoked")
         }
+    }
+}
+
+private struct ContactPauseTile: View {
+    @Environment(\.appAccent) private var appAccent
+    let paused: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: paused ? "play.fill" : "pause.fill")
+                    .font(.body.weight(.semibold))
+                Group {
+                    if paused {
+                        Text("sharing.resume")
+                    } else {
+                        Text("sharing.pause")
+                    }
+                }
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            }
+            .foregroundStyle(appAccent)
+            .frame(minWidth: 64, minHeight: 52)
+            .padding(.horizontal, 6)
+            .background(appAccent.opacity(paused ? 0.28 : 0.16), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(Text(paused ? LocalizedStringKey("sharing.resume") : LocalizedStringKey("sharing.pause")))
+        .accessibilityIdentifier(paused ? "contact-resume" : "contact-pause")
     }
 }
 

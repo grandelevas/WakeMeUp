@@ -278,6 +278,64 @@ final class AppModel {
         Task { await reschedule(requestAccess: true) }
     }
 
+    func renameAlarm(_ alarmID: UUID, to label: String) {
+        update { $0.library.rename(alarmID: alarmID, to: label) }
+        Task { await reschedule(requestAccess: false) }
+    }
+
+    func renameCustomSound(_ soundID: String, to name: String) {
+        update {
+            guard let sounds = SoundLibraryEdit.renamed($0.customSounds, id: soundID, to: name) else { return }
+            $0.customSounds = sounds
+        }
+    }
+
+    func deleteCustomSound(_ soundID: String) {
+        let filename = snapshot.customSounds.first { $0.id == soundID }?.filename
+        guard snapshot.customSounds.contains(where: { $0.id == soundID }) else { return }
+        update {
+            $0.customSounds = SoundLibraryEdit.removed($0.customSounds, id: soundID)
+            $0.library.alarms = SoundLibraryEdit.clearing(soundID, in: $0.library.alarms)
+            for index in $0.sentAlarms.indices where $0.sentAlarms[index].alarm.soundID == soundID {
+                $0.sentAlarms[index].alarm.soundID = SoundCatalog.defaultID
+            }
+        }
+        if let filename {
+            VoiceFiles.remove(relativeFilename: filename)
+        }
+        Task { await reschedule(requestAccess: false) }
+    }
+
+    func applyBulk(_ patch: BulkAlarmPatch, to alarmIDs: Set<UUID>) {
+        guard !alarmIDs.isEmpty else { return }
+        update { $0.library.apply(patch, to: alarmIDs) }
+        Task { await reschedule(requestAccess: true) }
+    }
+
+    func setCollaborationPaused(_ paused: Bool, for contact: SharingContact) async {
+        let now = Date()
+        let actor = snapshot.profile.id
+        let ids = [contact.hostedGrantID, contact.wakeGrantID].compactMap { $0 }
+        var written: [ShareGrant] = []
+        update { snapshot in
+            for id in ids {
+                guard var grant = snapshot.permissions.grant(id: id) else { continue }
+                grant.collaborationPaused = paused
+                grant.collaborationPausedAt = now
+                grant.collaborationPausedBy = actor
+                snapshot.permissions.replace(grant)
+                written.append(grant)
+            }
+        }
+        if let cloudKit {
+            for grant in written where grant.cloudKitRootRecordName != nil {
+                let asOwner = grant.owner.id == actor
+                try? await cloudKit.setCollaborationPause(paused, at: now, by: actor, on: grant, asOwner: asOwner)
+            }
+        }
+        await reschedule(requestAccess: false)
+    }
+
     func setSound(_ soundID: String, for alarmIDs: Set<UUID>) {
         guard !alarmIDs.isEmpty else { return }
         update { $0.library.setSound(soundID, alarmIDs: alarmIDs) }
@@ -577,6 +635,14 @@ final class AppModel {
                     applied.append(command.id)
                     continue
                 }
+                var grantsNow = snapshot.permissions.grants
+                if let index = grantsNow.firstIndex(where: { $0.id == updated.id }) {
+                    grantsNow[index] = updated
+                }
+                if CollaborationPause.isPaused(profileID: mine, otherID: command.senderID, grants: grantsNow) {
+                    applied.append(command.id)
+                    continue
+                }
                 if updated.state == .active {
                     if var alarm = command.alarm, command.voiceRecordName != nil {
                         let voiceID = command.voiceRecordName ?? ""
@@ -735,6 +801,13 @@ final class AppModel {
         prepared: Alarm? = nil
     ) async {
         guard let grant = snapshot.permissions.grant(id: grantID), let cloudKit else { return }
+        if grant.collaborationPaused == true {
+            return
+        }
+        if let other = grant.owner.id == snapshot.profile.id ? grant.grantee?.id : grant.owner.id,
+           CollaborationPause.isPaused(profileID: snapshot.profile.id, otherID: other, grants: snapshot.permissions.grants) {
+            return
+        }
         var alarm = prepared ?? Alarm(
             id: UUID(),
             schedule: immediately
@@ -1003,7 +1076,11 @@ final class AppModel {
             authorization = coordinator.accessState()
         }
         if let failure = await coordinator.sync(
-            alarms: snapshot.library.alarms,
+            alarms: CollaborationPause.alarmsForSync(
+                snapshot.library.alarms,
+                profileID: snapshot.profile.id,
+                grants: snapshot.permissions.grants
+            ),
             customSounds: snapshot.customSounds
         ) {
             scheduleFailure = String(format: String(localized: "settings.systemAlarm.failed"), failure)
