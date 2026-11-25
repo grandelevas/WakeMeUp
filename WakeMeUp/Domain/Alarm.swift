@@ -73,6 +73,8 @@ struct Alarm: Codable, Equatable, Hashable, Identifiable {
     var songLink: SongLink?
     /// Optional note, at most 1000 characters. Empty means no note.
     var note: String? = nil
+    /// When a non-repeating wall-clock alarm should ring once. Not a CloudKit field.
+    var firesOnceAt: Date? = nil
     var origin: AlarmOrigin
     /// Enabled state to restore when a disabled group is turned back on.
     var resumeWhenGroupEnables: Bool?
@@ -462,6 +464,9 @@ struct AlarmDraft: Equatable, Identifiable {
             groupID: groupID,
             songLink: parsedSong,
             note: AlarmNote.cleaned(note),
+            firesOnceAt: repeatDays.isEmpty
+                ? schedule.nextFireDate(from: .now, calendar: .current)
+                : nil,
             origin: origin,
             resumeWhenGroupEnables: nil
         )

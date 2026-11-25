@@ -5,6 +5,8 @@ struct AlarmListView: View {
     @Environment(AppModel.self) private var model
     @State private var reorderMode = EditMode.inactive
     @State private var collapsedGroups: Set<UUID> = GroupExpansionStore.collapsedIDs()
+    @State private var fromOthersExpanded = SectionExpansionStore.isExpanded(SectionExpansionStore.fromOthers)
+    @State private var toOthersExpanded = SectionExpansionStore.isExpanded(SectionExpansionStore.toOthers)
     @State private var collapseBeforeSelection: Set<UUID>?
     @State private var collapseBeforeReorder: Set<UUID>?
     @State private var editingGroupID: UUID?
@@ -214,34 +216,66 @@ struct AlarmListView: View {
             }
             let received = model.library.receivedFromOthers
             if !received.isEmpty {
-                Section("alarms.fromOthers") {
-                    alarmRows(received, emptyKey: "alarms.empty.group")
+                Section {
+                    if fromOthersExpanded {
+                        alarmRows(received, emptyKey: "alarms.empty.group")
+                    }
+                } header: {
+                    collapsibleHeader("alarms.fromOthers", expanded: fromOthersExpanded) {
+                        fromOthersExpanded.toggle()
+                        SectionExpansionStore.setExpanded(fromOthersExpanded, id: SectionExpansionStore.fromOthers)
+                    }
                 }
             }
             if !model.snapshot.sentAlarms.isEmpty {
-                Section("alarms.toOthers") {
-                    ForEach(FriendGroupRoster.sections(from: model.snapshot.sentAlarms)) { section in
-                        if let title = section.title, !title.isEmpty {
-                            Text(title)
-                                .font(.headline)
-                        }
-                        ForEach(section.rows) { row in
-                            if let sent = model.snapshot.sentAlarms.first(where: { $0.commandID == row.commandID }) {
-                                SentAlarmRow(sent: sent)
-                                    .swipeActions {
-                                        Button(role: .destructive) {
-                                            Task { await model.deleteSentAlarm(commandID: sent.commandID) }
-                                        } label: {
-                                            Label("alarm.delete", systemImage: "trash")
+                Section {
+                    if toOthersExpanded {
+                        ForEach(FriendGroupRoster.sections(from: model.snapshot.sentAlarms)) { section in
+                            if let title = section.title, !title.isEmpty {
+                                Text(title)
+                                    .font(.headline)
+                            }
+                            ForEach(section.rows) { row in
+                                if let sent = model.snapshot.sentAlarms.first(where: { $0.commandID == row.commandID }) {
+                                    SentAlarmRow(sent: sent)
+                                        .swipeActions {
+                                            Button(role: .destructive) {
+                                                Task { await model.deleteSentAlarm(commandID: sent.commandID) }
+                                            } label: {
+                                                Label("alarm.delete", systemImage: "trash")
+                                            }
                                         }
-                                    }
+                                }
                             }
                         }
+                    }
+                } header: {
+                    collapsibleHeader("alarms.toOthers", expanded: toOthersExpanded) {
+                        toOthersExpanded.toggle()
+                        SectionExpansionStore.setExpanded(toOthersExpanded, id: SectionExpansionStore.toOthers)
                     }
                 }
             }
         }
         .environment(\.editMode, $reorderMode)
+    }
+
+    private func collapsibleHeader(
+        _ title: LocalizedStringKey,
+        expanded: Bool,
+        toggle: @escaping () -> Void
+    ) -> some View {
+        Button(action: toggle) {
+            HStack {
+                Text(title)
+                Spacer()
+                Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func groupRow(_ group: AlarmGroup) -> some View {

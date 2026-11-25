@@ -2,6 +2,18 @@
     "entries": [
     {
       "version": "1.0.0",
+      "date": "2026-11-25",
+      "changes": {
+        "en": [
+          "Lists scroll all the way above the tab bar. From friends and For friends can be collapsed. Alarms you send no longer show up as if a friend sent them to you, and one-time alarms disappear after they ring."
+        ],
+        "pl": [
+          "Listy przewijają się do końca nad paskiem kart. Od znajomych i Dla znajomych można zwinąć. Alarmy, które wysyłasz, nie pokazują się już tak, jakby znajomy wysłał je Tobie, a alarmy jednorazowe znikają po dzwonku."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
       "date": "2026-11-21",
       "changes": {
         "en": [
