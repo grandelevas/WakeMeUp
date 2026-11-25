@@ -2413,6 +2413,60 @@ final class EditingUXTests: XCTestCase {
         XCTAssertEqual(decoded.owner.displayName, "Mateusz")
     }
 
+    func testVideoMessageStaysUnderThirtySecondsAndDropsWhenUploadFails() throws {
+        XCTAssertEqual(VideoMessagePolicy.clamped(45), 30)
+        XCTAssertEqual(VideoMessagePolicy.clamped(12), 12)
+        XCTAssertFalse(VideoMessagePolicy.fits(byteCount: 0))
+        XCTAssertTrue(VideoMessagePolicy.fits(byteCount: 1024))
+        XCTAssertFalse(VideoMessagePolicy.fits(byteCount: VideoMessagePolicy.maxBytes + 1))
+        XCTAssertEqual(
+            OutgoingVideo.payload(recordName: "video-1", uploaded: true),
+            OutgoingVideo.Payload(recordName: "video-1", warn: false)
+        )
+        XCTAssertEqual(
+            OutgoingVideo.payload(recordName: "video-1", uploaded: false),
+            OutgoingVideo.Payload(recordName: nil, warn: true)
+        )
+        XCTAssertEqual(
+            OutgoingVideo.payload(recordName: nil, uploaded: false),
+            OutgoingVideo.Payload(recordName: nil, warn: false)
+        )
+        let alarm = Alarm(
+            id: UUID(),
+            schedule: .oneShot(fireAt: Date(timeIntervalSince1970: 1)),
+            label: "Clip",
+            soundID: "classic",
+            snoozeEnabled: false,
+            snoozeMinutes: 9,
+            isEnabled: true,
+            groupID: nil,
+            songLink: nil,
+            origin: .local,
+            resumeWhenGroupEnables: nil
+        )
+        let data = try JSONEncoder().encode(alarm)
+        var object = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        object.removeValue(forKey: "videoFileID")
+        let decoded = try JSONDecoder().decode(Alarm.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertNil(decoded.videoFileID)
+        let command = RemoteAlarmCommand(
+            id: UUID(),
+            grantID: UUID(),
+            senderID: UUID(),
+            recipientID: UUID(),
+            action: .upsert,
+            createdAt: Date(timeIntervalSince1970: 1),
+            alarm: decoded,
+            alarmID: nil,
+            enabled: true
+        )
+        let commandData = try JSONEncoder().encode(command)
+        var commandObject = try JSONSerialization.jsonObject(with: commandData) as! [String: Any]
+        commandObject.removeValue(forKey: "videoRecordName")
+        let decodedCommand = try JSONDecoder().decode(RemoteAlarmCommand.self, from: JSONSerialization.data(withJSONObject: commandObject))
+        XCTAssertNil(decodedCommand.videoRecordName)
+    }
+
     private func share(owner: Participant, grantee: Participant?) -> ShareGrant {
         ShareGrant(
             id: UUID(),

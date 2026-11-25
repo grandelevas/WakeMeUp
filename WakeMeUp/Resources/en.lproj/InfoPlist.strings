@@ -1,4 +1,5 @@
 "NSAlarmKitUsageDescription" = "Wakito schedules alarms so a wake-up you set still rings when iPhone is locked or on silent.";
-"NSMicrophoneUsageDescription" = "Wakito uses the microphone to record a voice message that plays when an alarm rings.";
+"NSCameraUsageDescription" = "Wakito uses the camera to record a short video message that plays when an alarm rings.";
+"NSMicrophoneUsageDescription" = "Wakito uses the microphone to record a voice message or the sound of a video message that plays when an alarm rings.";
 "CFBundleDisplayName" = "Wakito";
 "CFBundleName" = "Wakito";

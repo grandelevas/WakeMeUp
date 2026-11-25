@@ -512,6 +512,7 @@ struct AlarmListView: View {
 struct AlarmRow: View {
     @Environment(\.appAccent) private var appAccent
     @State private var preview = SoundPreviewPlayer()
+    @State private var showingVideo = false
     let alarm: Alarm
     let enabled: Bool
     var showsToggle: Bool = true
@@ -548,6 +549,22 @@ struct AlarmRow: View {
                     Text("sharing.paused")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+            }
+            if let videoID = alarm.videoFileID, VideoFiles.url(id: videoID) != nil {
+                Button {
+                    showingVideo = true
+                } label: {
+                    Image(systemName: "video.circle")
+                        .font(.title2)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("video.play")
+                .sheet(isPresented: $showingVideo) {
+                    if let url = VideoFiles.url(id: videoID) {
+                        VideoMessagePlayer(url: url)
+                            .ignoresSafeArea()
+                    }
                 }
             }
             if alarm.soundID.hasPrefix("voice-"),

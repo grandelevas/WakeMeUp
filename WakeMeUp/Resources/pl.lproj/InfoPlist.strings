@@ -1,4 +1,5 @@
 "NSAlarmKitUsageDescription" = "Wakito planuje alarmy, żeby ustawiona pobudka zadzwoniła nawet przy zablokowanym iPhonie i wyciszonym dźwięku.";
-"NSMicrophoneUsageDescription" = "Wakito używa mikrofonu, żeby nagrać wiadomość głosową odtwarzaną przy alarmie.";
+"NSCameraUsageDescription" = "Wakito używa aparatu, żeby nagrać krótką wiadomość wideo odtwarzaną przy alarmie.";
+"NSMicrophoneUsageDescription" = "Wakito używa mikrofonu, żeby nagrać wiadomość głosową albo dźwięk wiadomości wideo odtwarzanej przy alarmie.";
 "CFBundleDisplayName" = "Wakito";
 "CFBundleName" = "Wakito";

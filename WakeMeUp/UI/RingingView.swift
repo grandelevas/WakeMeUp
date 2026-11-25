@@ -29,6 +29,13 @@ struct RingingView: View {
                     Text(String(format: String(localized: "sharing.remoteFrom"), name))
                         .foregroundStyle(appAccent)
                 }
+                if let videoID = alarm.videoFileID, let url = VideoFiles.url(id: videoID) {
+                    VideoMessagePlayer(url: url)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 220)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .padding(.horizontal)
+                }
                 if let note = alarm.note, !note.isEmpty {
                     ScrollView {
                         Text(note)

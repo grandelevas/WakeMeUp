@@ -1,12 +1,19 @@
 {
   "containerID": "iCloud.com.grandelevas.wakemeup",
-  "environmentNote": "TestFlight uses Production. Create WMRoot in Development, then deploy the schema to Production. No other record types or queryable indexes are required: reads are by record ID, and the push is a zone subscription.",
+  "environmentNote": "TestFlight uses Production. WMRoot and WMVoice.Audio are already in Production. Video messages need one new optional field on the existing WMVoice record type: name Video, type Asset. Deploy that field to Production before a video upload can succeed. Reads stay by record ID. No new queryable indexes.",
   "recordTypes": [
     {
       "name": "WMRoot",
       "fields": [
         { "name": "grantJSON", "type": "STRING" },
         { "name": "commandsJSON", "type": "STRING" }
+      ]
+    },
+    {
+      "name": "WMVoice",
+      "fields": [
+        { "name": "Audio", "type": "ASSET" },
+        { "name": "Video", "type": "ASSET", "note": "New. Deploy to Production. Optional. A video message record sets Video and leaves Audio empty." }
       ]
     }
   ]

@@ -229,6 +229,14 @@
 "sharing.voice.duration" = "Length %@";
 "sound.voice" = "Voice message";
 "sound.voice.play" = "Play voice message";
+"video.title" = "Video message";
+"video.record" = "Record video";
+"video.delete" = "Delete video";
+"video.play" = "Play video message";
+"video.help" = "Up to 30 seconds. It plays when this alarm rings, and you can send it to a contact.";
+"video.camera.unavailable" = "This iPhone has no camera available for a video message.";
+"video.unreadable" = "Could not save the video.";
+"video.skipped" = "The alarm was sent without the video message.";
 "sharing.simulatedFriend" = "Simulated friend";
 "sharing.addFriend" = "Add a simulated friend";
 "sharing.friendName" = "Friend’s name";

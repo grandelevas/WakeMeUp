@@ -53,8 +53,10 @@
 	<string>$(IPHONEOS_DEPLOYMENT_TARGET)</string>
 	<key>NSAlarmKitUsageDescription</key>
 	<string>Wakito schedules alarms so a wake-up you set still rings when iPhone is locked or on silent.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Wakito uses the camera to record a short video message that plays when an alarm rings.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Wakito uses the microphone to record a voice message that plays when an alarm rings.</string>
+	<string>Wakito uses the microphone to record a voice message or the sound of a video message that plays when an alarm rings.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

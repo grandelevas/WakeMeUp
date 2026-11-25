@@ -240,6 +240,20 @@ final class AppModel {
         return sound.id
     }
 
+    func installVideo(from url: URL) async -> String? {
+        let id = VideoMessagePolicy.makeID()
+        do {
+            return try await VideoFiles.install(from: url, id: id)
+        } catch {
+            report(summary: String(localized: "video.unreadable"))
+            return nil
+        }
+    }
+
+    func removeVideo(_ id: String) {
+        VideoFiles.remove(id: id)
+    }
+
     func removeLocalVoice(_ soundID: String) {
         let filename = snapshot.customSounds.first { $0.id == soundID }?.filename
         update { $0.customSounds.removeAll { $0.id == soundID } }
@@ -715,6 +729,15 @@ final class AppModel {
                     continue
                 }
                 if updated.state == .active {
+                    if var alarm = command.alarm, let videoID = command.videoRecordName {
+                        if let file = try? await cloudKit.videoFile(named: videoID, grant: grant, asOwner: asOwner),
+                           let installed = try? await VideoFiles.install(from: file, id: videoID) {
+                            alarm.videoFileID = installed
+                        } else {
+                            alarm.videoFileID = nil
+                        }
+                        command.alarm = alarm
+                    }
                     if var alarm = command.alarm, command.voiceRecordName != nil {
                         let voiceID = command.voiceRecordName ?? ""
                         var installed = false
@@ -927,6 +950,24 @@ final class AppModel {
                 voiceWarning = String(localized: "sharing.voice.skipped")
             }
         }
+        var videoName: String?
+        var videoWarning: String?
+        var videoDetail = ""
+        if let videoID = alarm.videoFileID, let videoFile = VideoFiles.url(id: videoID) {
+            var uploaded = false
+            do {
+                try await cloudKit.saveVideo(file: videoFile, recordName: videoID, grant: grant, asOwner: false)
+                uploaded = true
+            } catch {
+                videoDetail = CloudKitErrorText.detail(for: error)
+            }
+            let payload = OutgoingVideo.payload(recordName: videoID, uploaded: uploaded)
+            videoName = payload.recordName
+            if payload.warn {
+                alarm.videoFileID = nil
+                videoWarning = String(localized: "video.skipped")
+            }
+        }
         var command = RemoteAlarmCommand(
             id: UUID(),
             grantID: grant.id,
@@ -939,11 +980,14 @@ final class AppModel {
             enabled: true
         )
         command.voiceRecordName = voiceName
+        command.videoRecordName = videoName
         do {
             _ = try snapshot.permissions.authorize(sender: snapshot.profile.id, recipient: grant.owner.id)
             try await cloudKit.append(command: command, grant: grant, asOwner: false)
             if let voiceWarning {
                 report(summary: voiceWarning, detail: voiceDetail)
+            } else if let videoWarning {
+                report(summary: videoWarning, detail: videoDetail)
             } else if immediately {
                 statusNotice = String(localized: "sharing.wakeNow.soon")
             }

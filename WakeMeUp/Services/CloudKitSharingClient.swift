@@ -130,6 +130,20 @@ enum ShareRecordAddress {
     }
 }
 
+enum VideoAssetField {
+    /// Same record type as a voice clip. Production needs a new optional Asset field named `Video`.
+    static let recordType = VoiceAssetField.recordType
+    static let key = "Video"
+
+    static func assign(_ asset: CKAsset, on record: CKRecord) {
+        record[key] = asset
+    }
+
+    static func asset(from record: CKRecord) -> CKAsset? {
+        record[key] as? CKAsset
+    }
+}
+
 enum VoiceAssetField {
     static let recordType = "WMVoice"
     /// Production schema. CloudKit field names are case-sensitive.
@@ -551,6 +565,60 @@ final class CloudKitSharingClient {
             rebuilt.parent = CKRecord.Reference(recordID: CKRecord.ID(recordName: rootID.recordName, zoneID: zoneID), action: .none)
             _ = try await database.save(rebuilt)
         }
+    }
+
+    /// Saves a video message on a `WMVoice` record, field `Video` (Asset). Record names start with `video-`.
+    func saveVideo(file: URL, recordName: String, grant: ShareGrant, asOwner: Bool) async throws {
+        try await requireAccount()
+        let database = asOwner ? container.privateCloudDatabase : container.sharedCloudDatabase
+        if database.databaseScope == .private {
+            _ = try await ensurePrivateZone()
+        }
+        var rootID = try recordID(for: grant, database: database)
+        if database.databaseScope != .private {
+            rootID = await resolvedSharedID(proposed: rootID)
+        }
+        let video = CKRecord(recordType: VideoAssetField.recordType, recordID: CKRecord.ID(recordName: recordName, zoneID: rootID.zoneID))
+        VideoAssetField.assign(CKAsset(fileURL: file), on: video)
+        video.parent = CKRecord.Reference(recordID: rootID, action: .none)
+        do {
+            _ = try await database.save(video)
+        } catch {
+            if database.databaseScope != .private,
+               CloudKitZoneFailure.isZoneNotFound(error),
+               let url = inviteURL(for: grant) {
+                let root = try await reopenShare(url)
+                let rebuilt = CKRecord(recordType: VideoAssetField.recordType, recordID: CKRecord.ID(recordName: recordName, zoneID: root.zoneID))
+                VideoAssetField.assign(CKAsset(fileURL: file), on: rebuilt)
+                rebuilt.parent = CKRecord.Reference(recordID: root, action: .none)
+                _ = try await database.save(rebuilt)
+                return
+            }
+            guard database.databaseScope == .private, PrivateZonePolicy.shouldCreate(after: error) else { throw error }
+            _ = try await ensurePrivateZone(resetCache: true)
+            let zoneID = ShareRecordAddress.zoneID(
+                zoneName: PrivateCloudZone.name,
+                storedOwnerName: nil,
+                database: .privateDatabase
+            )
+            let rebuilt = CKRecord(recordType: VideoAssetField.recordType, recordID: CKRecord.ID(recordName: recordName, zoneID: zoneID))
+            VideoAssetField.assign(CKAsset(fileURL: file), on: rebuilt)
+            rebuilt.parent = CKRecord.Reference(recordID: CKRecord.ID(recordName: rootID.recordName, zoneID: zoneID), action: .none)
+            _ = try await database.save(rebuilt)
+        }
+    }
+
+    func videoFile(named recordName: String, grant: ShareGrant, asOwner: Bool) async throws -> URL? {
+        try await requireAccount()
+        let database = asOwner ? container.privateCloudDatabase : container.sharedCloudDatabase
+        let zoneID = try recordID(for: grant, database: database).zoneID
+        let record = try await fetchRecord(
+            CKRecord.ID(recordName: recordName, zoneID: zoneID),
+            in: database,
+            inviteURL: inviteURL(for: grant)
+        )
+        guard let asset = VideoAssetField.asset(from: record) else { return nil }
+        return asset.fileURL
     }
 
     func voiceFile(named recordName: String, grant: ShareGrant, asOwner: Bool) async throws -> URL? {
