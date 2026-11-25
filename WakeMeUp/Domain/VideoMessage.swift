@@ -2,7 +2,7 @@ import Foundation
 
 enum VideoMessagePolicy {
     static let maxSeconds: TimeInterval = 30
-    /// Medium export stays well under a CloudKit asset. A larger file is compressed again.
+    /// Medium export, then a lower preset if needed, stays under a CloudKit asset.
     static let maxBytes = 12 * 1024 * 1024
     static let fileExtension = "mp4"
 
