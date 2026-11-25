@@ -370,6 +370,7 @@ final class AlarmCoordinator {
     private var lastSynced: [Alarm] = []
     private var alarmKitIDs = Set<UUID>()
     private var notificationIDs = Set<UUID>()
+    private var standaloneIDs = Set<UUID>()
 
     func accessState() -> AlarmAccessState {
         alarmKit.accessState()
@@ -385,6 +386,34 @@ final class AlarmCoordinator {
 
     /// Re-schedules enabled alarms through AlarmKit and removes pending notification banners.
     /// Returns the first AlarmKit failure that was not replaced by the system alarm sound.
+    func scheduleStandalone(_ alarm: Alarm, customSounds: [CustomSound]) async -> String? {
+        let attempt = await alarmKit.schedule(alarm, customSounds: customSounds)
+        let delivery = AlarmDeliveryPolicy.decide(
+            permission: attempt.permission,
+            alarmKitAvailable: true,
+            namedSoundError: attempt.namedSoundError,
+            defaultSoundError: attempt.defaultSoundError
+        )
+        switch delivery {
+        case .alarmKit, .alarmKitSystemSound:
+            standaloneIDs.insert(alarm.id)
+            return nil
+        case .notificationFallback:
+            await notifications.schedule(alarm, customSounds: customSounds)
+            standaloneIDs.insert(alarm.id)
+            return nil
+        case .blocked(let message):
+            alarmLog.error("AlarmKit nap blocked: \(message, privacy: .public)")
+            return message
+        }
+    }
+
+    func cancelStandalone(id: UUID) async {
+        alarmKit.cancel(id: id)
+        await notifications.cancel(id: id)
+        standaloneIDs.remove(id)
+    }
+
     func sync(alarms: [Alarm], customSounds: [CustomSound]) async -> String? {
         let plan = AlarmSyncPlan.make(previous: lastSynced, current: alarms)
         let byID = Dictionary(uniqueKeysWithValues: alarms.map { ($0.id, $0) })

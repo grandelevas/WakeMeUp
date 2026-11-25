@@ -2546,6 +2546,57 @@ final class NapCalendarTests: XCTestCase {
         XCTAssertEqual(NapSettings.minutes(in: snoozeDefaults), NapSettings.defaultMinutes)
     }
 
+    func testNapSessionStaysOutOfTheAlarmList() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let session = NapSession.make(minutes: 15, soundID: "classic", now: now)
+        XCTAssertEqual(session.fireAt.timeIntervalSince(now), 15 * 60, accuracy: 0.1)
+        XCTAssertTrue(session.isRunning(at: now.addingTimeInterval(10)))
+        XCTAssertFalse(session.isRunning(at: session.fireAt))
+        XCTAssertEqual(NapCountdown.remaining(until: session.fireAt, now: now), 15 * 60, accuracy: 0.1)
+
+        let defaults = UserDefaults(suiteName: "nap-session-\(UUID().uuidString)")!
+        NapSessionStore.save(session, to: defaults)
+        XCTAssertEqual(NapSessionStore.load(from: defaults, now: now.addingTimeInterval(30))?.id, session.id)
+        XCTAssertNil(NapSessionStore.load(from: defaults, now: session.fireAt.addingTimeInterval(1)))
+
+        let nap = session.alarm()
+        let oldNap = Alarm(
+            id: UUID(),
+            schedule: .oneShot(fireAt: now.addingTimeInterval(600)),
+            label: "Drzemka",
+            soundID: "classic",
+            snoozeEnabled: false,
+            snoozeMinutes: 9,
+            isEnabled: true,
+            groupID: nil,
+            songLink: nil,
+            note: nil,
+            countdownLead: 600,
+            origin: .local,
+            resumeWhenGroupEnables: nil
+        )
+        let meeting = Alarm(
+            id: UUID(),
+            schedule: .oneShot(fireAt: now.addingTimeInterval(3600)),
+            label: "Meeting",
+            soundID: "classic",
+            snoozeEnabled: true,
+            snoozeMinutes: 9,
+            isEnabled: true,
+            groupID: nil,
+            songLink: nil,
+            note: nil,
+            origin: .local,
+            resumeWhenGroupEnables: nil
+        )
+        let cleaned = NapListCleanup.removing(from: [nap, oldNap, meeting], sessionID: session.id)
+        XCTAssertEqual(cleaned.map(\.id), [meeting.id])
+        XCTAssertEqual(
+            NapListCleanup.idsToCancel(in: [nap, oldNap], sessionID: session.id, legacyID: oldNap.id),
+            [oldNap.id]
+        )
+    }
+
     func testOneTimeCalendarAlarmsLeaveAndStayOutOfTheAlarmList() {
         let calendar = gregorian()
         let now = moment(2026, 11, 25, 8, 0, calendar)
