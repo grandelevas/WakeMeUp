@@ -3,6 +3,8 @@ import SwiftUI
 struct NapView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.appAccent) private var appAccent
+    @State private var guideExpanded = false
+    @State private var factsExpanded = false
 
     var body: some View {
         NavigationStack {
@@ -113,7 +115,7 @@ struct NapView: View {
     }
 
     private var education: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             educationSection(
                 title: "nap.guide.title",
                 intro: "nap.guide.intro",
@@ -123,7 +125,8 @@ struct NapView: View {
                     "nap.guide.quiet",
                     "nap.guide.alarm",
                     "nap.guide.after"
-                ]
+                ],
+                isExpanded: $guideExpanded
             )
             educationSection(
                 title: "nap.facts.title",
@@ -133,28 +136,39 @@ struct NapView: View {
                     "nap.facts.legs",
                     "nap.facts.famous",
                     "nap.facts.rest"
-                ]
+                ],
+                isExpanded: $factsExpanded
             )
         }
     }
 
-    private func educationSection(title: LocalizedStringKey, intro: LocalizedStringKey, items: [LocalizedStringKey]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.headline)
-            Text(intro)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            ForEach(items, id: \.self) { item in
-                HStack(alignment: .top, spacing: 8) {
-                    Text("•")
-                    Text(item)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+    private func educationSection(
+        title: LocalizedStringKey,
+        intro: LocalizedStringKey,
+        items: [LocalizedStringKey],
+        isExpanded: Binding<Bool>
+    ) -> some View {
+        DisclosureGroup(isExpanded: isExpanded) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(intro)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(items, id: \.self) { item in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("•")
+                        Text(item)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
+            .padding(.top, 8)
+        } label: {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(.primary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
