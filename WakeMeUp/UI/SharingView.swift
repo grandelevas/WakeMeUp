@@ -327,7 +327,16 @@ struct SharingView: View {
     private var contactSection: some View {
         Section("sharing.contacts") {
             if contacts.isEmpty {
-                Text("sharing.none").foregroundStyle(.secondary)
+                Text("sharing.empty.hint")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                if !model.showsSimulatedPreview {
+                    Button("sharing.empty.action") {
+                        inviteeDraft = ""
+                        inviting = true
+                    }
+                    .accessibilityIdentifier("empty-invite")
+                }
             }
             ForEach(contacts) { contact in
                 let paused = CollaborationPause.isPaused(contact: contact, profileID: model.profile.id, grants: model.grants)

@@ -2818,3 +2818,31 @@ final class DemoScreenshotTests: XCTestCase {
         XCTAssertGreaterThan(wav.count, 12 * 8_000)
     }
 }
+
+final class OnboardingStoreTests: XCTestCase {
+    func testWelcomeAndTipsAreShownOnceAndStayHiddenInDemo() {
+        let defaults = UserDefaults(suiteName: "onboarding-\(UUID().uuidString)")!
+        XCTAssertTrue(OnboardingStore.shouldShowWelcome(demo: false, defaults: defaults))
+        XCTAssertFalse(OnboardingStore.shouldShowWelcome(demo: true, defaults: defaults))
+        XCTAssertFalse(OnboardingStore.shouldOfferGroupTip(demo: false, defaults: defaults))
+
+        OnboardingStore.markWelcomeSeen(defaults: defaults)
+        XCTAssertFalse(OnboardingStore.shouldShowWelcome(demo: false, defaults: defaults))
+        XCTAssertTrue(OnboardingStore.shouldShowGroupTip(demo: false, defaults: defaults))
+        XCTAssertTrue(OnboardingStore.shouldShowVoiceTip(demo: false, defaults: defaults))
+        XCTAssertFalse(OnboardingStore.shouldShowGroupTip(demo: true, defaults: defaults))
+        XCTAssertFalse(OnboardingStore.shouldShowVoiceTip(demo: true, defaults: defaults))
+
+        OnboardingStore.markGroupTipSeen(defaults: defaults)
+        XCTAssertFalse(OnboardingStore.shouldShowGroupTip(demo: false, defaults: defaults))
+        XCTAssertFalse(OnboardingStore.shouldOfferGroupTip(demo: false, defaults: defaults))
+        XCTAssertTrue(OnboardingStore.shouldShowVoiceTip(demo: false, defaults: defaults))
+
+        OnboardingStore.markVoiceTipSeen(defaults: defaults)
+        XCTAssertFalse(OnboardingStore.shouldShowVoiceTip(demo: false, defaults: defaults))
+        OnboardingStore.markWelcomeSeen(defaults: defaults)
+        OnboardingStore.markGroupTipSeen(defaults: defaults)
+        XCTAssertFalse(OnboardingStore.shouldShowWelcome(demo: false, defaults: defaults))
+        XCTAssertFalse(OnboardingStore.shouldShowGroupTip(demo: false, defaults: defaults))
+    }
+}

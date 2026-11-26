@@ -10,6 +10,9 @@ struct VideoMessageSection: View {
     var body: some View {
         Section {
             if videoID == nil {
+                Text("video.empty")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 if UIImagePickerController.isSourceTypeAvailable(.camera) {
                     Button("video.record") { capturing = true }
                 } else {

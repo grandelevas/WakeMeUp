@@ -26,16 +26,23 @@ struct AlarmListView: View {
     @State private var renamingAlarm: Alarm?
     @State private var alarmRenameText = ""
     @State private var soundGroupID: UUID?
+    @State private var showGroupTip = false
 
     var body: some View {
         NavigationStack {
             Group {
                 if model.library.alarms.isEmpty && model.library.groups.isEmpty && model.snapshot.sentAlarms.isEmpty {
-                    ContentUnavailableView(
-                        "alarms.empty.title",
-                        systemImage: "alarm",
-                        description: Text("alarms.empty.message")
-                    )
+                    ContentUnavailableView {
+                        Label("alarms.empty.title", systemImage: "alarm")
+                    } description: {
+                        Text("alarms.empty.hint")
+                    } actions: {
+                        Button("alarms.empty.action") {
+                            model.addAlarm()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("empty-add-alarm")
+                    }
                 } else {
                     list
                 }
@@ -55,6 +62,16 @@ struct AlarmListView: View {
                         }
                         .accessibilityIdentifier("groups.add")
                         .accessibilityLabel("groups.add")
+                        .popover(isPresented: $showGroupTip) {
+                            OnboardingTip(
+                                title: "onboarding.tip.group.title",
+                                message: "onboarding.tip.group.body"
+                            ) {
+                                OnboardingStore.markGroupTipSeen(defaults: .standard)
+                                showGroupTip = false
+                            }
+                            .presentationCompactAdaptation(.popover)
+                        }
                         Button {
                             toggleSelecting()
                         } label: {
@@ -134,6 +151,12 @@ struct AlarmListView: View {
             }
         }
         .accessibilityIdentifier("alarm-list")
+        .onAppear {
+            showGroupTip = OnboardingStore.shouldOfferGroupTip(
+                demo: model.suppressPermissionBanner,
+                defaults: .standard
+            )
+        }
     }
 
     private var isReordering: Bool {
