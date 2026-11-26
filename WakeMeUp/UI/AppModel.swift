@@ -200,7 +200,9 @@ final class AppModel {
         notificationAllowed = await coordinator.notificationStatus() == .authorized
         await reschedule(requestAccess: false)
         await restoreNapAlarm()
-        applyAlerting(coordinator.alertingIDs())
+        if let ids = coordinator.alertingIDs() {
+            applyAlerting(ids)
+        }
         if let handoff = LaunchHandoff.consume() {
             presentResolved(handoff.alarmID)
             await UIApplication.shared.open(handoff.songURL)
@@ -215,7 +217,8 @@ final class AppModel {
 
     /// Reads AlarmKit again after the app returns from the background.
     func reconcileRingingWithSystem() {
-        applyAlerting(coordinator.alertingIDs())
+        guard let ids = coordinator.alertingIDs() else { return }
+        applyAlerting(ids)
     }
 
     func allowAlarms() async {
@@ -1248,7 +1251,7 @@ final class AppModel {
     }
 
     private func presentResolved(_ id: UUID) {
-        var ids = coordinator.alertingIDs()
+        var ids = coordinator.alertingIDs() ?? []
         ids.insert(id)
         applyAlerting(ids)
     }

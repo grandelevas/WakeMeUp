@@ -142,8 +142,9 @@ final class AlarmKitEngine {
         try? manager.countdown(id: id)
     }
 
-    func alertingIDs() -> Set<UUID> {
-        Set(manager.alarms.compactMap { $0.state == .alerting ? $0.id : nil })
+    func alertingIDs() -> Set<UUID>? {
+        guard let alarms = try? manager.alarms else { return nil }
+        return Set(alarms.compactMap { $0.state == .alerting ? $0.id : nil })
     }
 
     /// AlarmKit publishes on an arbitrary executor. The caller applies the set on the main actor.
@@ -473,7 +474,7 @@ final class AlarmCoordinator {
         }
     }
 
-    func alertingIDs() -> Set<UUID> {
+    func alertingIDs() -> Set<UUID>? {
         alarmKit.alertingIDs()
     }
 
