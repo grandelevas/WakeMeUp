@@ -8,7 +8,6 @@ enum DemoData {
     static let tomekID = UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000012")!
     static let weekdaysID = UUID(uuidString: "BBBBBBBB-0000-0000-0000-000000000001")!
     static let weekendID = UUID(uuidString: "BBBBBBBB-0000-0000-0000-000000000002")!
-    static let familyID = UUID(uuidString: "BBBBBBBB-0000-0000-0000-000000000003")!
     static let lovedOneAlarmID = UUID(uuidString: "CCCCCCCC-0000-0000-0000-000000000010")!
     static let ringingAlarmID = UUID(uuidString: "CCCCCCCC-0000-0000-0000-000000000011")!
     static let voiceSoundID = "voice-demo-akhi"
@@ -22,7 +21,6 @@ enum DemoData {
         let tomek = Participant(id: tomekID, displayName: "Tomek")
         let weekdays = AlarmGroup(id: weekdaysID, name: String(localized: "demo.weekdays"), isEnabled: true, symbol: "briefcase")
         let weekend = AlarmGroup(id: weekendID, name: String(localized: "demo.weekend"), isEnabled: true, symbol: "sun.max")
-        let family = AlarmGroup(id: familyID, name: String(localized: "demo.family"), isEnabled: true, symbol: "heart")
         let morning = alarm(
             id: UUID(uuidString: "CCCCCCCC-0000-0000-0000-000000000001")!,
             hour: 6, minute: 30,
@@ -54,7 +52,7 @@ enum DemoData {
             days: [.monday, .tuesday, .wednesday, .thursday, .friday],
             label: "Akhi",
             soundID: voiceSoundID,
-            groupID: family.id,
+            groupID: weekdays.id,
             note: String(localized: "demo.note.akhi"),
             videoFileID: videoID
         )
@@ -100,7 +98,7 @@ enum DemoData {
         return LibrarySnapshot(
             library: AlarmLibrary(
                 alarms: [loved, morning, work, sleepIn, fromAkhi, fromMama],
-                groups: [weekdays, weekend, family]
+                groups: [weekdays, weekend]
             ),
             permissions: PermissionCenter(grants: grants),
             customSounds: [
