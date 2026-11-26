@@ -47,16 +47,18 @@ capture() {
   xcrun simctl terminate "${UDID}" "${BUNDLE_ID}" || true
   sleep 1
   xcrun simctl launch "${UDID}" "${BUNDLE_ID}" "$@"
+  # The list paints before a cover or a scrolled page. Keep the later frame.
+  sleep 4
   local dest="${OUT}/${name}.png"
   local attempt bytes
-  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+  for attempt in 1 2 3 4 5 6; do
     sleep 2
     xcrun simctl io "${UDID}" screenshot "${dest}"
     bytes="$(wc -c < "${dest}" | tr -d ' ')"
-    if [[ "${bytes}" -gt 150000 ]]; then
+    if [[ "${bytes}" -gt 150000 && "${attempt}" -ge 2 ]]; then
       break
     fi
-    echo "Screenshot ${name} is still blank (${bytes} bytes), retry ${attempt}"
+    echo "Screenshot ${name} is not settled (${bytes} bytes), retry ${attempt}"
   done
   expect_pixels "${dest}"
   bytes="$(wc -c < "${dest}" | tr -d ' ')"

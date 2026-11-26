@@ -57,7 +57,7 @@ struct AchievementsView: View {
     private func scrollDemoBadges(_ proxy: ScrollViewProxy) {
         guard LaunchConfiguration.seedDemo else { return }
         DispatchQueue.main.async {
-            proxy.scrollTo("demo-badges", anchor: UnitPoint(x: 0.5, y: 0.16))
+            proxy.scrollTo("demo-badges", anchor: UnitPoint(x: 0.5, y: 0.1))
         }
     }
 
