@@ -39,6 +39,7 @@ struct AlarmEditorView: View {
                 Section("alarm.label") {
                     TextField("alarm.defaultLabel", text: $draft.label)
                 }
+                .id("demo-label")
 
                 Section("alarm.note") {
                     TextField("alarm.note.placeholder", text: $draft.note, axis: .vertical)
@@ -139,7 +140,7 @@ struct AlarmEditorView: View {
             .onAppear {
                 guard LaunchConfiguration.seedDemo, LaunchConfiguration.screen == .editor else { return }
                 DispatchQueue.main.async {
-                    proxy.scrollTo("demo-voice", anchor: UnitPoint(x: 0.5, y: 0.12))
+                    proxy.scrollTo("demo-label", anchor: UnitPoint(x: 0.5, y: 0.22))
                 }
             }
             .onDisappear {

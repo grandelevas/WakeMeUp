@@ -24,16 +24,18 @@ struct AchievementsView: View {
                     }
                     totalsCard
                     historySection
-                    badgeSection
+                    Color.clear
+                        .frame(height: 1)
                         .id("demo-badges")
+                    badgeSection
                 }
                 .padding(16)
             }
             .onAppear {
-                guard LaunchConfiguration.seedDemo else { return }
-                DispatchQueue.main.async {
-                    proxy.scrollTo("demo-badges", anchor: UnitPoint(x: 0.5, y: 0.08))
-                }
+                scrollDemoBadges(proxy)
+            }
+            .onChange(of: document?.schemaVersion) { _, _ in
+                scrollDemoBadges(proxy)
             }
             .navigationTitle("tab.achievements")
             .toolbar {
@@ -50,6 +52,13 @@ struct AchievementsView: View {
             }
         }
         .accessibilityIdentifier("achievements-screen")
+    }
+
+    private func scrollDemoBadges(_ proxy: ScrollViewProxy) {
+        guard LaunchConfiguration.seedDemo else { return }
+        DispatchQueue.main.async {
+            proxy.scrollTo("demo-badges", anchor: UnitPoint(x: 0.5, y: 0.16))
+        }
     }
 
     private var languageCode: String {
