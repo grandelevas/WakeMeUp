@@ -18,15 +18,17 @@ struct SharingView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Text(model.usesCloudKit ? "sharing.cloudBanner" : "sharing.previewBanner")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                if !model.suppressPermissionBanner {
+                    Section {
+                        Text(model.usesCloudKit ? "sharing.cloudBanner" : "sharing.previewBanner")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 ownNameSection
-                if model.showsSimulatedPreview {
+                if model.showsSimulatedPreview && !model.suppressPermissionBanner {
                     previewSection
-                } else {
+                } else if !model.showsSimulatedPreview {
                     cloudSection
                 }
                 if !model.showsSimulatedPreview {
@@ -39,6 +41,9 @@ struct SharingView: View {
             }
             .navigationTitle("sharing.title")
             .onAppear {
+                if model.suppressPermissionBanner, expandedContactID == nil {
+                    expandedContactID = contacts.first?.id
+                }
                 guard model.selectedTab == .sharing else { return }
                 Task { await model.refreshRemote() }
             }

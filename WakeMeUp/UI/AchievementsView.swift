@@ -247,10 +247,13 @@ struct AchievementsView: View {
     }
 
     private func reload() async {
-        firstUse = SupportTenureStore.ensureFirstUse()
+        firstUse = LaunchConfiguration.seedDemo
+            ? DemoTenure.firstUse()
+            : SupportTenureStore.ensureFirstUse()
         if document == nil {
             document = AchievementsContentStore.startingDocument()
         }
+        if LaunchConfiguration.seedDemo { return }
         if let remote = await AchievementsContentStore.refresh(urlString: AppConfig.achievementsContentURL) {
             document = remote
         }

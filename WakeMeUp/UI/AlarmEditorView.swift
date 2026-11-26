@@ -17,6 +17,7 @@ struct AlarmEditorView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { proxy in
             Form {
                 DatePicker("alarm.label", selection: $time, displayedComponents: .hourAndMinute)
                     .datePickerStyle(.wheel)
@@ -54,6 +55,7 @@ struct AlarmEditorView: View {
                 }
 
                 voiceSection
+                    .id("demo-voice")
 
                 VideoMessageSection(videoID: draft.videoFileID) { id in
                     draft.videoFileID = id
@@ -134,9 +136,16 @@ struct AlarmEditorView: View {
                 draft.soundID = id
                 playPreview(of: id)
             }
+            .onAppear {
+                guard LaunchConfiguration.seedDemo, LaunchConfiguration.screen == .editor else { return }
+                DispatchQueue.main.async {
+                    proxy.scrollTo("demo-voice", anchor: .top)
+                }
+            }
             .onDisappear {
                 preview.stop()
                 recorder.stop()
+            }
             }
         }
         .accessibilityIdentifier("alarm-editor")

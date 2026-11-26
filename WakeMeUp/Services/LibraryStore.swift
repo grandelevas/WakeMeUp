@@ -99,6 +99,9 @@ enum LaunchConfiguration {
         case groups
         case sharing
         case ringing
+        case nap
+        case calendar
+        case achievements
     }
 
     static var screen: Screen {

@@ -332,6 +332,15 @@
 "demo.weekend" = "Weekend";
 "demo.me" = "Maja";
 "demo.friend" = "Ola";
+"demo.family" = "Rodzina";
+"demo.note.akhi" = "Wstań, gorąca kawa czeka. Życzę ci pięknego słońca i ćwicz z uśmiechem.";
+"demo.note.mama" = "Nie zapomnij szalika.";
+"demo.sent.ola" = "Pociąg";
+"demo.sent.tomek" = "Szkoła";
+"demo.calendar.breakfast" = "Śniadanie z Akhi";
+"demo.calendar.birthday" = "Urodziny Tomka";
+"demo.calendar.mama" = "Wizyta u mamy";
+"demo.calendar.yoga" = "Joga";
 
 "achievements.disclosure" = "Mateusz przekazuje 50% przychodu z subskrypcji na wybrane cele. Nie zbieramy darowizn w aplikacji.";
 "achievements.userCount" = "Jest nas już %@";

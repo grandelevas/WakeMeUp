@@ -93,16 +93,16 @@ jobs:
             DEVELOPMENT_TEAM= \
             ENABLE_DEBUG_DYLIB=NO
 
-      - name: Capture simulator screenshots
-        run: bash scripts/ci-screenshots.sh "${{ steps.sim.outputs.udid }}"
+      - name: Capture App Store screenshots
+        run: bash scripts/ci-screenshots.sh
 
-      - name: Upload screenshots
+      - name: Upload App Store screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: simulator-screenshots
-          path: screenshots
-          if-no-files-found: ignore
+          name: appstore-screenshots
+          path: screenshots/appstore
+          if-no-files-found: error
 
       - name: Upload test results
         if: failure()
