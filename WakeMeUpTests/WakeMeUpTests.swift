@@ -2785,3 +2785,36 @@ final class NapCalendarTests: XCTestCase {
         )
     }
 }
+
+final class DemoScreenshotTests: XCTestCase {
+    func testDemoDataFillsEveryStoreScreenAndStaysOutOfTheRealLibrary() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 11, day: 26, hour: 9, minute: 41))!
+        let snapshot = DemoData.storeSnapshot(now: now, calendar: calendar)
+        let names = ContactRoster.contacts(profileID: snapshot.profile.id, grants: snapshot.permissions.grants).map(\.name)
+        XCTAssertEqual(names, ["Akhi", "Mama", "Ola", "Tomek"])
+        XCTAssertTrue(ContactRoster.contacts(profileID: snapshot.profile.id, grants: snapshot.permissions.grants).allSatisfy { $0.wakeGrantID != nil })
+        XCTAssertEqual(snapshot.library.groups.first?.id, DemoData.weekdaysID)
+        XCTAssertEqual(snapshot.library.groups.dropFirst().first?.id, DemoData.weekendID)
+        let loved = snapshot.library.alarm(DemoData.lovedOneAlarmID)
+        XCTAssertEqual(loved?.label, "Akhi")
+        XCTAssertEqual(loved?.soundID, DemoData.voiceSoundID)
+        XCTAssertEqual(loved?.videoFileID, DemoData.videoID)
+        let ringing = snapshot.library.alarm(DemoData.ringingAlarmID)
+        XCTAssertEqual(ringing?.origin.senderName, "Akhi")
+        XCTAssertFalse(ringing?.note?.isEmpty ?? true)
+        XCTAssertEqual(snapshot.sentAlarms.map(\.recipientName), ["Ola", "Tomek"])
+        XCTAssertEqual(snapshot.calendarAlarms.count, 4)
+        XCTAssertTrue(snapshot.calendarAlarms.contains { $0.occurs(on: now, calendar: calendar) })
+        let session = DemoData.napSession(now: now)
+        XCTAssertTrue(session.isRunning(at: now))
+        XCTAssertEqual(session.minutes, 10)
+        let firstUse = DemoTenure.firstUse(now: now, calendar: calendar)
+        XCTAssertTrue(SupportMilestone.oneYear.isUnlocked(firstUse: firstUse, now: now, calendar: calendar))
+        XCTAssertFalse(SupportMilestone.twoYears.isUnlocked(firstUse: firstUse, now: now, calendar: calendar))
+        let wav = DemoMedia.wavData(seconds: 12)
+        XCTAssertEqual(String(data: wav.prefix(4), encoding: .ascii), "RIFF")
+        XCTAssertGreaterThan(wav.count, 12 * 8_000)
+    }
+}

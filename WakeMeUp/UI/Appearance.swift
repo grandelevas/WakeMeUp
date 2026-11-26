@@ -165,7 +165,11 @@ final class AppearanceSettings {
     }
 
     static func load() -> AppearanceSettings {
-        AppearanceSettings(record: AppearanceRecord.load(from: .standard))
+        var record = AppearanceRecord.load(from: .standard)
+        if LaunchConfiguration.seedDemo {
+            record.theme = .light
+        }
+        return AppearanceSettings(record: record)
     }
 
     func persist() {

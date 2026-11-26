@@ -332,6 +332,14 @@
 "demo.weekend" = "Weekend";
 "demo.me" = "Maja";
 "demo.friend" = "Ola";
+"demo.note.akhi" = "Get up, hot coffee is waiting. I wish you a beautiful, sunny day.";
+"demo.note.mama" = "Don't forget your scarf.";
+"demo.sent.ola" = "Train";
+"demo.sent.tomek" = "School";
+"demo.calendar.breakfast" = "Breakfast with Akhi";
+"demo.calendar.birthday" = "Tomek's birthday";
+"demo.calendar.mama" = "Visit Mama";
+"demo.calendar.yoga" = "Yoga";
 
 "achievements.disclosure" = "Mateusz gives 50% of subscription proceeds to causes he chooses. The app does not collect donations.";
 "achievements.userCount" = "%@ of us already";

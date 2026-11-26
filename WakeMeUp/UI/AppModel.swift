@@ -147,7 +147,14 @@ final class AppModel {
         let loaded = store.load() ?? LibrarySnapshot.empty(
             profile: Participant(id: UUID(), displayName: "")
         )
-        snapshot = screenshot ? DemoData.make() : loaded
+        if screenshot && LaunchConfiguration.storeScreenshots {
+            DemoMedia.install()
+            snapshot = DemoData.storeSnapshot()
+        } else if screenshot {
+            snapshot = DemoData.make()
+        } else {
+            snapshot = loaded
+        }
         coordinator = AlarmCoordinator()
         if let explicitCloudKit {
             cloudKit = explicitCloudKit
@@ -170,13 +177,23 @@ final class AppModel {
         remoteLabel = String(localized: "demo.morning")
         switch LaunchConfiguration.screen {
         case .editor:
-            editor = snapshot.library.alarms.first.map { AlarmDraft(alarm: $0) } ?? .makeNew()
+            editor = DemoData.lovedOneDraft(in: snapshot)
         case .groups:
             showGroups = true
         case .sharing:
             selectedTab = .sharing
         case .ringing:
-            ringingAlarmID = snapshot.library.alarms.first?.id
+            ringingAlarmID = DemoData.ringingAlarmID
+            heldRingingAlarm = snapshot.library.alarm(DemoData.ringingAlarmID)
+        case .nap:
+            selectedTab = .nap
+            let session = DemoData.napSession()
+            napMinutes = session.minutes
+            napSession = session
+        case .calendar:
+            selectedTab = .calendar
+        case .achievements:
+            selectedTab = .achievements
         case .alarms:
             break
         }

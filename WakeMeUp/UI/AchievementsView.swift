@@ -15,7 +15,7 @@ struct AchievementsView: View {
                         .foregroundStyle(.secondary)
                     userCountRow
                     personalCard
-                    if let campaign = document?.campaign {
+                    if let campaign = document?.campaign, !LaunchConfiguration.storeScreenshots {
                         campaignCard(campaign)
                         CampaignPhotoStrip(photos: campaign.gallery, title: "achievements.photos")
                         CampaignUpdatesSection(updates: campaign.visibleUpdates)
@@ -247,10 +247,13 @@ struct AchievementsView: View {
     }
 
     private func reload() async {
-        firstUse = SupportTenureStore.ensureFirstUse()
+        firstUse = LaunchConfiguration.seedDemo
+            ? DemoTenure.firstUse()
+            : SupportTenureStore.ensureFirstUse()
         if document == nil {
             document = AchievementsContentStore.startingDocument()
         }
+        if LaunchConfiguration.seedDemo { return }
         if let remote = await AchievementsContentStore.refresh(urlString: AppConfig.achievementsContentURL) {
             document = remote
         }

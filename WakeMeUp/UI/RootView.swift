@@ -11,7 +11,11 @@ struct RootView: View {
         @Bindable var model = model
         MainTabPager(selection: $model.selectedTab)
         .readableWidth()
-        .sheet(item: $model.editor) { draft in
+        .sheet(item: liveEditor) { draft in
+            AlarmEditorView(draft: draft)
+                .readableWidth()
+        }
+        .fullScreenCover(item: demoEditor) { draft in
             AlarmEditorView(draft: draft)
                 .readableWidth()
         }
@@ -76,6 +80,21 @@ struct RootView: View {
 
     /// Presents only when there is an alarm to draw. An id with no alarm used to
     /// leave an empty black cover that could not be dismissed.
+    /// Demo captures need the editor edge to edge. A sheet would leave the list peeking through.
+    private var liveEditor: Binding<AlarmDraft?> {
+        Binding(
+            get: { LaunchConfiguration.seedDemo ? nil : model.editor },
+            set: { model.editor = $0 }
+        )
+    }
+
+    private var demoEditor: Binding<AlarmDraft?> {
+        Binding(
+            get: { LaunchConfiguration.seedDemo ? model.editor : nil },
+            set: { if $0 == nil { model.editor = nil } }
+        )
+    }
+
     private var ringingAlarm: Binding<Alarm?> {
         Binding(
             get: { model.ringingAlarm },
