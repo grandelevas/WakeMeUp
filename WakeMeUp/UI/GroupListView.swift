@@ -6,11 +6,13 @@ struct GroupListView: View {
     @State private var name = ""
     @State private var symbol = "folder"
     @State private var pendingDelete: AlarmGroup?
+    @FocusState private var nameFocused: Bool
 
     var body: some View {
         List {
             Section("groups.add") {
                 TextField("groups.name", text: $name)
+                    .focused($nameFocused)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
                         ForEach(GroupSymbols.all, id: \.self) { item in
@@ -33,7 +35,17 @@ struct GroupListView: View {
                 .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             if model.library.groups.isEmpty {
-                ContentUnavailableView("groups.empty", systemImage: "folder", description: Text("groups.add"))
+                ContentUnavailableView {
+                    Label("groups.empty", systemImage: "folder")
+                } description: {
+                    Text("groups.empty.hint")
+                } actions: {
+                    Button("groups.empty.action") {
+                        nameFocused = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("empty-create-group")
+                }
             } else {
                 ForEach(model.library.groups) { group in
                     HStack {

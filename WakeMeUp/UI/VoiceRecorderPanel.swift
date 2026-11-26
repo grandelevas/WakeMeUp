@@ -4,8 +4,9 @@ import SwiftUI
 struct VoiceRecorderPanel: View {
     var recorder: VoiceClipRecorder
     var preview: SoundPreviewPlayer
-    var savedURL: URL?
+    var savedURL: URL? = nil
     var help: LocalizedStringKey
+    var voiceTipPresented: Binding<Bool> = .constant(false)
     var onUse: (URL) -> Void
     var onClear: () -> Void
 
@@ -58,10 +59,23 @@ struct VoiceRecorderPanel: View {
                 .buttonStyle(.borderless)
                 .foregroundStyle(.red)
             } else {
+                Text("voice.empty")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 Button("sharing.voice.record") {
                     Task { await recorder.start() }
                 }
                 .buttonStyle(.borderless)
+                .popover(isPresented: voiceTipPresented) {
+                    OnboardingTip(
+                        title: "onboarding.tip.voice.title",
+                        message: "onboarding.tip.voice.body"
+                    ) {
+                        OnboardingStore.markVoiceTipSeen(defaults: .standard)
+                        voiceTipPresented.wrappedValue = false
+                    }
+                    .presentationCompactAdaptation(.popover)
+                }
             }
         }
         .onChange(of: recorder.isRecording) { _, recording in

@@ -17,6 +17,9 @@ struct SettingsView: View {
                 NavigationLink("settings.history") {
                     ReleaseNotesView()
                 }
+                NavigationLink("onboarding.how.title") {
+                    HowItWorksView()
+                }
             }
             appearanceSection
             Section("settings.defaultSnooze") {

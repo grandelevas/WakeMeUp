@@ -9,6 +9,7 @@ struct AlarmEditorView: View {
     @State private var preview = SoundPreviewPlayer()
     @State private var recorder = VoiceClipRecorder()
     @State private var installedVoiceID: String?
+    @State private var showVoiceTip = false
 
     init(draft: AlarmDraft) {
         _draft = State(initialValue: draft)
@@ -138,10 +139,15 @@ struct AlarmEditorView: View {
                 playPreview(of: id)
             }
             .onAppear {
-                guard LaunchConfiguration.seedDemo, LaunchConfiguration.screen == .editor else { return }
-                DispatchQueue.main.async {
-                    proxy.scrollTo("demo-voice", anchor: UnitPoint(x: 0.5, y: 0.28))
+                if LaunchConfiguration.seedDemo, LaunchConfiguration.screen == .editor {
+                    DispatchQueue.main.async {
+                        proxy.scrollTo("demo-voice", anchor: UnitPoint(x: 0.5, y: 0.28))
+                    }
                 }
+                showVoiceTip = savedVoiceURL == nil && OnboardingStore.shouldShowVoiceTip(
+                    demo: model.suppressPermissionBanner,
+                    defaults: .standard
+                )
             }
             .onDisappear {
                 preview.stop()
@@ -159,6 +165,7 @@ struct AlarmEditorView: View {
                 preview: preview,
                 savedURL: savedVoiceURL,
                 help: "alarm.voice.help",
+                voiceTipPresented: $showVoiceTip,
                 onUse: { url in
                     if let previous = installedVoiceID {
                         model.removeLocalVoice(previous)

@@ -125,7 +125,20 @@ struct CalendarView: View {
         return VStack(alignment: .leading, spacing: 8) {
             Text(selectedDay.formatted(date: .complete, time: .omitted))
                 .font(.headline)
-            if alarms.isEmpty {
+            if model.calendarAlarms.isEmpty {
+                Text("calendar.empty.first")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Button("calendar.empty.action") {
+                    draft = CalendarAlarmDraft(
+                        day: selectedDay,
+                        calendar: calendar,
+                        snoozeMinutes: model.defaultSnoozeMinutes
+                    )
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("empty-add-calendar")
+            } else if alarms.isEmpty {
                 Text("calendar.empty")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)

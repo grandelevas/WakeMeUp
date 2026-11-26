@@ -4,6 +4,7 @@ struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
     @State private var whatsNew: ReleaseNote?
+    @State private var showWelcome = false
     @State private var showErrorDetail = false
     @State private var errorDetail = ""
 
@@ -69,7 +70,21 @@ struct RootView: View {
             Task { await model.refreshRemote() }
         }
         .task { await model.start() }
-        .task { presentWhatsNewIfNeeded() }
+        .task {
+            showWelcome = OnboardingStore.shouldShowWelcome(
+                demo: model.suppressPermissionBanner,
+                defaults: .standard
+            )
+            if !showWelcome {
+                presentWhatsNewIfNeeded()
+            }
+        }
+        .fullScreenCover(isPresented: $showWelcome) {
+            WelcomeView {
+                OnboardingStore.markWelcomeSeen(defaults: .standard)
+                showWelcome = false
+            }
+        }
         .sheet(item: $whatsNew) { note in
             WhatsNewSheet(note: note) {
                 ReleaseNotesPrompt.markSeen(currentBuild: currentBuild, defaults: .standard)
