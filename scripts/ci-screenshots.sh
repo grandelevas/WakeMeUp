@@ -41,7 +41,7 @@ expect_pixels() {
   fi
 }
 
-capture() {
+shoot() {
   local name="$1"
   shift
   xcrun simctl terminate "${UDID}" "${BUNDLE_ID}" || true
@@ -56,16 +56,26 @@ capture() {
     xcrun simctl io "${UDID}" screenshot "${dest}"
     bytes="$(wc -c < "${dest}" | tr -d ' ')"
     if [[ "${bytes}" -gt 150000 && "${attempt}" -ge 2 ]]; then
-      break
+      expect_pixels "${dest}"
+      return 0
     fi
     echo "Screenshot ${name} is not settled (${bytes} bytes), retry ${attempt}"
   done
-  expect_pixels "${dest}"
-  bytes="$(wc -c < "${dest}" | tr -d ' ')"
-  if [[ "${bytes}" -le 150000 ]]; then
-    echo "Screenshot ${name} stayed blank (${bytes} bytes)" >&2
-    exit 1
+  return 1
+}
+
+capture() {
+  local name="$1"
+  shift
+  if shoot "${name}" "$@"; then
+    return 0
   fi
+  echo "Relaunching ${name} after a blank capture"
+  if shoot "${name}" "$@"; then
+    return 0
+  fi
+  echo "Screenshot ${name} stayed blank" >&2
+  exit 1
 }
 
 screens=(
