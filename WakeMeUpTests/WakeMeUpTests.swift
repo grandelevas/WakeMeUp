@@ -2791,7 +2791,7 @@ final class DemoScreenshotTests: XCTestCase {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let now = calendar.date(from: DateComponents(year: 2026, month: 11, day: 26, hour: 9, minute: 41))!
-        let snapshot = DemoData.make(now: now, calendar: calendar)
+        let snapshot = DemoData.storeSnapshot(now: now, calendar: calendar)
         let names = ContactRoster.contacts(profileID: snapshot.profile.id, grants: snapshot.permissions.grants).map(\.name)
         XCTAssertEqual(names, ["Akhi", "Mama", "Ola", "Tomek"])
         XCTAssertTrue(ContactRoster.contacts(profileID: snapshot.profile.id, grants: snapshot.permissions.grants).allSatisfy { $0.wakeGrantID != nil })

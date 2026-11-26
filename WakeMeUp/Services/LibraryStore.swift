@@ -116,6 +116,11 @@ enum LaunchConfiguration {
     static var seedDemo: Bool {
         ProcessInfo.processInfo.arguments.contains("-WakeMeUpDemo")
     }
+
+    /// Rich sample content for App Store captures. The plain demo flag stays small so UI tests can drag groups.
+    static var storeScreenshots: Bool {
+        ProcessInfo.processInfo.arguments.contains("-WakeMeUpStore")
+    }
 }
 
 enum SoundFiles {

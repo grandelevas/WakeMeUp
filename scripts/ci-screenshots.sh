@@ -87,7 +87,7 @@ for language in pl en; do
   for entry in "${screens[@]}"; do
     file="${entry%% *}"
     screen="${entry##* }"
-    capture "${language}-${file}" "${lang_args[@]}" -WakeMeUpDemo -WakeMeUpScreen "${screen}"
+    capture "${language}-${file}" "${lang_args[@]}" -WakeMeUpDemo -WakeMeUpStore -WakeMeUpScreen "${screen}"
   done
 done
 

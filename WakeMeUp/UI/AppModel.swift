@@ -147,8 +147,10 @@ final class AppModel {
         let loaded = store.load() ?? LibrarySnapshot.empty(
             profile: Participant(id: UUID(), displayName: "")
         )
-        if screenshot {
+        if screenshot && LaunchConfiguration.storeScreenshots {
             DemoMedia.install()
+            snapshot = DemoData.storeSnapshot()
+        } else if screenshot {
             snapshot = DemoData.make()
         } else {
             snapshot = loaded
