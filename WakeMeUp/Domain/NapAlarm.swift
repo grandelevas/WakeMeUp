@@ -78,11 +78,12 @@ struct NapSession: Codable, Equatable {
 enum NapSessionStore {
     static let key = "wakito.napSession"
 
+    /// A finished nap stays stored. The countdown uses `isRunning`. The ringing
+    /// screen still needs the session if the app is opened after the fire time.
     static func load(from defaults: UserDefaults, now: Date) -> NapSession? {
+        _ = now
         guard let data = defaults.data(forKey: key),
-              let session = try? JSONDecoder().decode(NapSession.self, from: data),
-              session.isRunning(at: now) else {
-            defaults.removeObject(forKey: key)
+              let session = try? JSONDecoder().decode(NapSession.self, from: data) else {
             return nil
         }
         return session

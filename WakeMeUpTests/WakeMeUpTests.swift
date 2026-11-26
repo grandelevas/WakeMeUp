@@ -2557,7 +2557,9 @@ final class NapCalendarTests: XCTestCase {
         let defaults = UserDefaults(suiteName: "nap-session-\(UUID().uuidString)")!
         NapSessionStore.save(session, to: defaults)
         XCTAssertEqual(NapSessionStore.load(from: defaults, now: now.addingTimeInterval(30))?.id, session.id)
-        XCTAssertNil(NapSessionStore.load(from: defaults, now: session.fireAt.addingTimeInterval(1)))
+        let finished = NapSessionStore.load(from: defaults, now: session.fireAt.addingTimeInterval(1))
+        XCTAssertEqual(finished?.id, session.id)
+        XCTAssertFalse(finished?.isRunning(at: session.fireAt.addingTimeInterval(1)) ?? true)
 
         let nap = session.alarm()
         let oldNap = Alarm(
@@ -2595,6 +2597,93 @@ final class NapCalendarTests: XCTestCase {
             NapListCleanup.idsToCancel(in: [nap, oldNap], sessionID: session.id, legacyID: oldNap.id),
             [oldNap.id]
         )
+    }
+
+    func testNapEndNeverLeavesAnEmptyRingingCover() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let session = NapSession.make(minutes: 20, soundID: "classic", now: now)
+        let idle = RingingOverlayState(ringingID: nil, held: nil, nap: session)
+
+        let firing = RingingOverlay.apply(
+            alerting: [session.id],
+            state: idle,
+            now: session.fireAt,
+            libraryAlarm: { _ in nil },
+            calendarAlarm: { _ in nil }
+        )
+        XCTAssertEqual(firing.ringingID, session.id)
+        XCTAssertEqual(firing.held?.id, session.id)
+        XCTAssertNil(firing.nap)
+        XCTAssertNotNil(firing.presentedAlarm(libraryAlarm: { _ in nil }, calendarAlarm: { _ in nil }))
+
+        let stopped = RingingOverlay.apply(
+            alerting: [],
+            state: firing,
+            now: session.fireAt.addingTimeInterval(5),
+            libraryAlarm: { _ in nil },
+            calendarAlarm: { _ in nil }
+        )
+        XCTAssertNil(stopped.ringingID)
+        XCTAssertNil(stopped.held)
+        XCTAssertNil(stopped.presentedAlarm(libraryAlarm: { _ in nil }, calendarAlarm: { _ in nil }))
+
+        let relaunched = RingingOverlayState(ringingID: nil, held: nil, nap: session)
+        let unknown = UUID()
+        let unresolved = RingingOverlay.apply(
+            alerting: [unknown],
+            state: relaunched,
+            now: session.fireAt,
+            libraryAlarm: { _ in nil },
+            calendarAlarm: { _ in nil }
+        )
+        XCTAssertNil(unresolved.ringingID, "An alarm id with nothing to draw must not present a cover")
+        XCTAssertNil(unresolved.presentedAlarm(libraryAlarm: { _ in nil }, calendarAlarm: { _ in nil }))
+        XCTAssertNil(unresolved.nap)
+
+        let duringNap = RingingOverlay.apply(
+            alerting: [unknown],
+            state: idle,
+            now: now.addingTimeInterval(30),
+            libraryAlarm: { _ in nil },
+            calendarAlarm: { _ in nil }
+        )
+        XCTAssertEqual(duringNap.nap?.id, session.id)
+        XCTAssertNil(duringNap.ringingID)
+
+        let running = RingingOverlay.apply(
+            alerting: [],
+            state: idle,
+            now: now.addingTimeInterval(30),
+            libraryAlarm: { _ in nil },
+            calendarAlarm: { _ in nil }
+        )
+        XCTAssertEqual(running.nap?.id, session.id)
+        XCTAssertNil(running.ringingID)
+
+        let meeting = Alarm(
+            id: UUID(),
+            schedule: .wallClock(hour: 7, minute: 0, repeatDays: [.monday]),
+            label: "Meeting",
+            soundID: "classic",
+            snoozeEnabled: true,
+            snoozeMinutes: 9,
+            isEnabled: true,
+            groupID: nil,
+            songLink: nil,
+            origin: .local,
+            resumeWhenGroupEnables: nil
+        )
+        let listed = RingingOverlay.apply(
+            alerting: [meeting.id],
+            state: RingingOverlayState(),
+            now: now,
+            libraryAlarm: { $0 == meeting.id ? meeting : nil },
+            calendarAlarm: { _ in nil }
+        )
+        XCTAssertEqual(listed.presentedAlarm(libraryAlarm: { $0 == meeting.id ? meeting : nil }, calendarAlarm: { _ in nil })?.id, meeting.id)
+
+        let blank = RingingOverlayState(ringingID: unknown, held: nil, nap: nil)
+        XCTAssertNil(blank.presentedAlarm(libraryAlarm: { _ in nil }, calendarAlarm: { _ in nil }))
     }
 
     func testOneTimeCalendarAlarmsLeaveAndStayOutOfTheAlarmList() {

@@ -142,10 +142,19 @@ final class AlarmKitEngine {
         try? manager.countdown(id: id)
     }
 
-    func observe(_ onUpdate: @escaping @MainActor ([Alarm.ID]) -> Void) async {
-        for await alarms in manager.alarmUpdates {
-            let alerting = alarms.filter { $0.state == .alerting }.map(\.id)
-            onUpdate(alerting)
+    func alertingIDs() -> Set<UUID>? {
+        guard let alarms = try? manager.alarms else { return nil }
+        return Set(alarms.compactMap { $0.state == .alerting ? $0.id : nil })
+    }
+
+    /// AlarmKit publishes on an arbitrary executor. The caller applies the set on the main actor.
+    func observe(_ onUpdate: @escaping @MainActor (Set<UUID>) -> Void) async {
+        let updates = manager.alarmUpdates
+        for await alarms in updates {
+            let alerting = Set(alarms.compactMap { $0.state == .alerting ? $0.id : nil })
+            await MainActor.run {
+                onUpdate(alerting)
+            }
         }
     }
 
@@ -465,11 +474,13 @@ final class AlarmCoordinator {
         }
     }
 
-    func observeAlerting(_ onAlerting: @escaping @MainActor (UUID) -> Void) async {
+    func alertingIDs() -> Set<UUID>? {
+        alarmKit.alertingIDs()
+    }
+
+    func observeAlerting(_ onChange: @escaping @MainActor (Set<UUID>) -> Void) async {
         await alarmKit.observe { ids in
-            if let id = ids.first {
-                onAlerting(id)
-            }
+            onChange(ids)
         }
     }
 }
