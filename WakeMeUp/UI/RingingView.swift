@@ -85,6 +85,7 @@ struct RingingView: View {
             }
             .padding(24)
         }
+        .preferredColorScheme(.dark)
         .accessibilityIdentifier("ringing-screen")
     }
 

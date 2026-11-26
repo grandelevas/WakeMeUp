@@ -9,12 +9,14 @@ struct VideoMessageSection: View {
 
     var body: some View {
         Section {
-            if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                Button("video.record") { capturing = true }
-            } else {
-                Text("video.camera.unavailable")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            if videoID == nil {
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    Button("video.record") { capturing = true }
+                } else {
+                    Text("video.camera.unavailable")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
             if videoID != nil {
                 VideoMessagePreview(videoID: videoID, height: 200)

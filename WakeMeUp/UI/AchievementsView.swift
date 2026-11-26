@@ -8,6 +8,7 @@ struct AchievementsView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(disclosure)
@@ -24,8 +25,15 @@ struct AchievementsView: View {
                     totalsCard
                     historySection
                     badgeSection
+                        .id("demo-badges")
                 }
                 .padding(16)
+            }
+            .onAppear {
+                guard LaunchConfiguration.seedDemo else { return }
+                DispatchQueue.main.async {
+                    proxy.scrollTo("demo-badges", anchor: UnitPoint(x: 0.5, y: 0.08))
+                }
             }
             .navigationTitle("tab.achievements")
             .toolbar {
@@ -39,6 +47,7 @@ struct AchievementsView: View {
                 }
             }
             .task { await reload() }
+            }
         }
         .accessibilityIdentifier("achievements-screen")
     }

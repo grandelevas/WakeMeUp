@@ -45,10 +45,25 @@ capture() {
   local name="$1"
   shift
   xcrun simctl terminate "${UDID}" "${BUNDLE_ID}" || true
+  sleep 1
   xcrun simctl launch "${UDID}" "${BUNDLE_ID}" "$@"
-  sleep 5
-  xcrun simctl io "${UDID}" screenshot "${OUT}/${name}.png"
-  expect_pixels "${OUT}/${name}.png"
+  local dest="${OUT}/${name}.png"
+  local attempt bytes
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    sleep 2
+    xcrun simctl io "${UDID}" screenshot "${dest}"
+    bytes="$(wc -c < "${dest}" | tr -d ' ')"
+    if [[ "${bytes}" -gt 150000 ]]; then
+      break
+    fi
+    echo "Screenshot ${name} is still blank (${bytes} bytes), retry ${attempt}"
+  done
+  expect_pixels "${dest}"
+  bytes="$(wc -c < "${dest}" | tr -d ' ')"
+  if [[ "${bytes}" -le 150000 ]]; then
+    echo "Screenshot ${name} stayed blank (${bytes} bytes)" >&2
+    exit 1
+  fi
 }
 
 screens=(

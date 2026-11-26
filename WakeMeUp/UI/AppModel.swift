@@ -185,7 +185,9 @@ final class AppModel {
             heldRingingAlarm = snapshot.library.alarm(DemoData.ringingAlarmID)
         case .nap:
             selectedTab = .nap
-            napSession = DemoData.napSession()
+            let session = DemoData.napSession()
+            napMinutes = session.minutes
+            napSession = session
         case .calendar:
             selectedTab = .calendar
         case .achievements:

@@ -139,7 +139,7 @@ struct AlarmEditorView: View {
             .onAppear {
                 guard LaunchConfiguration.seedDemo, LaunchConfiguration.screen == .editor else { return }
                 DispatchQueue.main.async {
-                    proxy.scrollTo("demo-voice", anchor: .top)
+                    proxy.scrollTo("demo-voice", anchor: UnitPoint(x: 0.5, y: 0.12))
                 }
             }
             .onDisappear {
