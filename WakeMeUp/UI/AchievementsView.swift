@@ -8,7 +8,6 @@ struct AchievementsView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(disclosure)
@@ -16,7 +15,7 @@ struct AchievementsView: View {
                         .foregroundStyle(.secondary)
                     userCountRow
                     personalCard
-                    if let campaign = document?.campaign {
+                    if let campaign = document?.campaign, !LaunchConfiguration.storeScreenshots {
                         campaignCard(campaign)
                         CampaignPhotoStrip(photos: campaign.gallery, title: "achievements.photos")
                         CampaignUpdatesSection(updates: campaign.visibleUpdates)
@@ -24,18 +23,9 @@ struct AchievementsView: View {
                     }
                     totalsCard
                     historySection
-                    Color.clear
-                        .frame(height: 1)
-                        .id("demo-badges")
                     badgeSection
                 }
                 .padding(16)
-            }
-            .onAppear {
-                scrollDemoBadges(proxy)
-            }
-            .onChange(of: document?.schemaVersion) { _, _ in
-                scrollDemoBadges(proxy)
             }
             .navigationTitle("tab.achievements")
             .toolbar {
@@ -49,16 +39,8 @@ struct AchievementsView: View {
                 }
             }
             .task { await reload() }
-            }
         }
         .accessibilityIdentifier("achievements-screen")
-    }
-
-    private func scrollDemoBadges(_ proxy: ScrollViewProxy) {
-        guard LaunchConfiguration.seedDemo else { return }
-        DispatchQueue.main.async {
-            proxy.scrollTo("demo-badges", anchor: UnitPoint(x: 0.5, y: 0.1))
-        }
     }
 
     private var languageCode: String {
