@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "currency": "EUR",
   "disclosure": {
-    "en": "Mateusz gives 50% of subscription proceeds to causes he chooses. The app does not collect donations.",
-    "pl": "Mateusz przekazuje 50% przychodu z subskrypcji na wybrane cele. Nie zbieramy darowizn w aplikacji."
+    "en": "Mateusz gives 50% of subscription profit to causes he chooses. The app does not collect donations.",
+    "pl": "Mateusz przekazuje 50% zysku z subskrypcji na wybrane cele. Nie zbieramy darowizn w aplikacji."
   },
   "campaign": {
     "id": "placeholder",

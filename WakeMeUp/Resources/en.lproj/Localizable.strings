@@ -341,7 +341,7 @@
 "demo.calendar.mama" = "Visit Mama";
 "demo.calendar.yoga" = "Yoga";
 
-"achievements.disclosure" = "Mateusz gives 50% of subscription proceeds to causes he chooses. The app does not collect donations.";
+"achievements.disclosure" = "Mateusz gives 50% of subscription profit to causes he chooses. The app does not collect donations.";
 "achievements.userCount" = "%@ of us already";
 "achievements.userCountDate" = "As of %@";
 "achievements.together" = "Our shared success";
