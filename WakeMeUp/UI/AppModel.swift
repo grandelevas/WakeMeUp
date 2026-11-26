@@ -200,16 +200,22 @@ final class AppModel {
         notificationAllowed = await coordinator.notificationStatus() == .authorized
         await reschedule(requestAccess: false)
         await restoreNapAlarm()
+        applyAlerting(coordinator.alertingIDs())
         if let handoff = LaunchHandoff.consume() {
-            ringingAlarmID = handoff.alarmID
+            presentResolved(handoff.alarmID)
             await UIApplication.shared.open(handoff.songURL)
         }
         Task { await refreshRemote() }
         Task { await cloudKit?.ensureSilentSubscription() }
         Task { await publishDueWakeReports() }
-        await coordinator.observeAlerting { [weak self] id in
-            self?.beginRinging(id)
+        await coordinator.observeAlerting { [weak self] ids in
+            self?.applyAlerting(ids)
         }
+    }
+
+    /// Reads AlarmKit again after the app returns from the background.
+    func reconcileRingingWithSystem() {
+        applyAlerting(coordinator.alertingIDs())
     }
 
     func allowAlarms() async {
@@ -378,10 +384,7 @@ final class AppModel {
     }
 
     private func restoreNapAlarm() async {
-        guard let napSession, napSession.isRunning(at: .now) else {
-            if napSession != nil { clearNapSession() }
-            return
-        }
+        guard let napSession, napSession.isRunning(at: .now) else { return }
         if let failure = await coordinator.scheduleStandalone(napSession.alarm(), customSounds: snapshot.customSounds) {
             scheduleFailure = failure
         }
@@ -1156,7 +1159,7 @@ final class AppModel {
             return
         }
         if let id = UUID(uuidString: url.lastPathComponent) {
-            ringingAlarmID = id
+            presentResolved(id)
         }
         if let song = URLComponents(url: url, resolvingAgainstBaseURL: false)?
             .queryItems?
@@ -1172,7 +1175,7 @@ final class AppModel {
         let alarmID = (info["alarmID"] as? String).flatMap(UUID.init(uuidString:))
         switch response.actionIdentifier {
         case NotificationAction.playSong:
-            if let alarmID { ringingAlarmID = alarmID }
+            if let alarmID { presentResolved(alarmID) }
             if let song = info["song"] as? String, let url = URL(string: song) {
                 await coordinator.stop(id: alarmID ?? UUID())
                 await UIApplication.shared.open(url)
@@ -1188,11 +1191,12 @@ final class AppModel {
                 await coordinator.stop(id: alarmID)
             }
         default:
-            if let alarmID { ringingAlarmID = alarmID }
+            if let alarmID { presentResolved(alarmID) }
         }
     }
 
     func dismissRinging() {
+        guard ringingAlarmID != nil || heldRingingAlarm != nil else { return }
         if let id = ringingAlarmID {
             noteRemoteAlarmDismissed(id)
             retireOneTimeAlarms(rungIDs: [id])
@@ -1243,16 +1247,38 @@ final class AppModel {
         }
     }
 
-    private func beginRinging(_ id: UUID) {
-        if napSession?.id == id {
+    private func presentResolved(_ id: UUID) {
+        var ids = coordinator.alertingIDs()
+        ids.insert(id)
+        applyAlerting(ids)
+    }
+
+    private func applyAlerting(_ ids: Set<UUID>) {
+        let previousID = ringingAlarmID
+        let hadNap = napSession != nil
+        let next = RingingOverlay.apply(
+            alerting: ids,
+            state: RingingOverlayState(ringingID: ringingAlarmID, held: heldRingingAlarm, nap: napSession),
+            now: .now,
+            libraryAlarm: { self.snapshot.library.alarm($0) },
+            calendarAlarm: { id in
+                self.snapshot.calendarAlarms.first { $0.id == id }?
+                    .alarmForScheduling(now: .now, calendar: .current)
+            }
+        )
+        let started = next.ringingID != nil && next.ringingID != previousID
+        ringingAlarmID = next.presentedAlarm(
+            libraryAlarm: { self.snapshot.library.alarm($0) },
+            calendarAlarm: { id in
+                self.snapshot.calendarAlarms.first { $0.id == id }?
+                    .alarmForScheduling(now: .now, calendar: .current)
+            }
+        ) == nil ? nil : next.ringingID
+        heldRingingAlarm = ringingAlarmID == nil ? nil : next.held
+        if hadNap, next.nap == nil {
             clearNapSession()
         }
-        if let alarm = snapshot.library.alarm(id) {
-            heldRingingAlarm = alarm
-        } else if let calendar = snapshot.calendarAlarms.first(where: { $0.id == id }) {
-            heldRingingAlarm = calendar.alarmForScheduling(now: .now, calendar: .current)
-        }
-        ringingAlarmID = id
+        guard started, let id = ringingAlarmID else { return }
         noteRemoteAlarmFired(id)
         retireOneTimeAlarms(rungIDs: [id])
         retireCalendarAlarms(rungIDs: [id])

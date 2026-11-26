@@ -15,10 +15,8 @@ struct RootView: View {
             AlarmEditorView(draft: draft)
                 .readableWidth()
         }
-        .fullScreenCover(isPresented: ringingPresented) {
-            if let alarm = model.ringingAlarm {
-                RingingView(alarm: alarm)
-            }
+        .fullScreenCover(item: ringingAlarm) { alarm in
+            RingingView(alarm: alarm)
         }
         .sheet(isPresented: sharePresented) {
             ActivityShareSheet(items: shareItems)
@@ -63,6 +61,7 @@ struct RootView: View {
         .onOpenURL { model.handle(url: $0) }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active, !model.suppressPermissionBanner else { return }
+            model.reconcileRingingWithSystem()
             Task { await model.refreshRemote() }
         }
         .task { await model.start() }
@@ -75,10 +74,12 @@ struct RootView: View {
         }
     }
 
-    private var ringingPresented: Binding<Bool> {
+    /// Presents only when there is an alarm to draw. An id with no alarm used to
+    /// leave an empty black cover that could not be dismissed.
+    private var ringingAlarm: Binding<Alarm?> {
         Binding(
-            get: { model.ringingAlarmID != nil },
-            set: { if !$0 { model.dismissRinging() } }
+            get: { model.ringingAlarm },
+            set: { if $0 == nil { model.dismissRinging() } }
         )
     }
 

@@ -2,6 +2,18 @@
     "entries": [
     {
       "version": "1.0.0",
+      "date": "2026-11-26",
+      "changes": {
+        "en": [
+          "After a nap, the app no longer gets stuck on a black screen. Stopping the alarm, including from the Lock Screen, closes the ringing screen."
+        ],
+        "pl": [
+          "Po drzemce aplikacja nie zostaje już na czarnym ekranie. Zatrzymanie alarmu, także z ekranu blokady, zamyka ekran dzwonienia."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
       "date": "2026-11-25",
       "changes": {
         "en": [
