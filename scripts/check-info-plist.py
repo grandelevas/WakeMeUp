@@ -55,6 +55,17 @@ def main() -> int:
             if plist.get(key) != "Wakito":
                 print(f"{label} {key} must be Wakito, got {plist.get(key)!r}", file=sys.stderr)
                 return 1
+    for key in ("NSCameraUsageDescription", "NSMicrophoneUsageDescription"):
+        value = app.get(key)
+        if not isinstance(value, str) or not value.strip():
+            print(f"Info.plist must explain {key}", file=sys.stderr)
+            return 1
+        for language in ("en", "pl"):
+            text = (ROOT / "WakeMeUp" / "Resources" / f"{language}.lproj" / "InfoPlist.strings").read_text()
+            if f'"{key}"' not in text:
+                print(f"{language} InfoPlist.strings must localize {key}", file=sys.stderr)
+                return 1
+
     if app.get("CKSharingSupported") is not True:
         print("CKSharingSupported must stay true so iCloud share links can open the app", file=sys.stderr)
         return 1

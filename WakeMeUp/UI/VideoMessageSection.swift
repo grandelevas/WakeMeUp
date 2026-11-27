@@ -5,8 +5,6 @@ struct VideoMessageSection: View {
     @Environment(AppModel.self) private var model
     var videoID: String?
     var onChange: (String?) -> Void
-    @State private var capturing = false
-
     var body: some View {
         Section {
             if videoID == nil {
@@ -14,7 +12,17 @@ struct VideoMessageSection: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                    Button("video.record") { capturing = true }
+                    Button("video.record") {
+                        model.videoCaptureActive = true
+                        CameraVideoCapture.present(
+                            onPick: { url in
+                                model.videoCaptureActive = false
+                                Task { await store(url) }
+                            },
+                            onCancel: { model.videoCaptureActive = false }
+                        )
+                    }
+                    .accessibilityIdentifier("record-video")
                 } else {
                     Text("video.camera.unavailable")
                         .font(.footnote)
@@ -35,21 +43,6 @@ struct VideoMessageSection: View {
         } footer: {
             Text("video.help")
         }
-        .fullScreenCover(isPresented: $capturing) {
-            CameraVideoPicker(
-                onPick: { url in
-                    capturing = false
-                    Task { await store(url) }
-                },
-                onCancel: { capturing = false }
-            )
-            .ignoresSafeArea()
-        }
-    }
-
-    private var videoURL: URL? {
-        guard let videoID else { return nil }
-        return VideoFiles.url(id: videoID)
     }
 
     private func store(_ url: URL) async {

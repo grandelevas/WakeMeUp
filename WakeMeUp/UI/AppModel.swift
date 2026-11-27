@@ -56,6 +56,8 @@ enum AppRuntime {
 final class AppModel {
     private(set) var snapshot: LibrarySnapshot
     var editor: AlarmDraft?
+    /// True while the camera is up, so a sheet dismissal cannot throw the draft away.
+    var videoCaptureActive = false
     /// When set, saving the editor sends the alarm to this grant instead of storing it locally.
     var editorRecipientGrantID: UUID?
     var ringingAlarmID: UUID?

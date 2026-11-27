@@ -65,7 +65,7 @@ struct RootView: View {
         }
         .onOpenURL { model.handle(url: $0) }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active, !model.suppressPermissionBanner else { return }
+            guard phase == .active, !model.suppressPermissionBanner, !model.videoCaptureActive else { return }
             model.reconcileRingingWithSystem()
             Task { await model.refreshRemote() }
         }
@@ -99,14 +99,20 @@ struct RootView: View {
     private var liveEditor: Binding<AlarmDraft?> {
         Binding(
             get: { LaunchConfiguration.seedDemo ? nil : model.editor },
-            set: { model.editor = $0 }
+            set: { model.editor = EditorDraftSession.draft(current: model.editor, proposed: $0, capturingVideo: model.videoCaptureActive) }
         )
     }
 
     private var demoEditor: Binding<AlarmDraft?> {
         Binding(
             get: { LaunchConfiguration.seedDemo ? model.editor : nil },
-            set: { if $0 == nil { model.editor = nil } }
+            set: {
+                model.editor = EditorDraftSession.draft(
+                    current: model.editor,
+                    proposed: $0,
+                    capturingVideo: model.videoCaptureActive
+                )
+            }
         )
     }
 

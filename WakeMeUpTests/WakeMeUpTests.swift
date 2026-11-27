@@ -2819,6 +2819,22 @@ final class DemoScreenshotTests: XCTestCase {
     }
 }
 
+final class EditorDraftSessionTests: XCTestCase {
+    func testCameraDismissalDoesNotDropTheOpenDraft() {
+        let draft = AlarmDraft.makeNew()
+        XCTAssertEqual(
+            EditorDraftSession.draft(current: draft, proposed: nil, capturingVideo: true)?.id,
+            draft.id
+        )
+        XCTAssertNil(EditorDraftSession.draft(current: draft, proposed: nil, capturingVideo: false))
+        let replacement = AlarmDraft.makeNew()
+        XCTAssertEqual(
+            EditorDraftSession.draft(current: draft, proposed: replacement, capturingVideo: true)?.id,
+            replacement.id
+        )
+    }
+}
+
 final class OnboardingStoreTests: XCTestCase {
     func testWelcomeAndTipsAreShownOnceAndStayHiddenInDemo() {
         let defaults = UserDefaults(suiteName: "onboarding-\(UUID().uuidString)")!
