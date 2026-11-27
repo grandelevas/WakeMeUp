@@ -71,49 +71,83 @@ enum VideoCompressor {
     }
 }
 
-struct CameraVideoPicker: UIViewControllerRepresentable {
-    var onPick: (URL) -> Void
-    var onCancel: () -> Void
+@MainActor
+enum CameraVideoCapture {
+    private static var retainedDelegates: [ObjectIdentifier: CameraPickerDelegate] = [:]
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onPick: onPick, onCancel: onCancel)
-    }
-
-    func makeUIViewController(context: Context) -> UIImagePickerController {
+    /// Presents the camera from the editor sheet itself. A SwiftUI fullScreenCover inside that sheet
+    /// dismisses the sheet and drops the draft.
+    static func present(onPick: @escaping (URL) -> Void, onCancel: @escaping () -> Void) {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera), let host = cameraHost() else {
+            onCancel()
+            return
+        }
         let picker = UIImagePickerController()
         picker.sourceType = .camera
         picker.mediaTypes = [UTType.movie.identifier]
         picker.cameraCaptureMode = .video
         picker.videoMaximumDuration = VideoMessagePolicy.maxSeconds
         picker.videoQuality = .typeMedium
-        picker.delegate = context.coordinator
-        return picker
+        let delegate = CameraPickerDelegate(onPick: onPick, onCancel: onCancel)
+        picker.delegate = delegate
+        retainedDelegates[ObjectIdentifier(picker)] = delegate
+        host.present(picker, animated: true)
     }
 
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-
-    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let onPick: (URL) -> Void
-        let onCancel: () -> Void
-
-        init(onPick: @escaping (URL) -> Void, onCancel: @escaping () -> Void) {
-            self.onPick = onPick
-            self.onCancel = onCancel
+    private static func cameraHost() -> UIViewController? {
+        let root = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }?
+            .rootViewController
+        var current = root
+        while let next = current?.presentedViewController {
+            if next.modalPresentationStyle == .popover { break }
+            current = next
         }
+        return current
+    }
 
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            onCancel()
-        }
+    fileprivate static func release(_ picker: UIImagePickerController) {
+        retainedDelegates[ObjectIdentifier(picker)] = nil
+    }
+}
 
-        func imagePickerController(
-            _ picker: UIImagePickerController,
-            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
-        ) {
-            guard let url = info[.mediaURL] as? URL else {
-                onCancel()
-                return
+private final class CameraPickerDelegate: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    let onPick: (URL) -> Void
+    let onCancel: () -> Void
+
+    init(onPick: @escaping (URL) -> Void, onCancel: @escaping () -> Void) {
+        self.onPick = onPick
+        self.onCancel = onCancel
+    }
+
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        picker.dismiss(animated: true) {
+            let cancel = self.onCancel
+            Task { @MainActor in
+                CameraVideoCapture.release(picker)
+                cancel()
             }
-            onPick(url)
+        }
+    }
+
+    func imagePickerController(
+        _ picker: UIImagePickerController,
+        didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+    ) {
+        let url = info[.mediaURL] as? URL
+        picker.dismiss(animated: true) {
+            let pick = self.onPick
+            let cancel = self.onCancel
+            Task { @MainActor in
+                CameraVideoCapture.release(picker)
+                if let url {
+                    pick(url)
+                } else {
+                    cancel()
+                }
+            }
         }
     }
 }

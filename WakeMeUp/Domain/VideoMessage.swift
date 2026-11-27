@@ -1,5 +1,16 @@
 import Foundation
 
+enum EditorDraftSession {
+    /// A camera presentation can make SwiftUI dismiss the editor sheet and write nil into the item binding.
+    /// While a video is being recorded, that nil is ignored so the draft stays on screen.
+    static func draft(current: AlarmDraft?, proposed: AlarmDraft?, capturingVideo: Bool) -> AlarmDraft? {
+        if proposed == nil, capturingVideo {
+            return current
+        }
+        return proposed
+    }
+}
+
 enum VideoMessagePolicy {
     static let maxSeconds: TimeInterval = 30
     /// Medium export, then a lower preset if needed, stays under a CloudKit asset.
