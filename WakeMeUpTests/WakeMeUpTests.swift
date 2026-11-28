@@ -2546,6 +2546,49 @@ final class NapCalendarTests: XCTestCase {
         XCTAssertEqual(NapSettings.minutes(in: snoozeDefaults), NapSettings.defaultMinutes)
     }
 
+    func testNewAlarmsUseTheChosenSoundAndExistingOnesKeepTheirs() {
+        let defaults = UserDefaults(suiteName: "default-sound-\(UUID().uuidString)")!
+        XCTAssertEqual(DefaultAlarmSound.soundID(in: defaults), SoundCatalog.defaultID)
+        XCTAssertNotEqual(DefaultAlarmSound.key, NapSettings.soundKey)
+        DefaultAlarmSound.setSoundID("bell", in: defaults)
+        XCTAssertEqual(DefaultAlarmSound.soundID(in: defaults), "bell")
+        DefaultAlarmSound.setSoundID("   ", in: defaults)
+        XCTAssertEqual(DefaultAlarmSound.soundID(in: defaults), SoundCatalog.defaultID)
+        XCTAssertEqual(DefaultAlarmSound.resolved("bell", availableCustomIDs: []), "bell")
+        XCTAssertEqual(DefaultAlarmSound.resolved("voice-mine", availableCustomIDs: ["voice-mine"]), "voice-mine")
+        XCTAssertEqual(DefaultAlarmSound.resolved("voice-gone", availableCustomIDs: []), SoundCatalog.defaultID)
+        XCTAssertEqual(DefaultAlarmSound.resolved("  ", availableCustomIDs: ["voice-mine"]), SoundCatalog.defaultID)
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 11, day: 28, hour: 8, minute: 0))!
+        let existing = Alarm(
+            id: UUID(),
+            schedule: .wallClock(hour: 7, minute: 0, repeatDays: [.saturday]),
+            label: "Already set",
+            soundID: "chime",
+            snoozeEnabled: true,
+            snoozeMinutes: 9,
+            isEnabled: true,
+            groupID: nil,
+            songLink: nil,
+            origin: .local,
+            resumeWhenGroupEnables: nil
+        )
+        let draft = AlarmDraft.makeNew(now: now, calendar: calendar, snoozeMinutes: 9, soundID: "bell")
+        XCTAssertEqual(draft.soundID, "bell")
+        XCTAssertEqual(existing.soundID, "chime")
+        XCTAssertEqual(AlarmDraft.makeNew().soundID, SoundCatalog.defaultID)
+        let spoken = SpokenAlarm.make(at: now, now: now, calendar: calendar, soundID: "rise")
+        XCTAssertEqual(spoken.soundID, "rise")
+        XCTAssertEqual(SpokenAlarm.make(at: now, now: now, calendar: calendar).soundID, SoundCatalog.defaultID)
+        let dated = CalendarAlarmDraft(day: now, calendar: calendar, soundID: "pulse")
+        XCTAssertEqual(dated.soundID, "pulse")
+        XCTAssertEqual(CalendarAlarmDraft(day: now, calendar: calendar).soundID, SoundCatalog.defaultID)
+        XCTAssertEqual(NapAlarm.make(minutes: 10, soundID: "birds", now: now).soundID, "birds")
+        XCTAssertEqual(NapSettings.soundID(in: defaults), SoundCatalog.defaultID)
+    }
+
     func testNapSessionStaysOutOfTheAlarmList() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let session = NapSession.make(minutes: 15, soundID: "classic", now: now)

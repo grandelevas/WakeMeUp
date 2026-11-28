@@ -6,6 +6,7 @@ struct SoundChoiceList: View {
     var preview: SoundPreviewPlayer
     var showsImport: Bool = false
     var title: LocalizedStringKey = "alarm.sound"
+    var footer: LocalizedStringKey? = nil
     var onImport: () -> Void = {}
     @State private var renaming: CustomSound?
     @State private var renameText = ""
@@ -46,6 +47,11 @@ struct SoundChoiceList: View {
                 Button("sound.delete", role: .destructive) {
                     delete(custom)
                 }
+            }
+            if let footer {
+                Text(footer)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
         .alert("sound.rename", isPresented: renamePresented) {

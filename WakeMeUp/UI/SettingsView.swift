@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(AppearanceSettings.self) private var appearance
     @Environment(\.appAccent) private var appAccent
+    @State private var alarmSoundPreview = SoundPreviewPlayer()
     @State private var napPreview = SoundPreviewPlayer()
 
     var body: some View {
@@ -36,6 +37,15 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            SoundChoiceList(
+                soundID: Binding(
+                    get: { model.defaultAlarmSoundID },
+                    set: { model.setDefaultAlarmSoundID($0) }
+                ),
+                preview: alarmSoundPreview,
+                title: "settings.defaultSound",
+                footer: "settings.defaultSound.help"
+            )
             SoundChoiceList(
                 soundID: Binding(
                     get: { model.napSoundID },
@@ -89,7 +99,10 @@ struct SettingsView: View {
         }
         .navigationTitle("settings.title")
         .accessibilityIdentifier("settings-screen")
-        .onDisappear { napPreview.stop() }
+        .onDisappear {
+            alarmSoundPreview.stop()
+            napPreview.stop()
+        }
     }
 
     @ViewBuilder

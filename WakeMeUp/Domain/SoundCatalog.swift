@@ -34,6 +34,29 @@ enum SoundCatalog {
     }
 }
 
+/// The sound a newly created alarm starts with. Stored on this iPhone only.
+enum DefaultAlarmSound {
+    static let key = "wakito.defaultAlarmSound"
+
+    static func soundID(in defaults: UserDefaults) -> String {
+        let stored = defaults.string(forKey: key) ?? ""
+        return stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? SoundCatalog.defaultID : stored
+    }
+
+    static func setSoundID(_ id: String, in defaults: UserDefaults) {
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        defaults.set(trimmed.isEmpty ? SoundCatalog.defaultID : trimmed, forKey: key)
+    }
+
+    /// Bundled sounds and custom sounds still on this phone are kept. Anything else falls back to the built-in sound.
+    static func resolved(_ id: String, availableCustomIDs: Set<String>) -> String {
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        if SoundCatalog.isBundled(trimmed) { return trimmed }
+        if availableCustomIDs.contains(trimmed) { return trimmed }
+        return SoundCatalog.defaultID
+    }
+}
+
 enum SoundLibraryEdit {
     static func isVoiceRecording(_ id: String) -> Bool {
         id.hasPrefix("voice-")
