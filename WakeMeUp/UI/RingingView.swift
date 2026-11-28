@@ -29,7 +29,13 @@ struct RingingView: View {
                     Text(String(format: String(localized: "sharing.remoteFrom"), name))
                         .foregroundStyle(appAccent)
                 }
-                if alarm.videoFileID != nil {
+                if let videoID = alarm.videoFileID, let url = VideoFiles.url(id: videoID), VideoFileCheck.byteCount(at: url) > 1000 {
+                    VideoMessagePlayer(url: url)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 220)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .padding(.horizontal)
+                } else if alarm.videoFileID != nil {
                     VideoMessagePreview(videoID: alarm.videoFileID, height: 220)
                         .padding(.horizontal)
                 }

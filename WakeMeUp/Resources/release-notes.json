@@ -2,6 +2,18 @@
     "entries": [
     {
       "version": "1.0.0",
+      "date": "2026-11-28",
+      "changes": {
+        "en": [
+          "Stopping an alarm that has a video message posts a notification. Tap it to play the video. The clip stays on the alarm, with a preview in the editor and the alarm list."
+        ],
+        "pl": [
+          "Zatrzymanie alarmu z wiadomością wideo wysyła powiadomienie. Dotknij je, aby odtworzyć wideo. Nagranie zostaje przy alarmie, z podglądem w edytorze i na liście alarmów."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
       "date": "2026-11-26",
       "changes": {
         "en": [
