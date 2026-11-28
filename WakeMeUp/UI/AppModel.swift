@@ -224,8 +224,11 @@ final class AppModel {
         }
         if let handoff = LaunchHandoff.consume() {
             presentResolved(handoff.alarmID)
-            await UIApplication.shared.open(handoff.songURL)
+            if !LaunchHandoff.isAlarmVideo(handoff.songURL) {
+                await UIApplication.shared.open(handoff.songURL)
+            }
         }
+        presentRecentVideoIfNeeded()
         Task { await refreshRemote() }
         Task { await cloudKit?.ensureSilentSubscription() }
         Task { await publishDueWakeReports() }
@@ -278,6 +281,11 @@ final class AppModel {
     }
 
     func installVideo(from url: URL) async -> String? {
+        defer {
+            if url.deletingLastPathComponent().lastPathComponent == "Inbox" {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
         let id = VideoMessagePolicy.makeID()
         do {
             return try await VideoFiles.install(from: url, id: id)
@@ -1152,6 +1160,7 @@ final class AppModel {
         noteRemoteAlarmDismissed(id)
         await coordinator.stop(id: id)
         ringingAlarmID = nil
+        RecentAlarmVideo.clear(defaults: .standard)
     }
 
     func snoozeRinging() async {
@@ -1178,6 +1187,10 @@ final class AppModel {
             if SongLink.parse(url.absoluteString) != nil {
                 UIApplication.shared.open(url)
             }
+            return
+        }
+        if LaunchHandoff.isAlarmVideo(url), let id = UUID(uuidString: url.lastPathComponent) {
+            presentResolved(id)
             return
         }
         if let id = UUID(uuidString: url.lastPathComponent) {
@@ -1226,6 +1239,7 @@ final class AppModel {
         }
         ringingAlarmID = nil
         heldRingingAlarm = nil
+        RecentAlarmVideo.clear(defaults: .standard)
         Task { await reschedule(requestAccess: false) }
     }
 
@@ -1301,9 +1315,22 @@ final class AppModel {
             clearNapSession()
         }
         guard started, let id = ringingAlarmID else { return }
+        if snapshot.library.alarm(id)?.videoFileID != nil || heldRingingAlarm?.videoFileID != nil {
+            RecentAlarmVideo.remember(id, now: .now, defaults: .standard)
+        }
         noteRemoteAlarmFired(id)
         retireOneTimeAlarms(rungIDs: [id])
         retireCalendarAlarms(rungIDs: [id])
+    }
+
+    func presentRecentVideoIfNeeded(now: Date = .now) {
+        guard ringingAlarmID == nil, let id = RecentAlarmVideo.pending(now: now, defaults: .standard) else { return }
+        guard snapshot.library.alarm(id)?.videoFileID != nil || heldRingingAlarm?.id == id else {
+            RecentAlarmVideo.clear(defaults: .standard)
+            return
+        }
+        RecentAlarmVideo.clear(defaults: .standard)
+        presentResolved(id)
     }
 
     private func retireCalendarAlarms(rungIDs: Set<UUID> = []) {

@@ -2819,6 +2819,35 @@ final class DemoScreenshotTests: XCTestCase {
     }
 }
 
+final class PickedVideoFileTests: XCTestCase {
+    func testCameraFileIsCopiedBeforeThePickerDeletesIt() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let inbox = root.appendingPathComponent("Inbox", isDirectory: true)
+        let source = root.appendingPathComponent("capture.mov")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("video-bytes".utf8).write(to: source)
+        let copy = try PickedVideoFile.durableCopy(of: source, inbox: inbox)
+        try FileManager.default.removeItem(at: source)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
+        XCTAssertEqual(try Data(contentsOf: copy), Data("video-bytes".utf8))
+        XCTAssertEqual(copy.pathExtension, "mov")
+        try FileManager.default.removeItem(at: root)
+    }
+
+    func testRecentVideoIsRememberedOnlyForAShortWhile() {
+        let defaults = UserDefaults(suiteName: "video-\(UUID().uuidString)")!
+        let id = UUID()
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        XCTAssertNil(RecentAlarmVideo.pending(now: now, defaults: defaults))
+        RecentAlarmVideo.remember(id, now: now, defaults: defaults)
+        XCTAssertEqual(RecentAlarmVideo.pending(now: now.addingTimeInterval(60), defaults: defaults), id)
+        XCTAssertNil(RecentAlarmVideo.pending(now: now.addingTimeInterval(181), defaults: defaults))
+        RecentAlarmVideo.remember(id, now: now, defaults: defaults)
+        RecentAlarmVideo.clear(defaults: defaults)
+        XCTAssertNil(RecentAlarmVideo.pending(now: now, defaults: defaults))
+    }
+}
+
 final class EditorDraftSessionTests: XCTestCase {
     func testCameraDismissalDoesNotDropTheOpenDraft() {
         let draft = AlarmDraft.makeNew()

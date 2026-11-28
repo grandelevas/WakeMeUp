@@ -618,8 +618,16 @@ struct AlarmRow: View {
                 Button {
                     showingVideo = true
                 } label: {
-                    Image(systemName: "video.circle")
-                        .font(.title2)
+                    if let image = VideoPoster.image(id: videoID) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 54, height: 54)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    } else {
+                        Image(systemName: "video.circle")
+                            .font(.title2)
+                    }
                 }
                 .buttonStyle(.borderless)
                 .accessibilityLabel("video.play")

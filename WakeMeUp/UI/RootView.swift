@@ -67,6 +67,7 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active, !model.suppressPermissionBanner, !model.videoCaptureActive else { return }
             model.reconcileRingingWithSystem()
+            model.presentRecentVideoIfNeeded()
             Task { await model.refreshRemote() }
         }
         .task { await model.start() }

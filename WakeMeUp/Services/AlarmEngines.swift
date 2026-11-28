@@ -164,9 +164,10 @@ final class AlarmKitEngine {
     ) -> AlarmManager.AlarmConfiguration<WakeMeUpAlarmMetadata> {
         let title = alarm.label.isEmpty ? String(localized: "alarm.defaultLabel") : alarm.label
         let localizedTitle = LocalizedStringResource(stringLiteral: title)
-        let wantsSong = alarm.songLink != nil
+        let wantsVideo = alarm.videoFileID != nil
+        let wantsSong = alarm.songLink != nil && !wantsVideo
         let secondaryBehavior: AlarmPresentation.Alert.SecondaryButtonBehavior? = {
-            if wantsSong { return .custom }
+            if wantsVideo || wantsSong { return .custom }
             if alarm.snoozeEnabled { return .countdown }
             return nil
         }()
@@ -175,9 +176,9 @@ final class AlarmKitEngine {
             switch secondaryBehavior {
             case .custom:
                 return AlarmButton(
-                    text: LocalizedStringResource(stringLiteral: String(localized: "song.play")),
+                    text: LocalizedStringResource(stringLiteral: String(localized: wantsVideo ? "video.watch" : "song.play")),
                     textColor: .white,
-                    systemImageName: "music.note"
+                    systemImageName: wantsVideo ? "video" : "music.note"
                 )
             case .countdown:
                 return AlarmButton(
@@ -218,6 +219,9 @@ final class AlarmKitEngine {
             tintColor: AppearanceSettings.storedAccent.color
         )
         let intent: (any LiveActivityIntent)? = {
+            if alarm.videoFileID != nil {
+                return OpenAlarmVideoIntent(alarmID: alarm.id)
+            }
             guard let link = alarm.songLink else { return nil }
             return PlaySongIntent(alarmID: alarm.id.uuidString, songURL: link.url.absoluteString)
         }()

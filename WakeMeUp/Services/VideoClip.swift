@@ -18,6 +18,11 @@ enum VideoFiles {
         return folder
     }
 
+    static func inbox() -> URL {
+        let folder = (try? directory()) ?? FileManager.default.temporaryDirectory
+        return folder.appendingPathComponent("Inbox", isDirectory: true)
+    }
+
     static func url(id: String) -> URL? {
         guard VideoMessagePolicy.isVideoID(id), let directory = try? directory() else { return nil }
         let url = directory.appendingPathComponent("\(id).\(VideoMessagePolicy.fileExtension)")
@@ -28,6 +33,7 @@ enum VideoFiles {
         guard VideoMessagePolicy.isVideoID(id) else { throw VideoInstallError.unreadable }
         let destination = try directory().appendingPathComponent("\(id).\(VideoMessagePolicy.fileExtension)")
         try await VideoCompressor.export(source: source, to: destination)
+        VideoPoster.write(from: destination, id: id)
         guard VideoMessagePolicy.fits(byteCount: VideoFileCheck.byteCount(at: destination)) else {
             try? FileManager.default.removeItem(at: destination)
             throw VideoInstallError.tooLarge
@@ -136,14 +142,16 @@ private final class CameraPickerDelegate: NSObject, UIImagePickerControllerDeleg
         _ picker: UIImagePickerController,
         didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
     ) {
-        let url = info[.mediaURL] as? URL
+        let stable = (info[.mediaURL] as? URL).flatMap { source in
+            try? PickedVideoFile.durableCopy(of: source, inbox: VideoFiles.inbox())
+        }
         picker.dismiss(animated: true) {
             let pick = self.onPick
             let cancel = self.onCancel
             Task { @MainActor in
                 CameraVideoCapture.release(picker)
-                if let url {
-                    pick(url)
+                if let stable {
+                    pick(stable)
                 } else {
                     cancel()
                 }

@@ -246,6 +246,9 @@
 "video.record" = "Nagraj wideo";
 "video.delete" = "Usuń wideo";
 "video.play" = "Odtwórz wiadomość wideo";
+"video.watch" = "Obejrzyj wideo";
+"video.replay" = "Odtwórz ponownie";
+"video.recordAgain" = "Nagraj ponownie";
 "video.help" = "Do 30 sekund. Odtworzy się, gdy ten alarm zadzwoni, i możesz ją wysłać do kontaktu.";
 "video.camera.unavailable" = "Ten iPhone nie ma teraz aparatu do wiadomości wideo.";
 "video.unreadable" = "Nie udało się zapisać wideo.";

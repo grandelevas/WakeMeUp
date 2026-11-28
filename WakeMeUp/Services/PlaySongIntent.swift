@@ -31,6 +31,14 @@ enum LaunchHandoff {
         }
         return (id, url)
     }
+
+    static func isAlarmVideo(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == "wakemeup" && url.host?.lowercased() == "video"
+    }
+
+    static func videoURL(alarmID: UUID) -> URL {
+        URL(string: "wakemeup://video/\(alarmID.uuidString)")!
+    }
 }
 
 struct PlaySongIntent: LiveActivityIntent {
@@ -64,6 +72,36 @@ struct PlaySongIntent: LiveActivityIntent {
             if let id = UUID(uuidString: alarmID) {
                 try? AlarmManager.shared.stop(id: id)
             }
+        }
+        return .result(opensIntent: OpenURLIntent(destination))
+    }
+}
+
+struct OpenAlarmVideoIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "Watch video"
+    static var description = IntentDescription("Opens Wakito and plays the alarm's video message.")
+    static var openAppWhenRun: Bool = true
+
+    @Parameter(title: "Alarm ID")
+    var alarmID: String
+
+    init() { alarmID = "" }
+
+    init(alarmID: UUID) {
+        self.alarmID = alarmID.uuidString
+    }
+
+    func perform() async throws -> some IntentResult & OpensIntent {
+        guard let id = UUID(uuidString: alarmID) else {
+            return .result(opensIntent: OpenURLIntent(URL(string: "wakemeup://")!))
+        }
+        let destination = LaunchHandoff.videoURL(alarmID: id)
+        LaunchHandoff.write(alarmID: alarmID, songURL: destination)
+        if !Bundle.main.bundlePath.hasSuffix(".appex") {
+            await MainActor.run {
+                UIApplication.shared.open(destination)
+            }
+            try? AlarmManager.shared.stop(id: id)
         }
         return .result(opensIntent: OpenURLIntent(destination))
     }

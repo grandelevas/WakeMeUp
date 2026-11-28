@@ -246,6 +246,9 @@
 "video.record" = "Record video";
 "video.delete" = "Delete video";
 "video.play" = "Play video message";
+"video.watch" = "Watch video";
+"video.replay" = "Replay";
+"video.recordAgain" = "Record again";
 "video.help" = "Up to 30 seconds. It plays when this alarm rings, and you can send it to a contact.";
 "video.camera.unavailable" = "This iPhone has no camera available for a video message.";
 "video.unreadable" = "Could not save the video.";
