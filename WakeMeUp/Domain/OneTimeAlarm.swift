@@ -28,7 +28,7 @@ enum OneTimeAlarmExpiry {
         }
     }
 
-    /// Non-repeating alarms leave after they ring, or after their one-time date has passed.
+    /// The one-time occurrence has rung or its moment has passed. The alarm stays; it is switched off.
     static func shouldRemove(
         schedule: AlarmSchedule,
         firesOnceAt: Date?,
@@ -68,26 +68,58 @@ enum OneTimeAlarmExpiry {
         }
     }
 
+    /// Switch a finished one-time alarm off. An alarm that is still alerting or snoozed stays on.
+    /// `rungIDs` are stops, so they are switched off even if AlarmKit has not caught up.
     static func partition(
         alarms: [Alarm],
         sent: [SentAlarm],
         now: Date,
         calendar: Calendar,
-        rungIDs: Set<UUID>
+        rungIDs: Set<UUID>,
+        keepAwake: Set<UUID> = []
     ) -> (alarms: [Alarm], sent: [SentAlarm]) {
-        let keptAlarms = alarms.compactMap { alarm -> Alarm? in
+        let awake = keepAwake.subtracting(rungIDs)
+        let keptAlarms = alarms.map { alarm -> Alarm in
             let stamped = stamped(alarm, now: now, calendar: calendar)
-            if shouldRemove(
+            let finished = shouldRemove(
                 schedule: stamped.schedule,
                 firesOnceAt: stamped.firesOnceAt,
                 now: now,
                 hasRung: rungIDs.contains(stamped.id)
-            ) {
-                return nil
-            }
-            return stamped
+            )
+            guard finished, !awake.contains(stamped.id) else { return stamped }
+            var copy = stamped
+            copy.isEnabled = false
+            return copy
         }
-        let keptSent = sent.filter { !shouldRemoveSent($0, now: now, calendar: calendar) }
+        let keptSent = sent.map { item -> SentAlarm in
+            guard shouldRemoveSent(item, now: now, calendar: calendar) else { return item }
+            var copy = item
+            copy.alarm.isEnabled = false
+            return copy
+        }
         return (keptAlarms, keptSent)
+    }
+
+    /// Turning a finished one-time alarm back on aims it at the next time that clock time occurs.
+    static func armed(_ alarm: Alarm, now: Date, calendar: Calendar) -> Alarm {
+        guard !isRepeating(alarm.schedule) else { return alarm }
+        var copy = alarm
+        copy.isEnabled = true
+        switch copy.schedule {
+        case let .oneShot(fireAt):
+            guard fireAt <= now else { return copy }
+            let hour = calendar.component(.hour, from: fireAt)
+            let minute = calendar.component(.minute, from: fireAt)
+            let wall = AlarmSchedule.wallClock(hour: hour, minute: minute, repeatDays: [])
+            if let next = wall.nextFireDate(from: now, calendar: calendar) {
+                copy.schedule = .oneShot(fireAt: next)
+            }
+        case .wallClock:
+            if copy.firesOnceAt == nil || copy.firesOnceAt! <= now {
+                copy.firesOnceAt = copy.schedule.nextFireDate(from: now, calendar: calendar)
+            }
+        }
+        return copy
     }
 }
