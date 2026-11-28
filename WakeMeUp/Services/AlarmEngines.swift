@@ -147,15 +147,31 @@ final class AlarmKitEngine {
         return Set(alarms.compactMap { $0.state == .alerting ? $0.id : nil })
     }
 
-    /// AlarmKit publishes on an arbitrary executor. The caller applies the set on the main actor.
-    func observe(_ onUpdate: @escaping @MainActor (Set<UUID>) -> Void) async {
+    /// Countdown or paused means the alarm was snoozed, not stopped.
+    func countingDownIDs() -> Set<UUID>? {
+        guard let alarms = try? manager.alarms else { return nil }
+        return Self.countingDownIDs(in: alarms)
+    }
+
+    /// AlarmKit publishes on an arbitrary executor. The caller applies the sets on the main actor.
+    func observe(_ onUpdate: @escaping @MainActor (_ alerting: Set<UUID>, _ countingDown: Set<UUID>) -> Void) async {
         let updates = manager.alarmUpdates
         for await alarms in updates {
             let alerting = Set(alarms.compactMap { $0.state == .alerting ? $0.id : nil })
+            let countingDown = Self.countingDownIDs(in: alarms)
             await MainActor.run {
-                onUpdate(alerting)
+                onUpdate(alerting, countingDown)
             }
         }
+    }
+
+    private static func countingDownIDs(in alarms: some Sequence<SystemAlarm>) -> Set<UUID> {
+        Set(alarms.compactMap { alarm in
+            switch alarm.state {
+            case .countdown, .paused: alarm.id
+            default: nil
+            }
+        })
     }
 
     private func makeConfiguration(
@@ -164,10 +180,9 @@ final class AlarmKitEngine {
     ) -> AlarmManager.AlarmConfiguration<WakeMeUpAlarmMetadata> {
         let title = alarm.label.isEmpty ? String(localized: "alarm.defaultLabel") : alarm.label
         let localizedTitle = LocalizedStringResource(stringLiteral: title)
-        let wantsVideo = alarm.videoFileID != nil
-        let wantsSong = alarm.songLink != nil && !wantsVideo
+        let wantsSong = alarm.songLink != nil
         let secondaryBehavior: AlarmPresentation.Alert.SecondaryButtonBehavior? = {
-            if wantsVideo || wantsSong { return .custom }
+            if wantsSong { return .custom }
             if alarm.snoozeEnabled { return .countdown }
             return nil
         }()
@@ -176,9 +191,9 @@ final class AlarmKitEngine {
             switch secondaryBehavior {
             case .custom:
                 return AlarmButton(
-                    text: LocalizedStringResource(stringLiteral: String(localized: wantsVideo ? "video.watch" : "song.play")),
+                    text: LocalizedStringResource(stringLiteral: String(localized: "song.play")),
                     textColor: .white,
-                    systemImageName: wantsVideo ? "video" : "music.note"
+                    systemImageName: "music.note"
                 )
             case .countdown:
                 return AlarmButton(
@@ -219,9 +234,6 @@ final class AlarmKitEngine {
             tintColor: AppearanceSettings.storedAccent.color
         )
         let intent: (any LiveActivityIntent)? = {
-            if alarm.videoFileID != nil {
-                return OpenAlarmVideoIntent(alarmID: alarm.id)
-            }
             guard let link = alarm.songLink else { return nil }
             return PlaySongIntent(alarmID: alarm.id.uuidString, songURL: link.url.absoluteString)
         }()
@@ -482,9 +494,13 @@ final class AlarmCoordinator {
         alarmKit.alertingIDs()
     }
 
-    func observeAlerting(_ onChange: @escaping @MainActor (Set<UUID>) -> Void) async {
-        await alarmKit.observe { ids in
-            onChange(ids)
+    func countingDownIDs() -> Set<UUID>? {
+        alarmKit.countingDownIDs()
+    }
+
+    func observeAlerting(_ onChange: @escaping @MainActor (Set<UUID>, Set<UUID>) -> Void) async {
+        await alarmKit.observe { alerting, countingDown in
+            onChange(alerting, countingDown)
         }
     }
 }

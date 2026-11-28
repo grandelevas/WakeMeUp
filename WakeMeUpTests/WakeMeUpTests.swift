@@ -2834,17 +2834,101 @@ final class PickedVideoFileTests: XCTestCase {
         try FileManager.default.removeItem(at: root)
     }
 
-    func testRecentVideoIsRememberedOnlyForAShortWhile() {
-        let defaults = UserDefaults(suiteName: "video-\(UUID().uuidString)")!
+    func testStoppingAVideoAlarmIsAnnouncedOnceAndASnoozeIsNot() {
         let id = UUID()
         let now = Date(timeIntervalSince1970: 1_700_000_000)
-        XCTAssertNil(RecentAlarmVideo.pending(now: now, defaults: defaults))
-        RecentAlarmVideo.remember(id, now: now, defaults: defaults)
-        XCTAssertEqual(RecentAlarmVideo.pending(now: now.addingTimeInterval(60), defaults: defaults), id)
-        XCTAssertNil(RecentAlarmVideo.pending(now: now.addingTimeInterval(181), defaults: defaults))
-        RecentAlarmVideo.remember(id, now: now, defaults: defaults)
-        RecentAlarmVideo.clear(defaults: defaults)
-        XCTAssertNil(RecentAlarmVideo.pending(now: now, defaults: defaults))
+        let due = VideoNoticeArm(alarmID: id, videoFileID: "video-clip", label: "Morning", fireAt: now.addingTimeInterval(-60))
+        let held = VideoMessageNotice.noticesDue(arms: [due], alerting: [id], countingDown: [], now: now)
+        XCTAssertTrue(held.post.isEmpty)
+        XCTAssertEqual(held.keep, [due])
+        let snoozed = VideoMessageNotice.noticesDue(arms: [due], alerting: [], countingDown: [id], now: now)
+        XCTAssertTrue(snoozed.post.isEmpty)
+        XCTAssertEqual(snoozed.keep, [due])
+        let stopped = VideoMessageNotice.noticesDue(arms: [due], alerting: [], countingDown: [], now: now)
+        XCTAssertEqual(stopped.post, [due])
+        XCTAssertTrue(stopped.keep.isEmpty)
+        let stale = VideoMessageNotice.noticesDue(
+            arms: [due],
+            alerting: [],
+            countingDown: [],
+            now: now.addingTimeInterval(VideoMessageNotice.staleAfter + 1)
+        )
+        XCTAssertTrue(stale.post.isEmpty)
+        XCTAssertTrue(stale.keep.isEmpty)
+        let tomorrow = VideoNoticeArm(alarmID: id, videoFileID: "video-clip", label: "Morning", fireAt: now.addingTimeInterval(86_400))
+        let waiting = VideoMessageNotice.noticesDue(arms: [tomorrow], alerting: [], countingDown: [], now: now)
+        XCTAssertTrue(waiting.post.isEmpty)
+        XCTAssertEqual(waiting.keep, [tomorrow])
+    }
+
+    func testAPassedVideoFireStaysArmedUntilItIsAnnounced() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 11, day: 28, hour: 8, minute: 0))!
+        let id = UUID()
+        let passed = VideoNoticeArm(
+            alarmID: id,
+            videoFileID: "video-clip",
+            label: "Morning",
+            fireAt: now.addingTimeInterval(-120)
+        )
+        let alarm = Alarm(
+            id: id,
+            schedule: .wallClock(hour: 7, minute: 58, repeatDays: [.saturday]),
+            label: "Morning",
+            soundID: "classic",
+            snoozeEnabled: true,
+            snoozeMinutes: 9,
+            isEnabled: true,
+            groupID: nil,
+            songLink: nil,
+            videoFileID: "video-clip",
+            origin: .local,
+            resumeWhenGroupEnables: nil
+        )
+        let next = VideoMessageNotice.arms(for: [alarm], now: now, calendar: calendar)
+        XCTAssertEqual(next.count, 1)
+        XCTAssertGreaterThan(next[0].fireAt, now)
+        let merged = VideoMessageNotice.merge(existing: [passed], scheduled: next, now: now)
+        XCTAssertEqual(merged, [passed])
+        let ringing = VideoMessageNotice.noteRinging(
+            arms: merged,
+            alarmID: id,
+            videoFileID: "video-clip",
+            label: "Morning",
+            now: now
+        )
+        XCTAssertEqual(ringing, [passed])
+        let added = VideoMessageNotice.noteRinging(
+            arms: [],
+            alarmID: id,
+            videoFileID: "video-clip",
+            label: "Morning",
+            now: now
+        )
+        XCTAssertEqual(added.first?.fireAt, now)
+        let later = VideoNoticeArm(alarmID: id, videoFileID: "video-clip", label: "Morning", fireAt: now.addingTimeInterval(3_600))
+        let pinned = VideoMessageNotice.noteRinging(
+            arms: [later],
+            alarmID: id,
+            videoFileID: "video-clip",
+            label: "Morning",
+            now: now
+        )
+        XCTAssertEqual(pinned.first?.fireAt, now)
+        var disabled = alarm
+        disabled.isEnabled = false
+        disabled.videoFileID = "voice-nope"
+        XCTAssertTrue(VideoMessageNotice.arms(for: [disabled], now: now, calendar: calendar).isEmpty)
+        XCTAssertFalse(VideoMessageNotice.shouldPost(videoFileID: nil))
+        XCTAssertFalse(VideoMessageNotice.shouldPost(videoFileID: "voice-nope"))
+        XCTAssertTrue(VideoMessageNotice.shouldPost(videoFileID: "video-clip"))
+        let defaults = UserDefaults(suiteName: "video-notice-\(UUID().uuidString)")!
+        VideoMessageNotice.save([passed], defaults: defaults)
+        XCTAssertEqual(VideoMessageNotice.load(defaults: defaults), [passed])
+        VideoMessageNotice.save([], defaults: defaults)
+        XCTAssertTrue(VideoMessageNotice.load(defaults: defaults).isEmpty)
+        XCTAssertEqual(VideoMessageNotice.identifier(alarmID: id), "video-message-\(id.uuidString)")
     }
 }
 

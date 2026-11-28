@@ -249,7 +249,10 @@
 "video.watch" = "Obejrzyj wideo";
 "video.replay" = "Odtwórz ponownie";
 "video.recordAgain" = "Nagraj ponownie";
-"video.help" = "Do 30 sekund. Odtworzy się, gdy ten alarm zadzwoni, i możesz ją wysłać do kontaktu.";
+"video.help" = "Do 30 sekund. Gdy zatrzymasz alarm, powiadomienie otworzy wideo. Możesz też odtworzyć je tutaj i wysłać do kontaktu.";
+"video.notice.title" = "Wiadomość wideo";
+"video.notice.body" = "Jest nagrana wiadomość wideo do alarmu %@.";
+"video.missing" = "Tej wiadomości wideo nie ma już na tym iPhonie.";
 "video.camera.unavailable" = "Ten iPhone nie ma teraz aparatu do wiadomości wideo.";
 "video.unreadable" = "Nie udało się zapisać wideo.";
 "video.skipped" = "Alarm został wysłany bez wiadomości wideo.";

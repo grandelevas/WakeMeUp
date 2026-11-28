@@ -66,29 +66,123 @@ enum PickedVideoFile {
     }
 }
 
-enum RecentAlarmVideo {
-    static let idKey = "wakito.recentVideoAlarm"
-    static let atKey = "wakito.recentVideoAt"
-    static let window: TimeInterval = 180
+struct VideoNoticeArm: Equatable, Codable {
+    var alarmID: UUID
+    var videoFileID: String
+    var label: String
+    var fireAt: Date
+}
 
-    static func remember(_ id: UUID, now: Date, defaults: UserDefaults) {
-        defaults.set(id.uuidString, forKey: idKey)
-        defaults.set(now.timeIntervalSince1970, forKey: atKey)
+enum VideoMessageNotice {
+    static let userInfoKey = "videoMessage"
+    static let fileInfoKey = "videoFileID"
+    static let storageKey = "wakito.videoNoticeArms"
+    /// A stop that happened while the app was not running is still announced for a few hours.
+    static let staleAfter: TimeInterval = 6 * 60 * 60
+
+    static func shouldPost(videoFileID: String?) -> Bool {
+        VideoMessagePolicy.isVideoID(videoFileID)
     }
 
-    static func pending(now: Date, defaults: UserDefaults) -> UUID? {
-        guard let text = defaults.string(forKey: idKey), let id = UUID(uuidString: text) else { return nil }
-        let at = Date(timeIntervalSince1970: defaults.double(forKey: atKey))
-        guard now.timeIntervalSince(at) <= window else {
-            clear(defaults: defaults)
-            return nil
+    static func identifier(alarmID: UUID) -> String {
+        "video-message-\(alarmID.uuidString)"
+    }
+
+    static func load(defaults: UserDefaults) -> [VideoNoticeArm] {
+        guard let data = defaults.data(forKey: storageKey),
+              let arms = try? JSONDecoder().decode([VideoNoticeArm].self, from: data) else {
+            return []
         }
-        return id
+        return arms
     }
 
-    static func clear(defaults: UserDefaults) {
-        defaults.removeObject(forKey: idKey)
-        defaults.removeObject(forKey: atKey)
+    static func save(_ arms: [VideoNoticeArm], defaults: UserDefaults) {
+        guard !arms.isEmpty, let data = try? JSONEncoder().encode(arms) else {
+            defaults.removeObject(forKey: storageKey)
+            return
+        }
+        defaults.set(data, forKey: storageKey)
+    }
+
+    /// Future fires only. A fire that already passed stays in storage until it is announced or goes stale.
+    static func arms(for alarms: [Alarm], now: Date, calendar: Calendar) -> [VideoNoticeArm] {
+        alarms.compactMap { alarm in
+            guard alarm.isEnabled,
+                  let file = alarm.videoFileID,
+                  shouldPost(videoFileID: file),
+                  let fireAt = upcomingFire(of: alarm, now: now, calendar: calendar) else { return nil }
+            return VideoNoticeArm(alarmID: alarm.id, videoFileID: file, label: alarm.label, fireAt: fireAt)
+        }
+    }
+
+    static func merge(existing: [VideoNoticeArm], scheduled: [VideoNoticeArm], now: Date) -> [VideoNoticeArm] {
+        var merged: [VideoNoticeArm] = []
+        var consumed = Set<UUID>()
+        for arm in scheduled {
+            if let previous = existing.first(where: { $0.alarmID == arm.alarmID }),
+               owesNotice(previous, now: now),
+               previous.fireAt != arm.fireAt {
+                merged.append(previous)
+            } else {
+                merged.append(arm)
+            }
+            consumed.insert(arm.alarmID)
+        }
+        for arm in existing where !consumed.contains(arm.alarmID) && owesNotice(arm, now: now) {
+            merged.append(arm)
+        }
+        return merged
+    }
+
+    /// Remember a video alarm that is ringing now, so a later stop can still find the clip.
+    static func noteRinging(
+        arms: [VideoNoticeArm],
+        alarmID: UUID,
+        videoFileID: String,
+        label: String,
+        now: Date
+    ) -> [VideoNoticeArm] {
+        guard shouldPost(videoFileID: videoFileID) else { return arms }
+        var arms = arms
+        if let index = arms.firstIndex(where: { $0.alarmID == alarmID }) {
+            arms[index].videoFileID = videoFileID
+            arms[index].label = label
+            if arms[index].fireAt > now {
+                arms[index].fireAt = now
+            }
+        } else {
+            arms.append(VideoNoticeArm(alarmID: alarmID, videoFileID: videoFileID, label: label, fireAt: now))
+        }
+        return arms
+    }
+
+    /// A due alarm that is no longer alerting and not snoozed gets one notification.
+    static func noticesDue(
+        arms: [VideoNoticeArm],
+        alerting: Set<UUID>,
+        countingDown: Set<UUID>,
+        now: Date
+    ) -> (post: [VideoNoticeArm], keep: [VideoNoticeArm]) {
+        var post: [VideoNoticeArm] = []
+        var keep: [VideoNoticeArm] = []
+        for arm in arms {
+            if alerting.contains(arm.alarmID) || countingDown.contains(arm.alarmID) || arm.fireAt > now {
+                keep.append(arm)
+            } else if owesNotice(arm, now: now) {
+                post.append(arm)
+            }
+        }
+        return (post, keep)
+    }
+
+    private static func owesNotice(_ arm: VideoNoticeArm, now: Date) -> Bool {
+        arm.fireAt <= now && now.timeIntervalSince(arm.fireAt) <= staleAfter
+    }
+
+    private static func upcomingFire(of alarm: Alarm, now: Date, calendar: Calendar) -> Date? {
+        if let once = alarm.firesOnceAt, once > now { return once }
+        if case let .oneShot(date) = alarm.schedule, date > now { return date }
+        return alarm.schedule.nextFireDate(from: now, calendar: calendar)
     }
 }
 

@@ -249,7 +249,10 @@
 "video.watch" = "Watch video";
 "video.replay" = "Replay";
 "video.recordAgain" = "Record again";
-"video.help" = "Up to 30 seconds. It plays when this alarm rings, and you can send it to a contact.";
+"video.help" = "Up to 30 seconds. When you stop the alarm, a notification opens the video. You can also play it here and send it to a contact.";
+"video.notice.title" = "Video message";
+"video.notice.body" = "There is a recorded video message for %@.";
+"video.missing" = "The video message is no longer on this iPhone.";
 "video.camera.unavailable" = "This iPhone has no camera available for a video message.";
 "video.unreadable" = "Could not save the video.";
 "video.skipped" = "The alarm was sent without the video message.";

@@ -23,6 +23,21 @@ struct RootView: View {
         .fullScreenCover(item: ringingAlarm) { alarm in
             RingingView(alarm: alarm)
         }
+        .fullScreenCover(isPresented: videoMessagePresented) {
+            if let url = model.videoMessageURL {
+                NavigationStack {
+                    VideoMessagePlayer(url: url)
+                        .ignoresSafeArea()
+                        .navigationTitle("video.notice.title")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("alarms.done") { model.playingVideoFileID = nil }
+                            }
+                        }
+                }
+            }
+        }
         .sheet(isPresented: sharePresented) {
             ActivityShareSheet(items: shareItems)
         }
@@ -67,7 +82,6 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active, !model.suppressPermissionBanner, !model.videoCaptureActive else { return }
             model.reconcileRingingWithSystem()
-            model.presentRecentVideoIfNeeded()
             Task { await model.refreshRemote() }
         }
         .task { await model.start() }
@@ -114,6 +128,13 @@ struct RootView: View {
                     capturingVideo: model.videoCaptureActive
                 )
             }
+        )
+    }
+
+    private var videoMessagePresented: Binding<Bool> {
+        Binding(
+            get: { model.videoMessageURL != nil },
+            set: { if !$0 { model.playingVideoFileID = nil } }
         )
     }
 
