@@ -2038,7 +2038,7 @@ final class ListHygieneTests: XCTestCase {
         XCTAssertEqual(SelfAlarmCleanup.removingSelfAuthored(from: [echo, kept], profileID: me).map(\.id), [kept.id])
     }
 
-    func testOneTimeAlarmsLeaveAfterTheyRingOrTheirTimePasses() {
+    func testOneTimeAlarmsStaySwitchedOffAfterTheyRingOrTheirTimePasses() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let past = Alarm(
             id: UUID(),
@@ -2100,15 +2100,49 @@ final class ListHygieneTests: XCTestCase {
             sentAt: now.addingTimeInterval(-60),
             commandID: UUID()
         )
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let result = OneTimeAlarmExpiry.partition(
             alarms: [past, soon, daily, once],
             sent: [sent],
             now: now,
-            calendar: Calendar(identifier: .gregorian),
+            calendar: calendar,
             rungIDs: []
         )
-        XCTAssertEqual(Set(result.alarms.map(\.label)), Set(["Soon", "Daily"]))
-        XCTAssertTrue(result.sent.isEmpty)
+        XCTAssertEqual(Set(result.alarms.map(\.label)), Set(["Past", "Soon", "Daily", "Once"]))
+        XCTAssertEqual(result.alarms.first { $0.label == "Past" }?.isEnabled, false)
+        XCTAssertEqual(result.alarms.first { $0.label == "Once" }?.isEnabled, false)
+        XCTAssertEqual(result.alarms.first { $0.label == "Soon" }?.isEnabled, true)
+        XCTAssertEqual(result.alarms.first { $0.label == "Daily" }?.isEnabled, true)
+        XCTAssertEqual(result.sent.map(\.alarm.label), ["Past"])
+        XCTAssertEqual(result.sent.first?.alarm.isEnabled, false)
+        let ringing = OneTimeAlarmExpiry.partition(
+            alarms: [once],
+            sent: [],
+            now: now,
+            calendar: calendar,
+            rungIDs: [],
+            keepAwake: [once.id]
+        )
+        XCTAssertEqual(ringing.alarms.first?.isEnabled, true)
+        let stopped = OneTimeAlarmExpiry.partition(
+            alarms: [soon],
+            sent: [],
+            now: now,
+            calendar: calendar,
+            rungIDs: [soon.id],
+            keepAwake: [soon.id]
+        )
+        XCTAssertEqual(stopped.alarms.count, 1)
+        XCTAssertEqual(stopped.alarms.first?.isEnabled, false)
+        let again = OneTimeAlarmExpiry.armed(once, now: now, calendar: calendar)
+        XCTAssertEqual(again.isEnabled, true)
+        XCTAssertGreaterThan(again.firesOnceAt ?? .distantPast, now)
+        let later = OneTimeAlarmExpiry.armed(past, now: now, calendar: calendar)
+        guard case let .oneShot(fireAt) = later.schedule else {
+            return XCTFail("A passed one-time alarm is aimed at the next clock time")
+        }
+        XCTAssertGreaterThan(fireAt, now)
         XCTAssertTrue(OneTimeAlarmExpiry.shouldRemove(
             schedule: soon.schedule,
             firesOnceAt: nil,

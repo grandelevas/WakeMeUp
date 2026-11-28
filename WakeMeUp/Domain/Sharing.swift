@@ -736,6 +736,9 @@ enum RemoteCommandApplier {
             guard let existing = library.alarm(alarmID) else { throw ApplyError.missingAlarm }
             guard existing.origin.isOwned(by: command.senderID) else { throw ApplyError.notOwnedBySender }
             library.setEnabled(enabled, alarmID: alarmID)
+            if enabled, let current = library.alarm(alarmID) {
+                library.upsert(OneTimeAlarmExpiry.armed(current, now: .now, calendar: .current))
+            }
         }
     }
 }

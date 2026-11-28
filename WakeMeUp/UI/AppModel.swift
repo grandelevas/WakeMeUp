@@ -475,7 +475,13 @@ final class AppModel {
 
     func toggle(alarmID: UUID) {
         guard let alarm = snapshot.library.alarm(alarmID) else { return }
-        update { $0.library.setEnabled(!alarm.isEnabled, alarmID: alarmID) }
+        let turningOn = !alarm.isEnabled
+        update {
+            $0.library.setEnabled(turningOn, alarmID: alarmID)
+            if turningOn, let current = $0.library.alarm(alarmID) {
+                $0.library.upsert(OneTimeAlarmExpiry.armed(current, now: .now, calendar: .current))
+            }
+        }
         Task { await reschedule(requestAccess: true) }
     }
 
@@ -1185,6 +1191,7 @@ final class AppModel {
         noteRemoteAlarmDismissed(id)
         await coordinator.stop(id: id)
         notifyStoppedAlarm(id)
+        retireOneTimeAlarms(rungIDs: [id])
         ringingAlarmID = nil
     }
 
@@ -1203,6 +1210,7 @@ final class AppModel {
         noteRemoteAlarmDismissed(alarm.id)
         await coordinator.stop(id: alarm.id)
         notifyStoppedAlarm(alarm.id)
+        retireOneTimeAlarms(rungIDs: [alarm.id])
         ringingAlarmID = nil
         await UIApplication.shared.open(link.url)
     }
@@ -1260,6 +1268,7 @@ final class AppModel {
                 noteRemoteAlarmDismissed(alarmID)
                 await coordinator.stop(id: alarmID)
                 notifyStoppedAlarm(alarmID)
+                retireOneTimeAlarms(rungIDs: [alarmID])
             }
         default:
             if let alarmID { presentResolved(alarmID) }
@@ -1419,12 +1428,17 @@ final class AppModel {
     }
 
     private func retireOneTimeAlarms(rungIDs: Set<UUID> = []) {
+        let alerting = coordinator.alertingIDs()
+        let counting = coordinator.countingDownIDs()
+        if alerting == nil, rungIDs.isEmpty { return }
+        let keepAwake = (alerting ?? []).union(counting ?? [])
         let result = OneTimeAlarmExpiry.partition(
             alarms: snapshot.library.alarms,
             sent: snapshot.sentAlarms,
             now: .now,
             calendar: .current,
-            rungIDs: rungIDs
+            rungIDs: rungIDs,
+            keepAwake: keepAwake
         )
         let changed = result.alarms != snapshot.library.alarms || result.sent != snapshot.sentAlarms
         guard changed else { return }
@@ -1468,7 +1482,6 @@ final class AppModel {
         deliverDueVideoNotices(alerting: ids, countingDown: countingDown)
         guard started, let id = ringingAlarmID else { return }
         noteRemoteAlarmFired(id)
-        retireOneTimeAlarms(rungIDs: [id])
         retireCalendarAlarms(rungIDs: [id])
     }
 

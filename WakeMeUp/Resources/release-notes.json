@@ -5,6 +5,18 @@
       "date": "2026-11-28",
       "changes": {
         "en": [
+          "A one-time alarm stays in the list after it rings, switched off. Turn it on again to schedule the next time. Alarms you sent stay in the sent list too."
+        ],
+        "pl": [
+          "Alarm jednorazowy zostaje na liście po dzwonku, wyłączony. Włącz go ponownie, aby ustawić następny raz. Wysłane alarmy też zostają na liście wysłanych."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-28",
+      "changes": {
+        "en": [
           "Settings has a default alarm sound, next to the nap sound. New alarms start with it. Alarms you already have keep their sound, and a nap still uses its own."
         ],
         "pl": [
