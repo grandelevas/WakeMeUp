@@ -21,6 +21,8 @@
 "nap.customMinutes" = "Własna, %lld min";
 "nap.cancel" = "Anuluj";
 "nap.sound" = "Dzwonek drzemki";
+"settings.defaultSound" = "Domyślny dźwięk alarmu";
+"settings.defaultSound.help" = "Nowe alarmy zaczynają się od tego dźwięku. Dotychczasowe alarmy zostają bez zmian. Drzemka ma własny dzwonek.";
 "nap.length.help" = "Jedno stuknięcie na karcie Drzemka ustawia budzik za tyle czasu. Domyślnie 15 minut.";
 "nap.needsPermission" = "Wakito potrzebuje zgody na alarmy, żeby drzemka mogła zadzwonić.";
 "nap.running" = "Zadzwoni o %@";

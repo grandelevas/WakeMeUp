@@ -29,7 +29,8 @@ struct CalendarView: View {
                         draft = CalendarAlarmDraft(
                             day: selectedDay,
                             calendar: calendar,
-                            snoozeMinutes: model.defaultSnoozeMinutes
+                            snoozeMinutes: model.defaultSnoozeMinutes,
+                            soundID: model.defaultAlarmSoundID
                         )
                     } label: {
                         Image(systemName: "plus")
@@ -133,7 +134,8 @@ struct CalendarView: View {
                     draft = CalendarAlarmDraft(
                         day: selectedDay,
                         calendar: calendar,
-                        snoozeMinutes: model.defaultSnoozeMinutes
+                        snoozeMinutes: model.defaultSnoozeMinutes,
+                        soundID: model.defaultAlarmSoundID
                     )
                 }
                 .buttonStyle(.borderedProminent)
@@ -219,7 +221,7 @@ struct CalendarAlarmDraft: Equatable, Identifiable {
     var isEnabled: Bool
     var isNew: Bool
 
-    init(day: Date, calendar: Calendar, snoozeMinutes: Int = 9) {
+    init(day: Date, calendar: Calendar, snoozeMinutes: Int = 9, soundID: String = SoundCatalog.defaultID) {
         id = UUID()
         self.day = calendar.startOfDay(for: day)
         var parts = calendar.dateComponents([.year, .month, .day], from: day)
@@ -229,7 +231,7 @@ struct CalendarAlarmDraft: Equatable, Identifiable {
         repeatRule = .once
         label = ""
         note = ""
-        soundID = SoundCatalog.defaultID
+        self.soundID = soundID
         snoozeEnabled = true
         self.snoozeMinutes = min(30, max(1, snoozeMinutes))
         isEnabled = true

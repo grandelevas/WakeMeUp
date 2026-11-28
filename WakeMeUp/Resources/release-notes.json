@@ -5,6 +5,18 @@
       "date": "2026-11-28",
       "changes": {
         "en": [
+          "Settings has a default alarm sound, next to the nap sound. New alarms start with it. Alarms you already have keep their sound, and a nap still uses its own."
+        ],
+        "pl": [
+          "W ustawieniach jest domyślny dźwięk alarmu, obok dzwonka drzemki. Nowe alarmy zaczynają się od niego. Dotychczasowe alarmy zostają ze swoim dźwiękiem, a drzemka nadal ma własny."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-11-28",
+      "changes": {
+        "en": [
           "Stopping an alarm that has a video message posts a notification. Tap it to play the video. The clip stays on the alarm, with a preview in the editor and the alarm list."
         ],
         "pl": [

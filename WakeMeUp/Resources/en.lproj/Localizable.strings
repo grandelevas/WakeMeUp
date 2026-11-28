@@ -21,6 +21,8 @@
 "nap.customMinutes" = "Custom, %lld min";
 "nap.cancel" = "Cancel";
 "nap.sound" = "Nap sound";
+"settings.defaultSound" = "Default alarm sound";
+"settings.defaultSound.help" = "New alarms start with this sound. Alarms you already have keep theirs. A nap uses its own sound.";
 "nap.length.help" = "One tap on the Nap tab sets an alarm for this long from now. 15 minutes is the default.";
 "nap.needsPermission" = "Wakito needs alarm permission before a nap can ring.";
 "nap.running" = "Rings at %@";

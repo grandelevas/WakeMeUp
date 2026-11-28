@@ -129,6 +129,7 @@ final class AppModel {
     var calendarAlarms: [CalendarAlarm] { snapshot.calendarAlarms }
     var napMinutes: Int = NapSettings.defaultMinutes
     var napSoundID: String = SoundCatalog.defaultID
+    var defaultAlarmSoundID: String = SoundCatalog.defaultID
     var defaultSnoozeMinutes: Int = DefaultSnooze.fallback
     /// Local nap timer. The Nap tab reads this directly. It is not an entry in the alarm list.
     var napSession: NapSession?
@@ -153,6 +154,7 @@ final class AppModel {
         self.store = store
         napMinutes = NapSettings.minutes(in: .standard)
         napSoundID = NapSettings.soundID(in: .standard)
+        defaultAlarmSoundID = DefaultAlarmSound.soundID(in: .standard)
         defaultSnoozeMinutes = DefaultSnooze.minutes(in: .standard)
         napSession = NapSessionStore.load(from: .standard, now: .now)
         let screenshot = screenshot ?? LaunchConfiguration.seedDemo
@@ -178,6 +180,12 @@ final class AppModel {
         }
         if !screenshot {
             restoreOwnName()
+            let customIDs = Set(snapshot.customSounds.map(\.id))
+            let resolved = DefaultAlarmSound.resolved(defaultAlarmSoundID, availableCustomIDs: customIDs)
+            if resolved != defaultAlarmSoundID {
+                defaultAlarmSoundID = resolved
+                DefaultAlarmSound.setSoundID(resolved, in: .standard)
+            }
         }
         AppRuntime.model = self
         Task {
@@ -259,7 +267,7 @@ final class AppModel {
 
     func addAlarm() {
         editorRecipientGrantID = nil
-        editor = .makeNew(snoozeMinutes: defaultSnoozeMinutes)
+        editor = .makeNew(snoozeMinutes: defaultSnoozeMinutes, soundID: defaultAlarmSoundID)
     }
 
     func edit(_ alarm: Alarm) {
@@ -274,7 +282,7 @@ final class AppModel {
 
     func editAlarm(forContactGrant grantID: UUID) {
         editorRecipientGrantID = grantID
-        editor = .makeNew(snoozeMinutes: defaultSnoozeMinutes)
+        editor = .makeNew(snoozeMinutes: defaultSnoozeMinutes, soundID: defaultAlarmSoundID)
     }
 
     func installLocalVoice(_ url: URL) -> String? {
@@ -363,6 +371,12 @@ final class AppModel {
         NapSettings.setSoundID(sound, in: .standard)
     }
 
+    func setDefaultAlarmSoundID(_ id: String) {
+        let resolved = DefaultAlarmSound.resolved(id, availableCustomIDs: Set(snapshot.customSounds.map(\.id)))
+        defaultAlarmSoundID = resolved
+        DefaultAlarmSound.setSoundID(resolved, in: .standard)
+    }
+
     var activeNapFireDate: Date? {
         guard let napSession, napSession.isRunning(at: .now) else { return nil }
         return napSession.fireAt
@@ -429,7 +443,7 @@ final class AppModel {
     }
 
     func addSpokenAlarm(at date: Date) async {
-        let alarm = SpokenAlarm.make(at: date, snoozeMinutes: defaultSnoozeMinutes)
+        let alarm = SpokenAlarm.make(at: date, snoozeMinutes: defaultSnoozeMinutes, soundID: defaultAlarmSoundID)
         update { $0.library.upsert(alarm) }
         await reschedule(requestAccess: true)
     }
@@ -492,6 +506,9 @@ final class AppModel {
             for index in $0.sentAlarms.indices where $0.sentAlarms[index].alarm.soundID == soundID {
                 $0.sentAlarms[index].alarm.soundID = SoundCatalog.defaultID
             }
+        }
+        if defaultAlarmSoundID == soundID {
+            setDefaultAlarmSoundID(SoundCatalog.defaultID)
         }
         if let filename {
             VoiceFiles.remove(relativeFilename: filename)
@@ -638,7 +655,7 @@ final class AppModel {
                     ? .oneShot(fireAt: Date().addingTimeInterval(3))
                     : .wallClock(hour: remoteHour, minute: remoteMinute, repeatDays: []),
                 label: remoteLabel.trimmingCharacters(in: .whitespacesAndNewlines),
-                soundID: SoundCatalog.defaultID,
+                soundID: defaultAlarmSoundID,
                 snoozeEnabled: true,
                 snoozeMinutes: defaultSnoozeMinutes,
                 isEnabled: true,
@@ -1017,7 +1034,7 @@ final class AppModel {
                 ? .oneShot(fireAt: Date().addingTimeInterval(3))
                 : .wallClock(hour: remoteHour, minute: remoteMinute, repeatDays: []),
             label: remoteLabel,
-            soundID: SoundCatalog.defaultID,
+            soundID: defaultAlarmSoundID,
             snoozeEnabled: true,
             snoozeMinutes: defaultSnoozeMinutes,
             isEnabled: true,
